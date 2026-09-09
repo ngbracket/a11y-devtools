@@ -1,5 +1,6 @@
-import type { RunOptions } from 'axe-core';
+import type { ContextObject, RunOptions } from 'axe-core';
 import { resolveOwningComponentName } from './attribution';
+import { OVERLAY_EXCLUDE_SELECTOR } from './overlay';
 
 export type Impact = 'minor' | 'moderate' | 'serious' | 'critical' | null;
 
@@ -41,7 +42,9 @@ async function runAxeOnce(
   options?: RunOptions,
 ): Promise<A11yFinding[]> {
   const axe = (await import('axe-core')).default;
-  const results = await axe.run(root as Element, options ?? {});
+  // Scan within `root` but never flag the overlay's own highlights.
+  const context: ContextObject = { include: root, exclude: [OVERLAY_EXCLUDE_SELECTOR] };
+  const results = await axe.run(context, options ?? {});
   const doc = root instanceof Document ? root : (root.ownerDocument ?? document);
 
   const findings: A11yFinding[] = [];

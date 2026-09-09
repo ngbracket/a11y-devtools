@@ -10,6 +10,7 @@ import {
 import { debounceTime, filter } from 'rxjs';
 import { runA11yScan } from './runner';
 import type { Logger } from './report';
+import { createOverlay } from './overlay';
 
 export interface A11yDevtoolsOptions {
   /** Element/Document to scan. Defaults to `document`. */
@@ -18,6 +19,8 @@ export interface A11yDevtoolsOptions {
   log?: boolean;
   /** Sink for reporting; defaults to `console`. */
   logger?: Logger;
+  /** Draw an in-app visual overlay over each flagged node. Default false. */
+  overlay?: boolean;
   /** Quiet window after stabilization before scanning. Default 500ms. */
   debounceMs?: number;
 }
@@ -36,12 +39,14 @@ export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): Environm
     return makeEnvironmentProviders([]);
   }
 
-  const { root, log = true, logger, debounceMs = 500 } = options;
+  const { root, log = true, logger, overlay = false, debounceMs = 500 } = options;
 
   return makeEnvironmentProviders([
     provideEnvironmentInitializer(() => {
       const appRef = inject(ApplicationRef);
       const destroyRef = inject(DestroyRef);
+
+      const overlayView = overlay ? createOverlay() : undefined;
 
       let scanning = false;
       const subscription = appRef.isStable
@@ -53,13 +58,17 @@ export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): Environm
           if (scanning) return; // don't stack rescans while one is in flight
           scanning = true;
           runA11yScan(root?.(), { log, logger })
+            .then((findings) => overlayView?.render(findings))
             .catch(() => undefined)
             .finally(() => {
               scanning = false;
             });
         });
 
-      destroyRef.onDestroy(() => subscription.unsubscribe());
+      destroyRef.onDestroy(() => {
+        subscription.unsubscribe();
+        overlayView?.destroy();
+      });
     }),
   ]);
 }
