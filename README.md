@@ -7,7 +7,7 @@ back to **the component that rendered it** — the attribution React overlay too
 Report `♿ UserCardComponent — 2 issue(s)` instead of a wall of CSS selectors.
 
 Part of the `@ngbracket` Angular tooling family. See
-`../content/tooling/item-5-devtools-findings.md` for the research and scope.
+[`docs/findings.md`](docs/findings.md) for the research and scope.
 
 ## Status
 
