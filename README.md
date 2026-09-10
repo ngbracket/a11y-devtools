@@ -11,8 +11,8 @@ Part of the `@ngbracket` Angular tooling family. See
 
 ## Status
 
-MVP. Ships attribution + axe scan + grouped console reporter + the dev-only
-provider. The visual in-app overlay is on the roadmap.
+Ships attribution + axe scan + grouped console reporter + the dev-only provider
++ the visual in-app overlay (severity-coloured highlights, click-to-scroll).
 
 ## How the attribution works
 
@@ -51,6 +51,7 @@ and logs violations grouped by owning component. Options:
 provideA11yDevtools({
   root: () => document.querySelector('main')!, // scan scope; default document
   log: true,           // grouped console output; default true
+  overlay: true,       // in-app visual highlights over flagged nodes; default false
   debounceMs: 500,     // quiet window after stabilization before scanning
 });
 ```
@@ -81,9 +82,10 @@ npm run build   # tsc -> dist/ (ESM + .d.ts)
 
 ## Roadmap
 
-- **In-app overlay:** severity-colored highlights, click-to-scroll, excludes its
-  own root from scanning.
 - **`host` / `hostDirectives` a11y** via `getDirectives(el)` — the runtime cases
   the item-2 lint plugin can't see statically.
 - Per-component filtering and a violation count badge.
 - CI bundle-size assertion proving axe-core is absent from prod builds.
+
+Done: attribution · axe scan · grouped console reporter · dev-only provider ·
+in-app overlay.

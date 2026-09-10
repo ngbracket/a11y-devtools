@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ngbracket/a11y-devtools — overlay demo</title>
+    <style>
+      body {
+        font: 15px/1.5 system-ui, sans-serif;
+        margin: 0;
+        padding: 40px;
+        color: #1a1a1a;
+      }
+      h1 { font-size: 20px; }
+      .card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 16px;
+        margin: 24px 0;
+        max-width: 420px;
+      }
+      img { width: 96px; height: 96px; background: #eee; border-radius: 6px; }
+      .low-contrast { color: #bcbcbc; background: #fff; border: none; padding: 8px 14px; }
+      .note { color: #666; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <h1>User profile</h1>
+    <p class="note">
+      This static page stands in for a running Angular app so the overlay's
+      rendering can be seen. In a real app <code>provideA11yDevtools({ overlay: true })</code>
+      feeds it live axe findings; here we feed hand-made findings.
+    </p>
+
+    <div class="card" id="user-card">
+      <img id="avatar" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" />
+      <p>Ada Lovelace</p>
+      <button id="save" class="low-contrast">Save changes</button>
+    </div>
+
+    <script type="module">
+      import { createOverlay } from '../dist/overlay.js';
+
+      const overlay = createOverlay();
+      overlay.render([
+        {
+          id: 'image-alt',
+          impact: 'critical',
+          help: 'Images must have alternate text',
+          helpUrl: 'https://dequeuniversity.com/rules/axe/4.13/image-alt',
+          component: 'UserCardComponent',
+          target: '#avatar',
+          html: '<img id="avatar">',
+        },
+        {
+          id: 'color-contrast',
+          impact: 'serious',
+          help: 'Elements must meet minimum colour contrast',
+          helpUrl: 'https://dequeuniversity.com/rules/axe/4.13/color-contrast',
+          component: 'UserCardComponent',
+          target: '#save',
+          html: '<button id="save">',
+        },
+      ]);
+    </script>
+  </body>
+</html>
