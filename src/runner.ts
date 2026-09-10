@@ -1,5 +1,5 @@
-import { scan, type A11yFinding } from './scan';
-import { logFindings, type Logger } from './report';
+import { scan, type A11yFinding } from './scan.js';
+import { logFindings, type Logger } from './report.js';
 
 export interface RunOptions {
   /** Log grouped findings to the console. Default true. */

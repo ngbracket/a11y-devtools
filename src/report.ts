@@ -1,4 +1,4 @@
-import type { A11yFinding } from './scan';
+import type { A11yFinding } from './scan.js';
 
 /** Minimal console-shaped sink, so reporting is testable without the real console. */
 export interface Logger {

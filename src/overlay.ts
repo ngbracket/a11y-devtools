@@ -1,4 +1,4 @@
-import type { A11yFinding, Impact } from './scan';
+import type { A11yFinding, Impact } from './scan.js';
 
 /**
  * Attribute marking the overlay's own DOM. `scan()` excludes anything under it
