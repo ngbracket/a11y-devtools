@@ -69,8 +69,14 @@ const raw = await scan(document.body);     // findings only
 
 In production `provideA11yDevtools()` is a **no-op** and axe-core is never loaded.
 axe-core is a **dynamic import**, so it lands in a lazy chunk that prod never
-fetches. For a hard guarantee that it's absent entirely, include the provider only
-in your dev bootstrap config — and verify with a bundle check in CI.
+fetches, and the package is `sideEffects: false` so an unused import tree-shakes
+away entirely. For a hard guarantee, include the provider only in your dev
+bootstrap config (e.g. behind `isDevMode()`).
+
+This is **enforced in CI**: `src/testing/prod-weight.spec.ts` bundles the entry
+with esbuild and walks the module graph — axe-core must be reachable *only*
+through a dynamic import, never a static one. Turning `import('axe-core')` into a
+static import (or adding a top-level side effect) fails the build.
 
 ## Develop
 
@@ -85,7 +91,6 @@ npm run build   # tsc -> dist/ (ESM + .d.ts)
 - **`host` / `hostDirectives` a11y** via `getDirectives(el)` — the runtime cases
   the item-2 lint plugin can't see statically.
 - Per-component filtering and a violation count badge.
-- CI bundle-size assertion proving axe-core is absent from prod builds.
 
 Done: attribution · axe scan · grouped console reporter · dev-only provider ·
-in-app overlay.
+in-app overlay · CI prod-weight guard.
