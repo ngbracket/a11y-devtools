@@ -26,4 +26,8 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
+      # setup-node's registry-url writes `_authToken=${NODE_AUTH_TOKEN}`; with no
+      # token that empty value hijacks auth (404) instead of letting npm 11 fall
+      # through to OIDC. Strip the line but keep the registry setting.
+      - run: 'sed -i "/_authToken/d" "$NPM_CONFIG_USERCONFIG"'
       - run: npm publish
