@@ -4,7 +4,7 @@ Status: **viable, the most defensible item so far — MVP shipped.** The headlin
 
 Target package: **`@ngbracket/a11y-devtools`** (see [family naming](item-2-a11y-lint-findings.md)). Public OSS under the ngbracket brand. Completes the accessibility cluster (items 2 lint + 3 testing + 5 runtime).
 
-**MVP promoted (Sep 2026):** package built at `ngbracket-a11y-devtools/` — attribution + axe scan (enriched with component names) + grouped console reporter + dev-only `provideA11yDevtools()` (zoneless-aware rescan via `ApplicationRef.isStable`). 9 tests green. Scans are serialized (axe is a singleton — concurrent runs throw). The visual overlay + `host`/`hostDirectives` runtime a11y are roadmap.
+**MVP promoted (Sep 2026):** package built at `ngbracket-a11y-devtools/` — attribution + axe scan (enriched with component names) + grouped console reporter + dev-only `provideA11yDevtools()` (zoneless-aware rescan via `ApplicationRef.isStable`). 16 tests green. Scans are serialized (axe is a singleton — concurrent runs throw). The visual overlay is now shipped (plain-DOM highlights coloured by impact, click-to-scroll, self-excluding via `data-ngb-a11y-overlay`, no ng-packagr needed — the shipped lib has no Angular components); `host`/`hostDirectives` runtime a11y remains roadmap.
 
 ---
 
