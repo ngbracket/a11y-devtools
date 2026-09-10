@@ -18,8 +18,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24.19.0
-          registry-url: 'https://registry.npmjs.org'
+          # No registry-url: it writes a token-auth .npmrc (NODE_AUTH_TOKEN)
+          # that suppresses OIDC. Trusted publishing uses the id-token below.
       - run: npm install -g npm@latest # trusted publishing needs npm >= 11.5.1
+      - run: npm --version
       - run: npm ci
       - run: npm run build
       - run: npm test
