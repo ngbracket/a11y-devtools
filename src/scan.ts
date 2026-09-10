@@ -1,6 +1,6 @@
 import type { ContextObject, RunOptions } from 'axe-core';
-import { resolveOwningComponentName } from './attribution';
-import { OVERLAY_EXCLUDE_SELECTOR } from './overlay';
+import { resolveOwningComponentName } from './attribution.js';
+import { OVERLAY_EXCLUDE_SELECTOR } from './overlay.js';
 
 export type Impact = 'minor' | 'moderate' | 'serious' | 'critical' | null;
 

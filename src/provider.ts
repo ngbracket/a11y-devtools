@@ -8,9 +8,9 @@ import {
   provideEnvironmentInitializer,
 } from '@angular/core';
 import { debounceTime, filter } from 'rxjs';
-import { runA11yScan } from './runner';
-import type { Logger } from './report';
-import { createOverlay } from './overlay';
+import { runA11yScan } from './runner.js';
+import type { Logger } from './report.js';
+import { createOverlay } from './overlay.js';
 
 export interface A11yDevtoolsOptions {
   /** Element/Document to scan. Defaults to `document`. */
