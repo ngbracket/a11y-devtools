@@ -1,0 +1,78 @@
+name: Release pack
+
+# Publish @ngbracket/a11y-devtools to npm via TRUSTED PUBLISHING (OIDC) — no
+# stored token, no OTP. Ported from ngbr-components/release-pack.yml (which
+# publishes the commercial packs the same way).
+#
+# Flow: bump version in package.json → merge to main → run from the Actions tab.
+#
+# ONE-TIME (on npmjs.com): Package → Settings → Trusted Publisher → GitHub
+# Actions, with:
+#   Organization or user : ngbracket
+#   Repository           : a11y-devtools
+#   Workflow filename    : release-pack.yml
+# The package stays PRIVATE — publish uses default (restricted) access.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Build + npm publish --dry-run only (no real publish)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write # REQUIRED for npm trusted publishing (OIDC)
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish @ngbracket/a11y-devtools
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      # NB: no `registry-url` — it makes setup-node write an `_authToken` line to
+      # .npmrc, and npm then SKIPS OIDC trusted publishing whenever it sees any
+      # auth already configured. npmjs is the default registry, so OIDC works
+      # without it.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      # Trusted publishing needs npm >= 11.5.1; node 24 ships 11.x, pin to be safe.
+      - name: Ensure npm supports trusted publishing
+        run: |
+          npm install -g npm@^11
+          npm --version
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+      # Always show (and validate) the tarball; dry-run needs no auth.
+      - name: Preview publish
+        run: |
+          node -e "const p=require('./package.json');console.log('Publishing '+p.name+'@'+p.version)"
+          npm publish --dry-run
+
+      # Treat ONLY the duplicate-version E403 as a green no-op; any other error fails.
+      - name: Publish (trusted publishing, private)
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set +e
+          OUT=$(npm publish 2>&1)
+          CODE=$?
+          echo "$OUT"
+          if [ $CODE -ne 0 ]; then
+            if echo "$OUT" | grep -q "cannot publish over the previously published versions"; then
+              echo "::notice::Version already published — treating as a no-op."
+              exit 0
+            fi
+            exit $CODE
+          fi
