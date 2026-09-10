@@ -1,0 +1,26 @@
+name: Release
+
+# Publishes the current package.json version to npm via OIDC trusted publishing
+# (no token/OTP). Trigger manually once the version has been bumped + merged.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token for npm trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm install -g npm@latest # trusted publishing needs npm >= 11.5.1
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm publish
