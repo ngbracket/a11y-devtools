@@ -19,17 +19,11 @@ jobs:
         with:
           node-version: 24.19.0
           registry-url: 'https://registry.npmjs.org'
-      - run: npm install -g npm@latest # trusted publishing needs npm >= 11.5.1
-      - name: Diagnostics
-        run: |
-          echo "npm: $(npm --version)"
-          echo "OIDC request URL present: ${ACTIONS_ID_TOKEN_REQUEST_URL:+YES}"
-          echo "OIDC request token present: ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+YES}"
-          echo "registry: $(npm config get registry)"
+      # OIDC trusted publishing is the 11.5.x line; npm@latest (12.x) doesn't
+      # initiate the OIDC exchange here (ENEEDAUTH). Pin to 11.
+      - run: npm install -g npm@^11.5
+      - run: npm --version
       - run: npm ci
       - run: npm run build
       - run: npm test
-      # setup-node writes an _authToken=${NODE_AUTH_TOKEN} line; with no token it
-      # breaks auth. Strip it so npm falls through to OIDC trusted publishing.
-      - run: 'sed -i "/_authToken/d" "$NPM_CONFIG_USERCONFIG" || true'
       - run: npm publish
