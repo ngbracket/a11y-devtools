@@ -1,25 +1,34 @@
 # @ngbracket/a11y-devtools
 
 Dev-only, in-app accessibility auditing for Angular that maps each axe violation
-back to **the component that rendered it** — the attribution React overlay tools
-(`@axe-core/react`, `axe-mode`, TanStack a11y) structurally can't do.
+back to **the component that rendered it** — so you get
+`♿ UserCardComponent — 2 issue(s)`, not a wall of CSS selectors.
 
-Report `♿ UserCardComponent — 2 issue(s)` instead of a wall of CSS selectors.
+The React axe tools in this space — [`@axe-core/react`](https://www.npmjs.com/package/@axe-core/react),
+[`axe-mode`](https://github.com/raunofreiberg/axe-mode), the
+[TanStack Devtools a11y plugin](https://tanstack.com/devtools/latest/docs/plugins/a11y)
+— report the DOM node (selector, HTML, rule id) and highlight it, but stop there:
+none tie a violation to the component that rendered it. This does, through
+Angular's **documented** dev debug API (`window.ng`) rather than private framework
+internals.
 
 Part of the `@ngbracket` Angular tooling family.
 
 ## Status
 
-Ships attribution + axe scan + grouped console reporter + the dev-only provider
-+ the visual in-app overlay (severity-coloured highlights, click-to-scroll).
+Ships attribution — component **and** directive-level — + axe scan + grouped
+console reporter (with a summary line) + the dev-only provider + the visual in-app
+overlay (severity-coloured highlights, click-to-scroll).
 
 ## How the attribution works
 
 Angular publishes debug helpers on the `window.ng` global in dev mode.
 `getOwningComponent(node)` returns the component whose view contains a DOM node,
-so any axe-flagged element resolves to its owning component. These helpers exist
-**only in dev builds** — which is exactly right: the tool is dev-only, and the
-global's absence in prod is the signal to no-op.
+so any axe-flagged element resolves to its owning component; `getDirectives(node)`
+adds the directives applied to that node — including those pulled in via
+`hostDirectives` — which are the runtime cases a static ESLint pass can't see.
+These helpers exist **only in dev builds** — which is exactly right: the tool is
+dev-only, and the global's absence in prod is the signal to no-op.
 
 ## Install
 
@@ -55,6 +64,20 @@ provideA11yDevtools({
 });
 ```
 
+Findings are grouped by owning component, led by a summary line, and each node's
+directives are shown inline:
+
+```text
+♿ a11y-devtools: 2 issue(s) across 1 component(s)
+♿ UserCardComponent — 2 issue(s)
+    critical · image-alt: Images must have alternative text [via TooltipDirective]
+      img
+      https://dequeuniversity.com/rules/axe/4.13/image-alt
+    serious · color-contrast: Elements must meet minimum contrast
+      button.save
+      https://dequeuniversity.com/rules/axe/4.13/color-contrast
+```
+
 You can also scan on demand:
 
 ```ts
@@ -87,9 +110,7 @@ npm run build   # tsc -> dist/ (ESM + .d.ts)
 
 ## Roadmap
 
-- **`host` / `hostDirectives` a11y** via `getDirectives(el)` — the runtime cases
-  a static ESLint pass can't see.
-- Per-component filtering and a violation count badge.
+- Per-component filtering and a violation-count badge.
 
-Done: attribution · axe scan · grouped console reporter · dev-only provider ·
-in-app overlay · CI prod-weight guard.
+Done: component attribution · directive / `hostDirectives` attribution · axe scan ·
+grouped console reporter · dev-only provider · in-app overlay · CI prod-weight guard.
