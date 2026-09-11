@@ -6,8 +6,7 @@ back to **the component that rendered it** — the attribution React overlay too
 
 Report `♿ UserCardComponent — 2 issue(s)` instead of a wall of CSS selectors.
 
-Part of the `@ngbracket` Angular tooling family. See
-[`docs/findings.md`](docs/findings.md) for the research and scope.
+Part of the `@ngbracket` Angular tooling family.
 
 ## Status
 
@@ -89,7 +88,7 @@ npm run build   # tsc -> dist/ (ESM + .d.ts)
 ## Roadmap
 
 - **`host` / `hostDirectives` a11y** via `getDirectives(el)` — the runtime cases
-  the item-2 lint plugin can't see statically.
+  a static ESLint pass can't see.
 - Per-component filtering and a violation count badge.
 
 Done: attribution · axe scan · grouped console reporter · dev-only provider ·
