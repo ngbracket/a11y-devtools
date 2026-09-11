@@ -27,11 +27,16 @@ export function logFindings(findings: A11yFinding[], logger: Logger = console): 
     else byComponent.set(key, [finding]);
   }
 
+  logger.info(
+    `♿ a11y-devtools: ${findings.length} issue(s) across ${byComponent.size} component(s)`,
+  );
+
   for (const [component, items] of byComponent) {
     logger.groupCollapsed(`♿ ${component} — ${items.length} issue(s)`);
     for (const finding of items) {
+      const via = finding.directives.length ? ` [via ${finding.directives.join(', ')}]` : '';
       logger.warn(
-        `${finding.impact ?? 'n/a'} · ${finding.id}: ${finding.help}`,
+        `${finding.impact ?? 'n/a'} · ${finding.id}: ${finding.help}${via}`,
         `\n  ${finding.target}\n  ${finding.helpUrl}`,
       );
     }

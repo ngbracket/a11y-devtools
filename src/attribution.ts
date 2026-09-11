@@ -12,15 +12,25 @@
 export interface NgDebugGlobal {
   getComponent(element: Element): unknown;
   getOwningComponent(element: Element | object): unknown;
+  getDirectives(element: Element | object): unknown[];
 }
 
 export function ngDebug(): NgDebugGlobal | undefined {
   return (globalThis as { ng?: NgDebugGlobal }).ng;
 }
 
+/**
+ * Angular's dev output can emit class names with a leading underscore
+ * (e.g. `_Login` for `Login`); strip it so attribution shows the authored name.
+ */
+function cleanName(name: string | null): string | null {
+  if (!name) return null;
+  return name.replace(/^_+/, '') || null;
+}
+
 function nameOf(instance: unknown): string | null {
   if (!instance || typeof instance !== 'object') return null;
-  return (instance.constructor as { name?: string }).name ?? null;
+  return cleanName((instance.constructor as { name?: string }).name ?? null);
 }
 
 export function resolveOwningComponentName(node: Element): string | null {
@@ -28,4 +38,26 @@ export function resolveOwningComponentName(node: Element): string | null {
   if (!ng) return null;
   const component = ng.getComponent(node) ?? ng.getOwningComponent(node);
   return nameOf(component);
+}
+
+/**
+ * Names of the directives applied directly to `node`, including those attached
+ * via `hostDirectives` — the runtime-only a11y cases the static lint plugin
+ * can't see. Empty when the debug global is absent or the node has none.
+ */
+export function resolveDirectiveNames(node: Element): string[] {
+  const ng = ngDebug();
+  if (!ng?.getDirectives) return [];
+  let directives: unknown[];
+  try {
+    directives = ng.getDirectives(node) ?? [];
+  } catch {
+    return []; // node isn't part of a live view
+  }
+  const names: string[] = [];
+  for (const directive of directives) {
+    const name = nameOf(directive);
+    if (name) names.push(name);
+  }
+  return names;
 }
