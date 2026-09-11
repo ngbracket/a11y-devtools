@@ -27,6 +27,7 @@ describe('scan + runner (real axe + attribution)', () => {
     const imgAlt = findings.find((f) => f.id === 'image-alt');
     expect(imgAlt).toBeDefined();
     expect(imgAlt!.component).toBe('UserCardComponent');
+    expect(imgAlt!.directives).toContain('TooltipDirective');
   });
 
   it('serializes concurrent scans (axe is a singleton)', async () => {

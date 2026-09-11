@@ -1,7 +1,7 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ngDebug, resolveOwningComponentName } from '../attribution';
+import { ngDebug, resolveDirectiveNames, resolveOwningComponentName } from '../attribution';
 import { AppComponent } from './fixtures';
 
 describe('attribution', () => {
@@ -28,5 +28,30 @@ describe('attribution', () => {
     expect(resolveOwningComponentName(img)).toBe('UserCardComponent');
 
     host.remove();
+  });
+
+  it('surfaces directives applied to the flagged node', async () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    host.appendChild(fixture.nativeElement);
+    await fixture.whenStable();
+
+    const img = host.querySelector('img')!;
+    expect(resolveDirectiveNames(img)).toContain('TooltipDirective');
+
+    host.remove();
+  });
+
+  it('strips a leading underscore from emitted class names', () => {
+    const original = (globalThis as { ng?: unknown }).ng;
+    (globalThis as { ng?: unknown }).ng = {
+      getComponent: () => ({ constructor: { name: '_Login' } }),
+      getOwningComponent: () => null,
+      getDirectives: () => [],
+    };
+    try {
+      expect(resolveOwningComponentName(document.createElement('div'))).toBe('Login');
+    } finally {
+      (globalThis as { ng?: unknown }).ng = original;
+    }
   });
 });

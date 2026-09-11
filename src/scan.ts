@@ -1,5 +1,5 @@
 import type { ContextObject, RunOptions } from 'axe-core';
-import { resolveOwningComponentName } from './attribution.js';
+import { resolveDirectiveNames, resolveOwningComponentName } from './attribution.js';
 import { OVERLAY_EXCLUDE_SELECTOR } from './overlay.js';
 
 export type Impact = 'minor' | 'moderate' | 'serious' | 'critical' | null;
@@ -13,6 +13,8 @@ export interface A11yFinding {
   helpUrl: string;
   /** Owning component name, or null when attribution isn't available (prod). */
   component: string | null;
+  /** Directives on the flagged node (incl. hostDirectives); [] when none/unavailable. */
+  directives: string[];
   /** CSS selector axe reported for the node. */
   target: string;
   html: string;
@@ -63,6 +65,7 @@ async function runAxeOnce(
         help: violation.help,
         helpUrl: violation.helpUrl,
         component: element ? resolveOwningComponentName(element) : null,
+        directives: element ? resolveDirectiveNames(element) : [],
         target,
         html: node.html,
       });
