@@ -1,8 +1,7 @@
 name: Release pack
 
 # Publish @ngbracket/a11y-devtools to npm via TRUSTED PUBLISHING (OIDC) — no
-# stored token, no OTP. Ported from ngbr-components/release-pack.yml (which
-# publishes the commercial packs the same way).
+# stored token, no OTP.
 #
 # Flow: bump version in package.json → merge to main → run from the Actions tab.
 #
