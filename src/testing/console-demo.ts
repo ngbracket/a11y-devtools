@@ -10,7 +10,8 @@ import { AppComponent } from './fixtures';
  * `console` so the grouped output is visible in the terminal: the summary line,
  * per-component groups, and the `[via <directive>]` annotation.
  *
- * Run just this file: `npx vitest run src/testing/console-demo.spec.ts`.
+ * Deliberately named `.ts` (not `.spec.ts`) so it's excluded from `npm test`
+ * and never spams CI. Run it on demand with `npm run demo:console`.
  */
 describe('console reporter (live demo output)', () => {
   beforeEach(() => {

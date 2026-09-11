@@ -42,6 +42,7 @@
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "demo:console": "vitest run --config vitest.demo.config.ts --disableConsoleIntercept",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {

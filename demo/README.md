@@ -40,6 +40,16 @@ This exercises the whole pipeline together: dynamic axe scan → `window.ng`
 component attribution → grouped console reporter → overlay → zoneless-aware
 rescan, all behind the dev-only provider (tree-shaken out of production).
 
+### All four severity colours
+
+The admin app also ships a **dev-only** `/a11y-demo` route (registered only under
+`isDevMode()`, so it never reaches production) that trips one axe rule per impact
+level. It's the quickest way to see the overlay's full palette — critical (red),
+serious (orange), moderate (yellow), minor (blue) — and the matching grouped
+console report:
+
+![all four overlay severity colours](all-severities.png)
+
 ### Local-link caveat (integrators)
 
 When **linking this package into an app locally** (not installing a published
