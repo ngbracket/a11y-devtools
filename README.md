@@ -4,13 +4,13 @@ Dev-only, in-app accessibility auditing for Angular that maps each axe violation
 back to **the component that rendered it** — so you get
 `♿ UserCardComponent — 2 issue(s)`, not a wall of CSS selectors.
 
-The React axe tools in this space — [`@axe-core/react`](https://www.npmjs.com/package/@axe-core/react),
-[`axe-mode`](https://github.com/raunofreiberg/axe-mode), the
-[TanStack Devtools a11y plugin](https://tanstack.com/devtools/latest/docs/plugins/a11y)
-— report the DOM node (selector, HTML, rule id) and highlight it, but stop there:
-none tie a violation to the component that rendered it. This does, through
-Angular's **documented** dev debug API (`window.ng`) rather than private framework
-internals.
+The axe-based devtools in this space — [`@axe-core/react`](https://www.npmjs.com/package/@axe-core/react),
+[`axe-mode`](https://github.com/raunofreiberg/axe-mode), and
+[TanStack's a11y plugin](https://tanstack.com/devtools/latest/docs/plugins/a11y)
+(now cross-framework, with an Angular adapter too) — report the DOM node (selector,
+HTML, rule id) and highlight it, but we haven't seen one tie a violation back to the
+component that rendered it, by name. This does, through Angular's **documented** dev
+debug API (`window.ng`) rather than private framework internals.
 
 Part of the `@ngbracket` Angular tooling family.
 
