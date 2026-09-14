@@ -1,6 +1,7 @@
 /**
  * Attribution core: given a DOM node that axe flagged, return the name of the
- * component responsible for it — the differentiator React overlay tools can't do.
+ * component responsible for it — the differentiator we haven't seen other axe
+ * overlay devtools do (they report the DOM node, not the owning component by name).
  *
  * Angular's debug helpers are NOT public named exports of `@angular/core`; they
  * are methods on the `window.ng` global published in dev mode
