@@ -50,6 +50,16 @@ console report:
 
 ![all four overlay severity colours](all-severities.png)
 
+The grouped, component-attributed console report the overlay writes alongside it —
+one summary line, then findings grouped by the component that rendered each:
+
+![grouped, component-attributed console report](grouped-console-2026-09.png)
+
+Run it across a real app, fix what it surfaces, and the report goes quiet — here's
+the admin `/login` page after clearing every violation the tool found there:
+
+![console reporting no violations after the fixes](login-no-violations-console-2026-09.png)
+
 ### Local-link caveat (integrators)
 
 When **linking this package into an app locally** (not installing a published

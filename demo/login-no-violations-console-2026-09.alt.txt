@@ -1,0 +1,1 @@
+Browser console output from @ngbracket/a11y-devtools on the admin example app's /login page after fixing every violation the tool originally surfaced there (was 9). A single green line reads: "a11y-devtools: no violations found".
