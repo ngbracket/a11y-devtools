@@ -61,4 +61,26 @@ describe('scan + runner (real axe + attribution)', () => {
       expect.stringContaining('UserCardComponent'),
     );
   });
+
+  it('scopes the ruleset when axe run options are passed through', async () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    host.appendChild(fixture.nativeElement);
+    await fixture.whenStable();
+
+    const ids = (findings: { id: string }[]) => new Set(findings.map((f) => f.id));
+
+    const all = ids(await runA11yScan(host, { log: false }));
+    const levelA = ids(
+      await runA11yScan(host, { log: false, axe: { runOnly: { type: 'tag', values: ['wcag2a'] } } }),
+    );
+
+    // image-alt is WCAG 2.0 Level A — kept under a Level-A-only scope.
+    expect(levelA.has('image-alt')).toBe(true);
+    // color-contrast is Level AA — if the full run flagged it, the A-only run must not.
+    if (all.has('color-contrast')) {
+      expect(levelA.has('color-contrast')).toBe(false);
+    }
+    // A scoped run only ever yields a subset of the default run.
+    expect([...levelA].every((id) => all.has(id))).toBe(true);
+  });
 });

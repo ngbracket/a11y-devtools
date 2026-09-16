@@ -7,6 +7,7 @@ import {
   makeEnvironmentProviders,
   provideEnvironmentInitializer,
 } from '@angular/core';
+import type { RunOptions as AxeRunOptions } from 'axe-core';
 import { debounceTime, filter } from 'rxjs';
 import { runA11yScan } from './runner.js';
 import type { Logger } from './report.js';
@@ -23,6 +24,14 @@ export interface A11yDevtoolsOptions {
   overlay?: boolean;
   /** Quiet window after stabilization before scanning. Default 500ms. */
   debounceMs?: number;
+  /**
+   * Restrict the scan to specific axe tags, e.g. `['wcag22aa']` or
+   * `['wcag21aa', 'best-practice']`. Omit to run axe-core's default ruleset —
+   * the machine-testable rules across WCAG 2.0/2.1/2.2 (Levels A & AA) plus axe's
+   * best-practice rules. (For finer control, call `runA11yScan`/`scan` with full
+   * axe run options.)
+   */
+  tags?: string[];
 }
 
 /**
@@ -39,7 +48,10 @@ export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): Environm
     return makeEnvironmentProviders([]);
   }
 
-  const { root, log = true, logger, overlay = false, debounceMs = 500 } = options;
+  const { root, log = true, logger, overlay = false, debounceMs = 500, tags } = options;
+  const axe: AxeRunOptions | undefined = tags
+    ? { runOnly: { type: 'tag', values: tags } }
+    : undefined;
 
   return makeEnvironmentProviders([
     provideEnvironmentInitializer(() => {
@@ -57,7 +69,7 @@ export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): Environm
         .subscribe(() => {
           if (scanning) return; // don't stack rescans while one is in flight
           scanning = true;
-          runA11yScan(root?.(), { log, logger })
+          runA11yScan(root?.(), { log, logger, axe })
             .then((findings) => overlayView?.render(findings))
             .catch(() => undefined)
             .finally(() => {

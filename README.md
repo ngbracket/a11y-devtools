@@ -61,6 +61,7 @@ provideA11yDevtools({
   log: true,           // grouped console output; default true
   overlay: true,       // in-app visual highlights over flagged nodes; default false
   debounceMs: 500,     // quiet window after stabilization before scanning
+  tags: ['wcag22aa'],  // scope the ruleset; default = axe-core's full ruleset
 });
 ```
 
@@ -86,6 +87,26 @@ import { runA11yScan, scan } from '@ngbracket/a11y-devtools';
 const findings = await runA11yScan();      // scan + grouped log
 const raw = await scan(document.body);     // findings only
 ```
+
+`scan()` and `runA11yScan()` also take full axe-core run options as a second
+argument (`scan(root, { runOnly: … })`) for finer control than the provider's
+`tags`.
+
+## What it checks (and what it can't)
+
+Under the hood this is [axe-core](https://github.com/dequelabs/axe-core) — the
+scan runs axe's rules and enriches each violation with the owning component. By
+default it runs axe-core's full ruleset: the **machine-testable** rules across
+**WCAG 2.0, 2.1 and 2.2, Levels A & AA**, plus axe's *best-practice* rules. Scope
+it to a single conformance target with `tags` (e.g. `['wcag22aa']`) or
+`['wcag21aa', 'best-practice']`.
+
+Automated checks only cover the part of WCAG a machine can test — on the order of
+a third of the success criteria. Many WCAG 2.2 additions have **no automated rule
+at all** (target size 2.5.8, dragging 2.5.7, consistent help, redundant entry,
+accessible authentication), so a clean run is necessary, not sufficient — the rest
+needs keyboard, screen-reader and human testing. (WCAG 3.0 is still an early W3C
+draft with a different, non-final model; there's nothing to test against yet.)
 
 ## Production weight
 
