@@ -15,6 +15,7 @@ function finding(partial: Partial<A11yFinding> = {}): A11yFinding {
     help: 'Images must have alternate text',
     helpUrl: 'https://dequeuniversity.com/rules/axe/4.10/image-alt',
     component: 'UserCardComponent',
+    componentPath: ['UserCardComponent'],
     directives: [],
     target: 'img',
     html: '<img src="a.png">',
@@ -93,5 +94,26 @@ describe('toMarkdown', () => {
 
   it('reports a clean page as no violations', () => {
     expect(md).toContain('No violations found. ✅');
+  });
+
+  it('notes the UI primitive an app component rendered through', () => {
+    const withPrimitive = toMarkdown({
+      generatedAt: '2026-09-22T10:00:00.000Z',
+      pages: [
+        {
+          label: 'Header',
+          url: 'http://localhost:4200/pages/dashboard',
+          findings: [
+            finding({
+              id: 'button-name',
+              component: 'HeaderComponent',
+              componentPath: ['NbButtonComponent', 'HeaderComponent'],
+            }),
+          ],
+        },
+      ],
+    });
+    expect(withPrimitive).toContain('### ♿ HeaderComponent — 1 issue(s)');
+    expect(withPrimitive).toContain('_(via NbButtonComponent)_');
   });
 });

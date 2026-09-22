@@ -129,8 +129,13 @@ export function toMarkdown(report: ScanReport): string {
       lines.push('');
       const sorted = [...items].sort((a, b) => impactRank(a.impact) - impactRank(b.impact));
       for (const finding of sorted) {
-        const via = finding.directives.length ? ` _(via ${finding.directives.join(', ')})_` : '';
-        lines.push(`- **${finding.impact ?? 'n/a'} · ${finding.id}**: ${finding.help}${via}`);
+        // UI primitives the app component rendered through, e.g. an `<button
+        // nbButton>` shows as "via NbButtonComponent" under its app owner.
+        const ownerIndex = finding.component ? finding.componentPath.indexOf(finding.component) : -1;
+        const wrappers = ownerIndex > 0 ? finding.componentPath.slice(0, ownerIndex) : [];
+        const via = [...wrappers, ...finding.directives];
+        const suffix = via.length ? ` _(via ${via.join(', ')})_` : '';
+        lines.push(`- **${finding.impact ?? 'n/a'} · ${finding.id}**: ${finding.help}${suffix}`);
         lines.push(`  - \`${finding.target}\``);
         lines.push(`  - ${finding.helpUrl}`);
       }

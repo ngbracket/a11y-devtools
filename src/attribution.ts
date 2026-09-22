@@ -34,11 +34,52 @@ function nameOf(instance: unknown): string | null {
   return cleanName((instance.constructor as { name?: string }).name ?? null);
 }
 
-export function resolveOwningComponentName(node: Element): string | null {
+/**
+ * Third-party UI-primitive components (Nebular `Nb*`, Angular Material `Mat*`,
+ * CDK `Cdk*`/`Mdc*`) whose violations are fixed where the primitive is *used*,
+ * not inside the library — e.g. `<button nbButton>` with no name is fixed in the
+ * component that placed it, not in Nebular. Attribution walks past these to the
+ * app component. Matched with a CamelCase boundary so `MatchListComponent` isn't
+ * mistaken for Material. A component library you author (e.g. `Ngbr*`) is
+ * deliberately absent: a bug in a component you ship is fixed in that component.
+ */
+const PRIMITIVE_COMPONENT = /^(Nb|Mat|Cdk|Mdc)[A-Z]/;
+
+function isPrimitiveComponent(name: string): boolean {
+  return PRIMITIVE_COMPONENT.test(name);
+}
+
+/**
+ * The chain of owning components from the flagged node up to the root, nearest
+ * first and de-duplicated. Built by walking DOM ancestors and asking Angular's
+ * debug API who owns each, so a control that is itself a library primitive still
+ * reveals the app component that placed it. Empty when the global is absent (prod).
+ */
+export function resolveComponentPath(node: Element): string[] {
   const ng = ngDebug();
-  if (!ng) return null;
-  const component = ng.getComponent(node) ?? ng.getOwningComponent(node);
-  return nameOf(component);
+  if (!ng) return [];
+  const path: string[] = [];
+  let el: Element | null = node;
+  while (el) {
+    const name = nameOf(ng.getComponent(el) ?? ng.getOwningComponent(el));
+    if (name && name !== path[path.length - 1]) path.push(name);
+    el = el.parentElement;
+  }
+  return path;
+}
+
+/** The component to blame from an ownership path: the nearest one the app owns. */
+export function appComponentFromPath(path: string[]): string | null {
+  return path.find((name) => !isPrimitiveComponent(name)) ?? path[0] ?? null;
+}
+
+/**
+ * The owning component name for a flagged node — the nearest component the app
+ * author actually owns (walking past third-party UI primitives to where the fix
+ * lives). Null when the debug global is absent (prod).
+ */
+export function resolveOwningComponentName(node: Element): string | null {
+  return appComponentFromPath(resolveComponentPath(node));
 }
 
 /**
