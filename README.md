@@ -92,6 +92,57 @@ const raw = await scan(document.body);     // findings only
 argument (`scan(root, { runOnly: … })`) for finer control than the provider's
 `tags`.
 
+## Report mode (headless, CI-friendly)
+
+The provider is for while you're developing a page. **Report mode** turns the same
+engine on a whole running app from the outside: it drives a headless browser over
+your **dev** server, injects the same component-attributed scan, and writes a
+report grouped by owning component — with no change to the app under test. It needs
+a dev build, because that's what publishes `window.ng` for attribution; against a
+production build, attribution falls back to `(unknown component)`.
+
+Report mode is opt-in and needs Playwright, an **optional peer** you install
+yourself (so the base package stays weightless):
+
+```bash
+npm i -D playwright
+npx playwright install chromium
+```
+
+Start your app (`ng serve`), then point the CLI at it:
+
+```bash
+# writes a11y.md and a11y.json
+npx ngbr-a11y-report --base http://localhost:4200 --route / --route /dashboard --out a11y
+
+# CI gate: exit non-zero on any serious/critical finding
+npx ngbr-a11y-report --base http://localhost:4200 --route / --fail-on serious
+```
+
+For apps gated behind a login or theme picker, use the programmatic API with a
+`setup` hook (run once before the routes are scanned):
+
+```ts
+import { scanPages, toMarkdown } from '@ngbracket/a11y-devtools/report';
+
+const report = await scanPages({
+  baseUrl: 'http://localhost:4200',
+  routes: ['/pages/dashboard'],
+  setup: async (page) => {
+    await page.goto('http://localhost:4200/login');
+    await page.fill('#email', 'demo@example.com');
+    await page.click('button[type=submit]');
+  },
+});
+console.log(toMarkdown(report));
+```
+
+The report leads with a summary of **distinct rules vs. raw node-instances** (a
+"54" is usually one rule firing dozens of times), then lists findings under each
+owning component. When a flagged control is itself a third-party UI primitive
+(e.g. `<button nbButton>`), attribution walks past the primitive to the app
+component that placed it and notes the primitive as `(via …)`.
+
 ## What it checks (and what it can't)
 
 Under the hood this is [axe-core](https://github.com/dequelabs/axe-core) — the
@@ -131,7 +182,11 @@ npm run build   # tsc -> dist/ (ESM + .d.ts)
 
 ## Roadmap
 
+- Configurable framework-primitive prefixes (PrimeNG, Clarity, Ionic, …).
+- HTML report + baseline/diff mode for CI.
 - Per-component filtering and a violation-count badge.
 
-Done: component attribution · directive / `hostDirectives` attribution · axe scan ·
-grouped console reporter · dev-only provider · in-app overlay · CI prod-weight guard.
+Done: component attribution (nearest app-owned, walking past UI primitives) ·
+directive / `hostDirectives` attribution · axe scan · grouped console reporter ·
+dev-only provider · in-app overlay · headless report mode (CLI + `./report`) ·
+CI prod-weight guard.

@@ -14,9 +14,13 @@ Options:
   --out <prefix>     Write <prefix>.md / <prefix>.json (default: print Markdown to stdout)
   --format <fmt>     md | json | both (default: both when --out is set)
   --wait <ms>        Settle time after load before scanning (default 1500)
+  --fail-on <impact> Exit non-zero if any finding is at/above impact
+                     (minor | moderate | serious | critical) — for CI gating
   --headed           Launch a visible browser (debugging)
   -h, --help         Show this help
 `;
+
+const IMPACT_RANK = { minor: 1, moderate: 2, serious: 3, critical: 4 };
 
 function parseArgs(argv) {
   const opts = { routes: [], format: 'both' };
@@ -30,6 +34,7 @@ function parseArgs(argv) {
       case '--out': opts.out = next(); break;
       case '--format': opts.format = next(); break;
       case '--wait': opts.wait = Number(next()); break;
+      case '--fail-on': opts.failOn = next(); break;
       case '--headed': opts.headed = true; break;
       case '-h': case '--help': opts.help = true; break;
       default: console.error(`Unknown argument: ${arg}\n`); opts.help = true;
@@ -69,5 +74,20 @@ if (!opts.out) {
   if (format === 'json' || format === 'both') {
     writeFileSync(`${opts.out}.json`, toJson(report));
     process.stderr.write(`Wrote ${opts.out}.json\n`);
+  }
+}
+
+if (opts.failOn) {
+  const threshold = IMPACT_RANK[opts.failOn];
+  if (!threshold) {
+    process.stderr.write(`Invalid --fail-on "${opts.failOn}" (use minor|moderate|serious|critical)\n`);
+    process.exit(2);
+  }
+  const worst = report.pages
+    .flatMap((p) => p.findings)
+    .reduce((max, f) => Math.max(max, IMPACT_RANK[f.impact] ?? 0), 0);
+  if (worst >= threshold) {
+    process.stderr.write(`Failing: found violation(s) at or above "${opts.failOn}".\n`);
+    process.exit(1);
   }
 }
