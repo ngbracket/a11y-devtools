@@ -1,4 +1,5 @@
 import type { A11yFinding } from './scan.js';
+import { groupByComponent } from './report/format.js';
 
 /** Minimal console-shaped sink, so reporting is testable without the real console. */
 export interface Logger {
@@ -19,13 +20,7 @@ export function logFindings(findings: A11yFinding[], logger: Logger = console): 
     return;
   }
 
-  const byComponent = new Map<string, A11yFinding[]>();
-  for (const finding of findings) {
-    const key = finding.component ?? '(unknown component)';
-    const bucket = byComponent.get(key);
-    if (bucket) bucket.push(finding);
-    else byComponent.set(key, [finding]);
-  }
+  const byComponent = groupByComponent(findings);
 
   logger.info(
     `♿ a11y-devtools: ${findings.length} issue(s) across ${byComponent.size} component(s)`,

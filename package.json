@@ -30,16 +30,24 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./report": {
+      "types": "./dist/report/index.d.ts",
+      "import": "./dist/report/index.js"
+    },
     "./package.json": "./package.json"
   },
+  "bin": {
+    "ngbr-a11y-report": "bin/ngbr-a11y-report.mjs"
+  },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "engines": {
     "node": "^20.19.0 || ^22.12.0 || >=24.0.0"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/build-inpage.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "demo:console": "vitest run --config vitest.demo.config.ts --disableConsoleIntercept",
@@ -52,7 +60,11 @@
     "@angular/core": ">=18.0.0",
     "rxjs": ">=7.0.0"
   },
+  "optionalDependencies": {
+    "playwright": "^1.40.0"
+  },
   "devDependencies": {
+    "esbuild": "^0.28.2",
     "@analogjs/vite-plugin-angular": "^2.7.2",
     "@analogjs/vitest-angular": "^2.7.2",
     "@angular/build": "^22.1.7",
