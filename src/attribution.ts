@@ -57,11 +57,21 @@ function isPrimitiveComponent(name: string): boolean {
  */
 export function resolveComponentPath(node: Element): string[] {
   const ng = ngDebug();
-  if (!ng) return [];
+  // A production build can leave a partial `ng` global (present but without the
+  // debug helpers). Treat a missing/!function owner-resolver as "no attribution"
+  // rather than throwing mid-scan.
+  if (!ng || typeof ng.getOwningComponent !== 'function') return [];
+  const getComponent = typeof ng.getComponent === 'function' ? ng.getComponent.bind(ng) : null;
   const path: string[] = [];
   let el: Element | null = node;
   while (el) {
-    const name = nameOf(ng.getComponent(el) ?? ng.getOwningComponent(el));
+    let owner: unknown = null;
+    try {
+      owner = getComponent?.(el) ?? ng.getOwningComponent(el);
+    } catch {
+      owner = null; // node isn't part of a live view
+    }
+    const name = nameOf(owner);
     if (name && name !== path[path.length - 1]) path.push(name);
     el = el.parentElement;
   }

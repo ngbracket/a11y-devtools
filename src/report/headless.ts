@@ -72,16 +72,23 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
 
     for (const route of routes) {
       const url = new URL(route, baseUrl).toString();
-      // networkidle is the right settle signal for an SPA, but some apps keep a
-      // socket open and never reach it — fall back to a plain load.
-      await page.goto(url, { waitUntil: 'networkidle' }).catch(() => page.goto(url));
-      await page.waitForTimeout(waitMs);
-      await page.addScriptTag({ content: inPageScript });
-      const findings = (await page.evaluate((opts) => {
-        const w = window as unknown as { __ngbA11yScan: (o?: unknown) => Promise<unknown> };
-        return w.__ngbA11yScan(opts);
-      }, axeOptions)) as A11yFinding[];
-      pages.push({ label: labels[route] ?? route, url: page.url(), findings });
+      const label = labels[route] ?? route;
+      try {
+        // networkidle is the right settle signal for an SPA, but some apps keep a
+        // socket open and never reach it — fall back to a plain load.
+        await page.goto(url, { waitUntil: 'networkidle' }).catch(() => page.goto(url));
+        await page.waitForTimeout(waitMs);
+        await page.addScriptTag({ content: inPageScript });
+        const findings = (await page.evaluate((opts) => {
+          const w = window as unknown as { __ngbA11yScan: (o?: unknown) => Promise<unknown> };
+          return w.__ngbA11yScan(opts);
+        }, axeOptions)) as A11yFinding[];
+        pages.push({ label, url: page.url(), findings });
+      } catch (err) {
+        // One bad route shouldn't sink the whole run — record it and continue.
+        const message = err instanceof Error ? err.message : String(err);
+        pages.push({ label, url, findings: [], error: message });
+      }
     }
   } finally {
     await browser.close();

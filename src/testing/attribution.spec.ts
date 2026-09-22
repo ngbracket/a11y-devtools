@@ -73,6 +73,19 @@ describe('attribution', () => {
     }
   });
 
+  it('treats a partial ng global (no debug helpers) as no attribution', () => {
+    // A production build can leave `window.ng` present but without getComponent/
+    // getOwningComponent — must not throw mid-scan.
+    const original = (globalThis as { ng?: unknown }).ng;
+    (globalThis as { ng?: unknown }).ng = { version: '21.0.0' };
+    try {
+      expect(resolveComponentPath(document.createElement('div'))).toEqual([]);
+      expect(resolveOwningComponentName(document.createElement('div'))).toBeNull();
+    } finally {
+      (globalThis as { ng?: unknown }).ng = original;
+    }
+  });
+
   it('strips a leading underscore from emitted class names', () => {
     const original = (globalThis as { ng?: unknown }).ng;
     (globalThis as { ng?: unknown }).ng = {

@@ -58,10 +58,15 @@ const report = await scanPages({
   headed: opts.headed,
 });
 
-const total = report.pages.reduce((n, p) => n + p.findings.length, 0);
+const allFindings = report.pages.flatMap((p) => p.findings);
 process.stderr.write(
-  `Scanned ${report.pages.length} route(s) · ${total} node-instance(s).\n`,
+  `Scanned ${report.pages.length} route(s) · ${allFindings.length} node-instance(s).\n`,
 );
+if (allFindings.length > 0 && allFindings.every((f) => f.component === null)) {
+  process.stderr.write(
+    'Note: no component attribution (window.ng absent) — is this a production build? Report mode names components only against a dev build.\n',
+  );
+}
 
 if (!opts.out) {
   process.stdout.write(toMarkdown(report) + '\n');

@@ -13,6 +13,8 @@ export interface PageReport {
   /** The URL actually scanned. */
   url: string;
   findings: A11yFinding[];
+  /** Set when this route failed to scan; findings will be empty. */
+  error?: string;
 }
 
 /** A whole report-mode run across one or more pages. */
@@ -111,6 +113,11 @@ export function toMarkdown(report: ScanReport): string {
   for (const page of report.pages) {
     lines.push(`## ${page.label} — \`${page.url}\``);
     lines.push('');
+    if (page.error) {
+      lines.push(`⚠️ Scan failed: ${page.error}`);
+      lines.push('');
+      continue;
+    }
     if (page.findings.length === 0) {
       lines.push('No violations found. ✅');
       lines.push('');
