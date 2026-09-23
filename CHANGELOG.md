@@ -3,6 +3,22 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.5.0
+
+### Added
+
+- **Configurable framework prefixes.** The component-name prefixes attribution
+  walks past (third-party UI primitives) are now configurable instead of a
+  hardcoded `Nb`/`Mat`/`Cdk`/`Mdc` list:
+  - `provideA11yDevtools({ frameworkPrefixes })`, `runA11yScan(root, { frameworkPrefixes })`,
+    `scan(root, axe, { frameworkPrefixes })`, and `scanPages({ frameworkPrefixes })`.
+  - CLI: `--framework-prefixes Nb,Mat,Nz,Clr,Ion` and `--no-skip-primitives`.
+  - Pass `[]` (or `--no-skip-primitives`) to attribute to the **immediate** owner —
+    e.g. when scanning a component library's *own* code, so it blames the library
+    component rather than a demo wrapper.
+  - Exported `DEFAULT_FRAMEWORK_PREFIXES` (spread it to extend: `[...DEFAULT_FRAMEWORK_PREFIXES, 'Nz']`)
+    and the `ScanOptions` type.
+
 ## 0.4.0
 
 ### Added

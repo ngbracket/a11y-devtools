@@ -32,6 +32,13 @@ export interface A11yDevtoolsOptions {
    * axe run options.)
    */
   tags?: string[];
+  /**
+   * Component-name prefixes treated as third-party UI primitives to walk past
+   * during attribution. Defaults to `Nb`/`Mat`/`Cdk`/`Mdc`. Add others (e.g.
+   * `Nz`/`Clr`/`Ion`) or pass `[]` to attribute to the immediate owner — useful
+   * when auditing a component library's own code.
+   */
+  frameworkPrefixes?: readonly string[];
 }
 
 /**
@@ -48,7 +55,8 @@ export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): Environm
     return makeEnvironmentProviders([]);
   }
 
-  const { root, log = true, logger, overlay = false, debounceMs = 500, tags } = options;
+  const { root, log = true, logger, overlay = false, debounceMs = 500, tags, frameworkPrefixes } =
+    options;
   const axe: AxeRunOptions | undefined = tags
     ? { runOnly: { type: 'tag', values: tags } }
     : undefined;
@@ -69,7 +77,7 @@ export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): Environm
         .subscribe(() => {
           if (scanning) return; // don't stack rescans while one is in flight
           scanning = true;
-          runA11yScan(root?.(), { log, logger, axe })
+          runA11yScan(root?.(), { log, logger, axe, frameworkPrefixes })
             .then((findings) => overlayView?.render(findings))
             .catch(() => undefined)
             .finally(() => {

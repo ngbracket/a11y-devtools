@@ -16,6 +16,13 @@ Options:
   --wait <ms>        Settle time after load before scanning (default 1500)
   --fail-on <impact> Exit non-zero if any finding is at/above impact
                      (minor | moderate | serious | critical) — for CI gating
+  --framework-prefixes <list>
+                     Comma-separated component-name prefixes to treat as
+                     third-party UI primitives to walk past during attribution
+                     (default: Nb,Mat,Cdk,Mdc). e.g. Nb,Mat,Nz,Clr,Ion
+  --no-skip-primitives
+                     Attribute to the immediate owner (skip nothing) — use when
+                     scanning a component library's own code
   --headed           Launch a visible browser (debugging)
   -h, --help         Show this help
 `;
@@ -35,6 +42,10 @@ function parseArgs(argv) {
       case '--format': opts.format = next(); break;
       case '--wait': opts.wait = Number(next()); break;
       case '--fail-on': opts.failOn = next(); break;
+      case '--framework-prefixes':
+        opts.frameworkPrefixes = next().split(',').map((s) => s.trim()).filter(Boolean);
+        break;
+      case '--no-skip-primitives': opts.frameworkPrefixes = []; break;
       case '--headed': opts.headed = true; break;
       case '-h': case '--help': opts.help = true; break;
       default: console.error(`Unknown argument: ${arg}\n`); opts.help = true;
@@ -56,6 +67,7 @@ const report = await scanPages({
   tags: opts.tags,
   waitMs: opts.wait,
   headed: opts.headed,
+  frameworkPrefixes: opts.frameworkPrefixes,
 });
 
 const allFindings = report.pages.flatMap((p) => p.findings);

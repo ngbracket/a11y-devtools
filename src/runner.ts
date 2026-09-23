@@ -15,6 +15,12 @@ export interface RunOptions {
    * as a friendlier `tags: string[]`.)
    */
   axe?: AxeRunOptions;
+  /**
+   * Component-name prefixes treated as third-party UI primitives to walk past
+   * during attribution. Defaults to `Nb`/`Mat`/`Cdk`/`Mdc`; pass `[]` to
+   * attribute to the immediate owner (e.g. when scanning a library's own code).
+   */
+  frameworkPrefixes?: readonly string[];
 }
 
 /** Scan `root`, optionally report, and return the findings. */
@@ -22,7 +28,9 @@ export async function runA11yScan(
   root?: Element | Document,
   options: RunOptions = {},
 ): Promise<A11yFinding[]> {
-  const findings = await scan(root ?? document, options.axe);
+  const findings = await scan(root ?? document, options.axe, {
+    frameworkPrefixes: options.frameworkPrefixes,
+  });
   if (options.log !== false) {
     logFindings(findings, options.logger);
   }

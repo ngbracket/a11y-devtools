@@ -1,8 +1,24 @@
 import type { ContextObject, RunOptions } from 'axe-core';
-import { appComponentFromPath, resolveComponentPath, resolveDirectiveNames } from './attribution.js';
+import {
+  appComponentFromPath,
+  DEFAULT_FRAMEWORK_PREFIXES,
+  resolveComponentPath,
+  resolveDirectiveNames,
+} from './attribution.js';
 import { OVERLAY_EXCLUDE_SELECTOR } from './overlay.js';
 
 export type Impact = 'minor' | 'moderate' | 'serious' | 'critical' | null;
+
+/** Attribution options for a scan (separate from axe's own run options). */
+export interface ScanOptions {
+  /**
+   * Component-name prefixes treated as third-party UI primitives to walk past
+   * during attribution. Defaults to {@link DEFAULT_FRAMEWORK_PREFIXES}
+   * (`Nb`/`Mat`/`Cdk`/`Mdc`). Pass `[]` to disable walking and attribute to the
+   * immediate owner — useful when scanning a component library's own code.
+   */
+  frameworkPrefixes?: readonly string[];
+}
 
 /** One axe violation node, enriched with the component that rendered it. */
 export interface A11yFinding {
@@ -35,8 +51,9 @@ let runChain: Promise<unknown> = Promise.resolve();
 export function scan(
   root: Element | Document = document,
   options?: RunOptions,
+  scanOptions?: ScanOptions,
 ): Promise<A11yFinding[]> {
-  const result = runChain.then(() => runAxeOnce(root, options));
+  const result = runChain.then(() => runAxeOnce(root, options, scanOptions));
   runChain = result.catch(() => undefined);
   return result;
 }
@@ -44,8 +61,10 @@ export function scan(
 async function runAxeOnce(
   root: Element | Document,
   options?: RunOptions,
+  scanOptions?: ScanOptions,
 ): Promise<A11yFinding[]> {
   const axe = (await import('axe-core')).default;
+  const frameworkPrefixes = scanOptions?.frameworkPrefixes ?? DEFAULT_FRAMEWORK_PREFIXES;
   // Scan within `root` but never flag the overlay's own highlights.
   const context: ContextObject = { include: root, exclude: [OVERLAY_EXCLUDE_SELECTOR] };
   const results = await axe.run(context, options ?? {});
@@ -67,7 +86,7 @@ async function runAxeOnce(
         impact: (violation.impact ?? null) as Impact,
         help: violation.help,
         helpUrl: violation.helpUrl,
-        component: appComponentFromPath(componentPath),
+        component: appComponentFromPath(componentPath, frameworkPrefixes),
         componentPath,
         directives: element ? resolveDirectiveNames(element) : [],
         target,

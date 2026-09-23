@@ -62,8 +62,17 @@ provideA11yDevtools({
   overlay: true,       // in-app visual highlights over flagged nodes; default false
   debounceMs: 500,     // quiet window after stabilization before scanning
   tags: ['wcag22aa'],  // scope the ruleset; default = axe-core's full ruleset
+  frameworkPrefixes: ['Nb', 'Mat', 'Cdk', 'Mdc'], // UI primitives to attribute past (default)
 });
 ```
+
+**Framework prefixes.** Attribution walks *past* third-party UI primitives to the app
+component that placed them — a `<button nbButton>` with no name is blamed on your
+`HeaderComponent`, not `NbButtonComponent`. The default list is `Nb`/`Mat`/`Cdk`/`Mdc`;
+override `frameworkPrefixes` to add others (e.g. `['Nb','Mat','Nz','Clr','Ion']` — spread
+`DEFAULT_FRAMEWORK_PREFIXES` to extend), or pass `[]` to attribute to the **immediate**
+owner (useful when auditing a component library's *own* code). The same option is available
+on `scan`, `runA11yScan`, `scanPages`, and the CLI (`--framework-prefixes` / `--no-skip-primitives`).
 
 Findings are grouped by owning component, led by a summary line, and each node's
 directives are shown inline:

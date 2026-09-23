@@ -35,18 +35,30 @@ function nameOf(instance: unknown): string | null {
 }
 
 /**
- * Third-party UI-primitive components (Nebular `Nb*`, Angular Material `Mat*`,
- * CDK `Cdk*`/`Mdc*`) whose violations are fixed where the primitive is *used*,
- * not inside the library — e.g. `<button nbButton>` with no name is fixed in the
- * component that placed it, not in Nebular. Attribution walks past these to the
- * app component. Matched with a CamelCase boundary so `MatchListComponent` isn't
- * mistaken for Material. A component library you author (e.g. `Ngbr*`) is
- * deliberately absent: a bug in a component you ship is fixed in that component.
+ * Default component-name prefixes treated as third-party UI primitives (Nebular
+ * `Nb*`, Angular Material `Mat*`, CDK `Cdk*`/`Mdc*`) whose violations are fixed
+ * where the primitive is *used*, not inside the library — e.g. `<button nbButton>`
+ * with no name is fixed in the component that placed it, not in Nebular.
+ * Attribution walks past these to the app component. A component library you
+ * author (e.g. `Ngbr*`) is deliberately absent: a bug in a component you ship is
+ * fixed in that component. Override with the `frameworkPrefixes` option — add
+ * `Nz`/`Clr`/`Ion`/`Tui` for other libraries, or pass `[]` to disable walking
+ * (attribute to the immediate owner) when scanning a library's own code.
  */
-const PRIMITIVE_COMPONENT = /^(Nb|Mat|Cdk|Mdc)[A-Z]/;
+export const DEFAULT_FRAMEWORK_PREFIXES: readonly string[] = ['Nb', 'Mat', 'Cdk', 'Mdc'];
 
-function isPrimitiveComponent(name: string): boolean {
-  return PRIMITIVE_COMPONENT.test(name);
+/**
+ * True when `name` starts with one of `prefixes` at a CamelCase boundary, so
+ * `MatCard` matches Material but `MatchList` does not. An empty prefix list
+ * matches nothing — nothing is treated as a primitive.
+ */
+function isPrimitiveComponent(name: string, prefixes: readonly string[]): boolean {
+  for (const prefix of prefixes) {
+    if (!prefix || name.length <= prefix.length || !name.startsWith(prefix)) continue;
+    const next = name.charCodeAt(prefix.length);
+    if (next >= 65 && next <= 90) return true; // next char is A–Z
+  }
+  return false;
 }
 
 /**
@@ -78,9 +90,16 @@ export function resolveComponentPath(node: Element): string[] {
   return path;
 }
 
-/** The component to blame from an ownership path: the nearest one the app owns. */
-export function appComponentFromPath(path: string[]): string | null {
-  return path.find((name) => !isPrimitiveComponent(name)) ?? path[0] ?? null;
+/**
+ * The component to blame from an ownership path: the nearest one the app owns,
+ * walking past third-party UI primitives. Pass `frameworkPrefixes: []` to skip
+ * nothing and return the immediate owner.
+ */
+export function appComponentFromPath(
+  path: string[],
+  frameworkPrefixes: readonly string[] = DEFAULT_FRAMEWORK_PREFIXES,
+): string | null {
+  return path.find((name) => !isPrimitiveComponent(name, frameworkPrefixes)) ?? path[0] ?? null;
 }
 
 /**
@@ -88,8 +107,11 @@ export function appComponentFromPath(path: string[]): string | null {
  * author actually owns (walking past third-party UI primitives to where the fix
  * lives). Null when the debug global is absent (prod).
  */
-export function resolveOwningComponentName(node: Element): string | null {
-  return appComponentFromPath(resolveComponentPath(node));
+export function resolveOwningComponentName(
+  node: Element,
+  frameworkPrefixes: readonly string[] = DEFAULT_FRAMEWORK_PREFIXES,
+): string | null {
+  return appComponentFromPath(resolveComponentPath(node), frameworkPrefixes);
 }
 
 /**

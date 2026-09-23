@@ -25,6 +25,13 @@ export interface ScanPagesOptions {
   setup?: (page: Page) => Promise<void>;
   /** Launch a headed browser (for debugging). Default false (headless). */
   headed?: boolean;
+  /**
+   * Component-name prefixes treated as third-party UI primitives to walk past
+   * during attribution. Defaults to `Nb`/`Mat`/`Cdk`/`Mdc`; pass `[]` to
+   * attribute to the immediate owner — useful when scanning a component
+   * library's own code (so it blames the library component, not a demo wrapper).
+   */
+  frameworkPrefixes?: readonly string[];
 }
 
 type PlaywrightModule = typeof import('playwright');
@@ -52,7 +59,8 @@ function inPageScriptPath(): string {
  * to the component that rendered it — with no change to the target app.
  */
 export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> {
-  const { baseUrl, routes, tags, waitMs = 1500, labels = {}, setup, headed = false } = options;
+  const { baseUrl, routes, tags, waitMs = 1500, labels = {}, setup, headed = false, frameworkPrefixes } =
+    options;
   const axeOptions: AxeRunOptions | undefined = tags
     ? { runOnly: { type: 'tag', values: tags } }
     : undefined;
@@ -79,10 +87,12 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
         await page.goto(url, { waitUntil: 'networkidle' }).catch(() => page.goto(url));
         await page.waitForTimeout(waitMs);
         await page.addScriptTag({ content: inPageScript });
-        const findings = (await page.evaluate((opts) => {
-          const w = window as unknown as { __ngbA11yScan: (o?: unknown) => Promise<unknown> };
-          return w.__ngbA11yScan(opts);
-        }, axeOptions)) as A11yFinding[];
+        const findings = (await page.evaluate((args) => {
+          const w = window as unknown as {
+            __ngbA11yScan: (a?: unknown, s?: unknown) => Promise<unknown>;
+          };
+          return w.__ngbA11yScan(args.axe, args.scan);
+        }, { axe: axeOptions, scan: { frameworkPrefixes } })) as A11yFinding[];
         pages.push({ label, url: page.url(), findings });
       } catch (err) {
         // One bad route shouldn't sink the whole run — record it and continue.

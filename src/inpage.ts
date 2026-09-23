@@ -1,5 +1,5 @@
 import type { RunOptions as AxeRunOptions } from 'axe-core';
-import { scan, type A11yFinding } from './scan.js';
+import { scan, type A11yFinding, type ScanOptions } from './scan.js';
 
 /**
  * The browser-injected half of report-mode. A headless driver injects the built
@@ -10,8 +10,11 @@ import { scan, type A11yFinding } from './scan.js';
  * This entry is deliberately NOT re-exported from `index.ts`: it bundles axe-core
  * and must never reach a consumer's application bundle.
  */
-export type InPageScan = (options?: AxeRunOptions) => Promise<A11yFinding[]>;
+export type InPageScan = (
+  options?: AxeRunOptions,
+  scanOptions?: ScanOptions,
+) => Promise<A11yFinding[]>;
 
-const run: InPageScan = (options) => scan(document, options);
+const run: InPageScan = (options, scanOptions) => scan(document, options, scanOptions);
 
 (globalThis as unknown as { __ngbA11yScan: InPageScan }).__ngbA11yScan = run;
