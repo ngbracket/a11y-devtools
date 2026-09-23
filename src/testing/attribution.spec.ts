@@ -1,7 +1,12 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ngDebug, resolveDirectiveNames, resolveOwningComponentName } from '../attribution';
+import {
+  ngDebug,
+  resolveComponentPath,
+  resolveDirectiveNames,
+  resolveOwningComponentName,
+} from '../attribution';
 import { AppComponent } from './fixtures';
 
 describe('attribution', () => {
@@ -39,6 +44,46 @@ describe('attribution', () => {
     expect(resolveDirectiveNames(img)).toContain('TooltipDirective');
 
     host.remove();
+  });
+
+  it('walks past a third-party UI primitive to the app component that placed it', () => {
+    // <button nbButton> in a HeaderComponent template: the button is owned by
+    // NbButtonComponent, but the fixable owner is HeaderComponent.
+    const header = document.createElement('div');
+    const button = document.createElement('button');
+    header.appendChild(button);
+    host.appendChild(header);
+
+    const original = (globalThis as { ng?: unknown }).ng;
+    (globalThis as { ng?: unknown }).ng = {
+      getComponent: (el: Element) =>
+        el === button ? { constructor: { name: 'NbButtonComponent' } } : null,
+      getOwningComponent: (el: Element) =>
+        el === button
+          ? { constructor: { name: 'NbButtonComponent' } }
+          : { constructor: { name: 'HeaderComponent' } },
+      getDirectives: () => [],
+    };
+    try {
+      expect(resolveComponentPath(button)).toEqual(['NbButtonComponent', 'HeaderComponent']);
+      expect(resolveOwningComponentName(button)).toBe('HeaderComponent');
+    } finally {
+      (globalThis as { ng?: unknown }).ng = original;
+      host.remove();
+    }
+  });
+
+  it('treats a partial ng global (no debug helpers) as no attribution', () => {
+    // A production build can leave `window.ng` present but without getComponent/
+    // getOwningComponent — must not throw mid-scan.
+    const original = (globalThis as { ng?: unknown }).ng;
+    (globalThis as { ng?: unknown }).ng = { version: '21.0.0' };
+    try {
+      expect(resolveComponentPath(document.createElement('div'))).toEqual([]);
+      expect(resolveOwningComponentName(document.createElement('div'))).toBeNull();
+    } finally {
+      (globalThis as { ng?: unknown }).ng = original;
+    }
   });
 
   it('strips a leading underscore from emitted class names', () => {

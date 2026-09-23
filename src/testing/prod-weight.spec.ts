@@ -76,6 +76,19 @@ describe('production weight (axe-core stays out of the initial bundle)', () => {
     expect(withDynamic.some((i) => AXE.test(i))).toBe(true);
   });
 
+  it('keeps report-mode (headless driver + playwright) out of the browser entry graph', async () => {
+    const meta = await bundleGraph();
+    const start = entryInput(meta);
+
+    // Follow dynamic imports too: report-mode must be unreachable from `.` by ANY path.
+    const all = [...reachable(meta, start, true)];
+    expect(all.some((i) => /report\/headless/.test(i))).toBe(false);
+    expect(all.some((i) => /playwright/.test(i))).toBe(false);
+    // Sanity: the shared *pure* formatter is allowed in the browser graph
+    // (the console logger reuses `groupByComponent`).
+    expect(all.some((i) => /report\/format/.test(i))).toBe(true);
+  });
+
   it('drops axe-core entirely when the provider is imported but unused (dead prod branch)', async () => {
     // Mirrors a production build where `isDevMode()` is false, so the
     // `provideA11yDevtools(...)` call is dead-code-eliminated. If the package
