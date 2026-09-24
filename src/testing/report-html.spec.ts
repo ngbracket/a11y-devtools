@@ -129,4 +129,12 @@ describe('toHtml', () => {
     expect(marked[0].textContent).toBe('New');
     expect(marked[0].parentElement!.textContent).toContain(first.id);
   });
+
+  it('explains a dark-only page', () => {
+    const doc = parse(toHtml({
+      generatedAt: 'x',
+      pages: [{ label: '/ (dark)', url: 'u', findings: [], colorScheme: 'dark', darkOnly: true }],
+    }));
+    expect(doc.body.textContent).toContain('only issues that don’t also appear in light mode');
+  });
 });

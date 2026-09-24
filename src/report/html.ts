@@ -1,6 +1,7 @@
 import type { BaselineDiff } from './baseline.js';
 import {
   addedBySeverity,
+  DARK_ONLY_NOTE,
   bySeverity,
   distinctRuleCount,
   groupByComponent,
@@ -154,6 +155,7 @@ export function toHtml(report: ScanReport, diff?: BaselineDiff): string {
     out.push(
       `<h2 id="${headingId}">${escapeHtml(page.label)} <code>${escapeHtml(page.url)}</code></h2>`,
     );
+    if (page.darkOnly) out.push(`<p class="meta">${escapeHtml(DARK_ONLY_NOTE)}</p>`);
     if (page.error) {
       out.push(`<p class="error">Scan failed: ${escapeHtml(page.error)}</p>`);
       out.push('</section>');

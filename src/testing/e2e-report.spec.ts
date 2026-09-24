@@ -114,6 +114,31 @@ const PAGES: Record<string, string> = {
       });
     </script>`,
 
+  // Dark theme via prefers-color-scheme: fine in light, low contrast in dark. The
+  // missing alt is in both schemes, so a "both" run must not repeat it for dark.
+  '/dark-media': `
+    <style>
+      @media (prefers-color-scheme: dark) {
+        body { background: #222; } .note { color: #444; }
+      }
+    </style>
+    <main><h1>Media</h1><p class="note">Theme-dependent text</p>
+      <img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" width="10" height="10" />
+    </main>`,
+
+  // Dark theme toggled by a class on <html> (Tailwind / Material style).
+  '/dark-class': `
+    <style>html.dark body { background: #222; } html.dark .note { color: #444; }</style>
+    <main><h1>Class</h1><p class="note">Theme-dependent text</p></main>`,
+
+  // Dark theme toggled by an attribute on <html> (Bootstrap style).
+  '/dark-attr': `
+    <style>
+      html[data-bs-theme="dark"] body { background: #222; }
+      html[data-bs-theme="dark"] .note { color: #444; }
+    </style>
+    <main><h1>Attribute</h1><p class="note">Theme-dependent text</p></main>`,
+
   // Plain axe + layout: a missing alt, and a positive tabindex that jumps up the page.
   '/axe': `
     <main>
@@ -198,6 +223,61 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
     expect(ids('/modal')).not.toContain('ngbr/modal-focus-not-contained');
   });
 
+  describe('colour schemes', () => {
+    type Report = import('../report/format').ScanReport;
+    const scanRoutes = async (routes: string[], extra: object): Promise<Report> => {
+      const { scanPages } = (await import(distReport)) as typeof import('../report/index');
+      return scanPages({ baseUrl, routes, waitMs: 50, ...extra });
+    };
+    const rules = (r: Report, label: string) =>
+      r.pages.find((p) => p.label === label)!.findings.map((f) => f.id);
+
+    it("'both' scans light then dark, and dark lists only what light doesn't have", async () => {
+      const r = await scanRoutes(['/dark-media'], { colorScheme: 'both' });
+      expect(r.pages.map((p) => p.label)).toEqual(['/dark-media', '/dark-media (dark)']);
+      expect(r.pages.map((p) => p.colorScheme)).toEqual(['light', 'dark']);
+      expect(r.pages[1].darkOnly).toBe(true);
+      expect(rules(r, '/dark-media')).toContain('image-alt');
+      expect(rules(r, '/dark-media')).not.toContain('color-contrast');
+      expect(rules(r, '/dark-media (dark)')).toContain('color-contrast');
+      expect(rules(r, '/dark-media (dark)')).not.toContain('image-alt'); // already reported in light
+    }, 60_000);
+
+    it("'dark' alone reports everything, under a (dark) label", async () => {
+      const r = await scanRoutes(['/dark-media'], { colorScheme: 'dark' });
+      expect(r.pages.map((p) => p.label)).toEqual(['/dark-media (dark)']);
+      expect(r.pages[0].darkOnly).toBeUndefined();
+      expect(rules(r, '/dark-media (dark)')).toEqual(expect.arrayContaining(['image-alt', 'color-contrast']));
+    }, 60_000);
+
+    it('darkClass applies a class-toggled theme for the dark pass (and implies both)', async () => {
+      const r = await scanRoutes(['/dark-class'], { darkClass: 'dark' });
+      expect(rules(r, '/dark-class')).not.toContain('color-contrast');
+      expect(rules(r, '/dark-class (dark)')).toContain('color-contrast');
+    }, 60_000);
+
+    it('setup and beforeScan hooks are told the scheme, so they can switch any theme', async () => {
+      const seen: string[] = [];
+      const r = await scanRoutes(['/dark-attr'], {
+        colorScheme: 'both',
+        setup: async (_page: unknown, { colorScheme }: { colorScheme: string }) => {
+          seen.push(`setup:${colorScheme}`);
+        },
+        beforeScan: async (
+          page: import('playwright').Page,
+          { colorScheme, route }: { colorScheme: string; route: string },
+        ) => {
+          seen.push(`before:${colorScheme}:${route}`);
+          if (colorScheme === 'dark') {
+            await page.evaluate(() => document.documentElement.setAttribute('data-bs-theme', 'dark'));
+          }
+        },
+      });
+      expect(seen).toEqual(['setup:light', 'before:light:/dark-attr', 'setup:dark', 'before:dark:/dark-attr']);
+      expect(rules(r, '/dark-attr (dark)')).toContain('color-contrast');
+    }, 60_000);
+  });
+
   describe('CLI: output formats and the baseline gate', () => {
     let dir: string;
     const scan = ['--wait', '50', '--keyboard', '--focus-traps'];
@@ -236,6 +316,22 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
       expect(stderr).toContain('Failing: found new violation(s)');
       expect(code).toBe(1);
     }, 60_000);
+
+    it('--dark-attribute scans an attribute-toggled dark theme', async () => {
+      const { code } = await runCli([
+        '--base', baseUrl, '--route', '/dark-attr', '--wait', '50',
+        '--dark-attribute', 'data-bs-theme=dark', '--out', join(dir, 'attr'), '--format', 'json',
+      ]);
+      expect(code).toBe(0);
+      const pages = JSON.parse(readFileSync(join(dir, 'attr.json'), 'utf8')).pages;
+      expect(pages.map((p: { label: string }) => p.label)).toEqual(['/dark-attr', '/dark-attr (dark)']);
+      expect(pages[1].findings.map((f: { id: string }) => f.id)).toContain('color-contrast');
+    }, 60_000);
+
+    it('rejects an invalid --color-scheme or --dark-attribute', async () => {
+      expect((await runCli(['--base', baseUrl, '--route', '/', '--color-scheme', 'dim'])).code).toBe(2);
+      expect((await runCli(['--base', baseUrl, '--route', '/', '--dark-attribute', 'dark'])).code).toBe(2);
+    });
 
     it('refuses a baseline that is not a JSON report, before scanning', async () => {
       const { code, stderr } = await runCli([

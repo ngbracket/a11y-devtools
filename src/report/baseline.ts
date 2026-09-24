@@ -53,6 +53,26 @@ export function findingKey(page: string, finding: A11yFinding): string {
 }
 
 /**
+ * The findings in `findings` that aren't also in `reference`, matched by
+ * {@link findingKey} with counts. Used for a dark-mode pass, so it reports only
+ * what dark mode adds rather than repeating every light-mode finding.
+ */
+export function findingsNotIn(findings: A11yFinding[], reference: A11yFinding[]): A11yFinding[] {
+  const counts = new Map<string, number>();
+  for (const finding of reference) {
+    const key = findingKey('', finding);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return findings.filter((finding) => {
+    const key = findingKey('', finding);
+    const left = counts.get(key) ?? 0;
+    if (left === 0) return true;
+    counts.set(key, left - 1);
+    return false;
+  });
+}
+
+/**
  * Compare `current` with `baseline`. Matching is by {@link findingKey} with
  * counts, so two identical keys in the current run against one in the baseline
  * leaves one new. Pages are matched by label; a route the baseline never

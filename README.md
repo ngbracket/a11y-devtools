@@ -145,6 +145,51 @@ accessible itself: landmarks, a sequential heading outline, a real data table,
 severity written as text (not colour alone), and AA contrast in light and dark
 mode. Its own report-mode scan comes back clean.
 
+### Dark mode (and other colour schemes)
+
+By default the headless browser reports a **light** colour-scheme preference, so a
+dark theme is never switched on and its contrast is never checked. Pick the
+scheme(s) to scan with `--color-scheme`:
+
+```bash
+# dark theme driven by prefers-color-scheme (the OS setting)
+npx ngbr-a11y-report --base http://localhost:4200 --route / --color-scheme both
+```
+
+- `light` (default) or `dark` scans once in that scheme. Dark pages are labelled
+  `/route (dark)`.
+- `both` scans each route twice. To avoid listing everything twice, the dark page
+  shows only the issues that **don't also** appear in light mode (typically contrast
+  problems specific to the dark palette).
+
+Many apps switch themes with a class or attribute instead of the OS setting. For
+those, tell report mode what to set on `<html>` for the dark pass (either flag
+implies `--color-scheme both`):
+
+```bash
+npx ngbr-a11y-report --base http://localhost:4200 --route / --dark-class dark          # Tailwind-style
+npx ngbr-a11y-report --base http://localhost:4200 --route / --dark-attribute data-bs-theme=dark  # Bootstrap
+```
+
+For anything else (a theme picker, a setting in localStorage, a class on `<body>`),
+use the programmatic hooks. Both receive the pass's `colorScheme`:
+
+```ts
+await scanPages({
+  baseUrl: 'http://localhost:4200',
+  routes: ['/', '/settings'],
+  colorScheme: 'both',
+  // once per pass, e.g. pick the theme in a persisted setting
+  setup: async (page, { colorScheme }) => {
+    await page.evaluate((s) => localStorage.setItem('theme', s), colorScheme);
+  },
+  // after every route loads, for a theme that doesn't persist between pages
+  beforeScan: async (page, { colorScheme }) => {
+    if (colorScheme === 'dark') await page.click('button[aria-label="Dark theme"]');
+  },
+});
+```
+
 ### Baseline: fail CI only on new issues
 
 An app with a backlog of known issues can't turn on `--fail-on` without every build
@@ -345,6 +390,7 @@ npm run build   # tsc -> dist/ (ESM + .d.ts)
 - Headless report mode (CLI + `./report`).
 - HTML report output.
 - Baseline/diff mode: CI fails only on new issues.
+- Dark-mode scanning: `--color-scheme`, `--dark-class` / `--dark-attribute`, and theme-aware hooks.
 - **Keyboard & Focus Mode M1** — tab-order visualisation + keyboard-reachability findings.
 - **Keyboard & Focus Mode M2** — focus-follow accessibility-tree preview.
 - **Keyboard & Focus Mode M3** — missing focus-trap detection (uncontained

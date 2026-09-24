@@ -27,6 +27,21 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   sequential headings, a real data table, severity as text, AA contrast in light and
   dark), and its own report-mode scan comes back clean. New `toHtml(report, diff?)`
   export.
+- **Dark-mode scanning.** Report mode used to run with the browser's default *light*
+  colour scheme, so a dark theme was never switched on or contrast-checked.
+  - `--color-scheme light|dark|both` (`colorScheme` in `scanPages`): the browser
+    emulates that `prefers-color-scheme`. `both` scans every route twice. Dark pages
+    are labelled `/route (dark)` and list only the issues that **don't also** appear
+    in light, so findings aren't doubled (`PageReport.darkOnly`). The keyboard-trap walk
+    runs once, in the light pass.
+  - Class/attribute-toggled themes: `--dark-class <name>` / `--dark-attribute
+    <name=value>` (`darkClass` / `darkAttribute`) set that on `<html>` before each
+    dark-pass scan. Either implies `both`.
+  - Hooks for anything else: `setup(page, { colorScheme })` now runs once per pass
+    in a fresh browser context, and the new `beforeScan(page, { colorScheme, route })`
+    runs after every route loads.
+  - New exports: `findingsNotIn`, `DARK_ONLY_NOTE`, and the `ColorScheme` /
+    `ThemeContext` types.
 - `--format` now takes a comma-separated list (`md,json,html`), plus `both` (md + json,
   still the default) and `all`.
 - The real-browser E2E spec now runs the CLI itself: output formats and the baseline

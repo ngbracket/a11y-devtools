@@ -16,7 +16,18 @@ export interface PageReport {
   findings: A11yFinding[];
   /** Set when this route failed to scan; findings will be empty. */
   error?: string;
+  /** Colour scheme the page was scanned in; absent means the browser default (light). */
+  colorScheme?: 'light' | 'dark';
+  /**
+   * True on the dark pass of a `colorScheme: 'both'` run: findings are only the
+   * ones that don't also appear in the light pass of the same route.
+   */
+  darkOnly?: boolean;
 }
+
+/** One-line explanation for a dark-only page, shared by the Markdown and HTML reports. */
+export const DARK_ONLY_NOTE =
+  'Dark mode: lists only issues that don’t also appear in light mode on this route.';
 
 /** A whole report-mode run across one or more pages. */
 export interface ScanReport {
@@ -163,6 +174,10 @@ export function toMarkdown(report: ScanReport, diff?: BaselineDiff): string {
   for (const page of report.pages) {
     lines.push(`## ${page.label} — \`${page.url}\``);
     lines.push('');
+    if (page.darkOnly) {
+      lines.push(`_${DARK_ONLY_NOTE}_`);
+      lines.push('');
+    }
     if (page.error) {
       lines.push(`⚠️ Scan failed: ${page.error}`);
       lines.push('');

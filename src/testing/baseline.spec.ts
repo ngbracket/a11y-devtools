@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diffAgainstBaseline, findingKey, parseBaseline } from '../report/baseline';
+import { diffAgainstBaseline, findingKey, findingsNotIn, parseBaseline } from '../report/baseline';
 import { toJson, toMarkdown, type ScanReport } from '../report/format';
 import type { A11yFinding } from '../scan';
 
@@ -87,6 +87,27 @@ describe('diffAgainstBaseline', () => {
     const run = report([{ label: '/', url: 'u', findings: [finding(), finding({ id: 'label' })] }]);
     const diff = diffAgainstBaseline(run, parseBaseline(toJson(run)));
     expect(diff).toEqual({ added: [], fixed: [], unchanged: 2 });
+  });
+});
+
+describe('findingsNotIn', () => {
+  it('keeps only findings the reference does not have, counting duplicates', () => {
+    const shared = finding();
+    const darkOnly = finding({ id: 'color-contrast', target: 'p.note' });
+    expect(findingsNotIn([shared, darkOnly], [shared])).toEqual([darkOnly]);
+    expect(findingsNotIn([shared, shared], [shared])).toHaveLength(1);
+    expect(findingsNotIn([shared], [])).toEqual([shared]);
+  });
+});
+
+describe('dark-only pages in the reports', () => {
+  const run = report([
+    { label: '/', url: 'u', findings: [], colorScheme: 'light' },
+    { label: '/ (dark)', url: 'u', findings: [finding()], colorScheme: 'dark', darkOnly: true },
+  ]);
+
+  it('Markdown explains that dark lists only what light does not have', () => {
+    expect(toMarkdown(run)).toContain('only issues that don’t also appear in light mode');
   });
 });
 

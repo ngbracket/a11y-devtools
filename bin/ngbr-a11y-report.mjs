@@ -41,6 +41,15 @@ Options:
   --focus-traps      Also walk each route with real Tab presses to find keyboard
                      traps — focus that cycles inside part of the page and
                      never moves on (ngbr/focus-trap). Runs after the scan
+  --color-scheme <s> light | dark | both — scan with the browser emulating that
+                     prefers-color-scheme (default light). "both" scans each
+                     route twice; dark pages list only issues light doesn't have
+  --dark-class <name>
+                     Dark theme toggled by a class: add it to <html> for the
+                     dark pass (e.g. dark, dark-theme). Implies --color-scheme both
+  --dark-attribute <name=value>
+                     Dark theme toggled by an attribute on <html>, e.g.
+                     data-bs-theme=dark. Implies --color-scheme both
   --headed           Launch a visible browser (debugging)
   -h, --help         Show this help
 `;
@@ -67,6 +76,9 @@ function parseArgs(argv) {
       case '--no-skip-primitives': opts.frameworkPrefixes = []; break;
       case '--keyboard': opts.keyboard = true; break;
       case '--focus-traps': opts.focusTraps = true; break;
+      case '--color-scheme': opts.colorScheme = next(); break;
+      case '--dark-class': opts.darkClass = next(); break;
+      case '--dark-attribute': opts.darkAttribute = next(); break;
       case '--headed': opts.headed = true; break;
       case '-h': case '--help': opts.help = true; break;
       default: console.error(`Unknown argument: ${arg}\n`); opts.help = true;
@@ -92,6 +104,20 @@ for (const name of String(opts.format).split(',').map((s) => s.trim()).filter(Bo
   FORMATS[name].forEach((f) => formats.add(f));
 }
 
+if (opts.colorScheme && !['light', 'dark', 'both'].includes(opts.colorScheme)) {
+  process.stderr.write(`Invalid --color-scheme "${opts.colorScheme}" (use light, dark or both)\n`);
+  process.exit(2);
+}
+let darkAttribute;
+if (opts.darkAttribute) {
+  const eq = opts.darkAttribute.indexOf('=');
+  if (eq <= 0) {
+    process.stderr.write(`Invalid --dark-attribute "${opts.darkAttribute}" (use name=value, e.g. data-bs-theme=dark)\n`);
+    process.exit(2);
+  }
+  darkAttribute = { name: opts.darkAttribute.slice(0, eq), value: opts.darkAttribute.slice(eq + 1) };
+}
+
 // Read the baseline before the (slow) scan, so a bad path fails fast.
 let baseline;
 if (opts.baseline) {
@@ -112,6 +138,9 @@ const report = await scanPages({
   frameworkPrefixes: opts.frameworkPrefixes,
   keyboard: opts.keyboard,
   focusTraps: opts.focusTraps,
+  colorScheme: opts.colorScheme,
+  darkClass: opts.darkClass,
+  darkAttribute,
 });
 
 const allFindings = report.pages.flatMap((p) => p.findings);
