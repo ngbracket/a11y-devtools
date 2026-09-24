@@ -12,6 +12,7 @@ import { debounceTime, filter } from 'rxjs';
 import { runA11yScan } from './runner.js';
 import type { Logger } from './report.js';
 import { createOverlay } from './overlay.js';
+import { tabSequence } from './keyboard/tab-sequence.js';
 
 export interface A11yDevtoolsOptions {
   /** Element/Document to scan. Defaults to `document`. */
@@ -39,6 +40,14 @@ export interface A11yDevtoolsOptions {
    * when auditing a component library's own code.
    */
   frameworkPrefixes?: readonly string[];
+  /**
+   * Turn on the **keyboard layer** — the ~2/3 of accessibility axe can't test.
+   * Adds heuristic `ngbr/*` findings (keyboard-unreachable controls,
+   * click-without-keyboard handlers, tab-order mismatches) to the report, and,
+   * when `overlay` is on, draws the numbered tab-order path over the page.
+   * Default false.
+   */
+  keyboard?: boolean;
 }
 
 /**
@@ -55,8 +64,16 @@ export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): Environm
     return makeEnvironmentProviders([]);
   }
 
-  const { root, log = true, logger, overlay = false, debounceMs = 500, tags, frameworkPrefixes } =
-    options;
+  const {
+    root,
+    log = true,
+    logger,
+    overlay = false,
+    debounceMs = 500,
+    tags,
+    frameworkPrefixes,
+    keyboard = false,
+  } = options;
   const axe: AxeRunOptions | undefined = tags
     ? { runOnly: { type: 'tag', values: tags } }
     : undefined;
@@ -77,8 +94,17 @@ export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): Environm
         .subscribe(() => {
           if (scanning) return; // don't stack rescans while one is in flight
           scanning = true;
-          runA11yScan(root?.(), { log, logger, axe, frameworkPrefixes })
-            .then((findings) => overlayView?.render(findings))
+          runA11yScan(root?.(), { log, logger, axe, frameworkPrefixes, keyboard })
+            .then((findings) => {
+              overlayView?.render(findings);
+              // Draw the tab-order path as its own overlay layer (independent of
+              // the findings highlights) when the keyboard layer is on.
+              if (overlayView && keyboard) {
+                overlayView.renderTabOrder(
+                  tabSequence(root?.() ?? document, { frameworkPrefixes }),
+                );
+              }
+            })
             .catch(() => undefined)
             .finally(() => {
               scanning = false;

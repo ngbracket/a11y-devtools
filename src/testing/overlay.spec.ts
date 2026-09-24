@@ -1,6 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createOverlay, OVERLAY_ATTR, type A11yOverlay } from '../overlay';
 import type { A11yFinding } from '../scan';
+import type { TabStop } from '../keyboard/tab-sequence';
+
+const stop = (element: Element, over: Partial<TabStop> = {}): TabStop => ({
+  element,
+  order: 1,
+  tabindex: 0,
+  positive: false,
+  component: null,
+  componentPath: [],
+  ...over,
+});
 
 const finding = (over: Partial<A11yFinding>): A11yFinding => ({
   id: 'image-alt',
@@ -96,5 +107,45 @@ describe('createOverlay', () => {
   it('removes its container on destroy', () => {
     overlay.destroy();
     expect(overlayRoot()).toBeNull();
+  });
+
+  it('draws a numbered tab-order badge per stop, centred on its target', () => {
+    const a = targetEl('a', { top: 100, left: 50, width: 20, height: 20 });
+    const b = targetEl('b', { top: 200, left: 60, width: 20, height: 20 });
+    overlay.renderTabOrder([stop(a, { order: 1 }), stop(b, { order: 2 })]);
+
+    const badges = overlayRoot()!.querySelectorAll('[data-ngb-tab-order]');
+    expect(badges).toHaveLength(2);
+    expect(badges[0].textContent).toBe('1');
+    const first = badges[0] as HTMLElement;
+    expect(first.style.top).toBe('100px'); // anchored at the target's top-left
+    expect(first.style.left).toBe('50px');
+  });
+
+  it('colours a positive-tabindex stop as a warning', () => {
+    const a = targetEl('a');
+    overlay.renderTabOrder([stop(a, { order: 1, positive: true, tabindex: 3 })]);
+    const badge = overlayRoot()!.querySelector('[data-ngb-tab-order]') as HTMLElement;
+    expect(badge.style.background).toContain('rgb(232, 113, 10)'); // #e8710a warn
+    expect(badge.title).toContain('hijacks order');
+  });
+
+  it('draws a connector polyline through the stop centres', () => {
+    const a = targetEl('a', { top: 100, left: 50, width: 20, height: 20 });
+    const b = targetEl('b', { top: 200, left: 60, width: 20, height: 20 });
+    overlay.renderTabOrder([stop(a, { order: 1 }), stop(b, { order: 2 })]);
+    const line = overlayRoot()!.querySelector('polyline') as SVGPolylineElement;
+    expect(line.getAttribute('points')).toBe('60,110 70,210');
+  });
+
+  it('clears the tab-order layer independently of the findings highlights', () => {
+    const a = targetEl('a');
+    overlay.render([finding({ target: '#a' })]);
+    overlay.renderTabOrder([stop(a, { order: 1 })]);
+    expect(overlayRoot()!.querySelectorAll('[data-ngb-tab-order]')).toHaveLength(1);
+
+    overlay.clearTabOrder();
+    expect(overlayRoot()!.querySelectorAll('[data-ngb-tab-order]')).toHaveLength(0);
+    expect(overlayRoot()!.querySelectorAll('[data-impact]')).toHaveLength(1); // highlights untouched
   });
 });

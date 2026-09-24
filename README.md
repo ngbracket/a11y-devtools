@@ -18,7 +18,9 @@ Part of the `@ngbracket` Angular tooling family.
 
 Ships attribution — component **and** directive-level — + axe scan + grouped
 console reporter (with a summary line) + the dev-only provider + the visual in-app
-overlay (severity-coloured highlights, click-to-scroll).
+overlay (severity-coloured highlights, click-to-scroll) + headless report mode +
+**Keyboard & Focus Mode M1** (tab-order visualisation + keyboard-reachability
+findings — the part of accessibility axe can't test).
 
 ## How the attribution works
 
@@ -63,6 +65,7 @@ provideA11yDevtools({
   debounceMs: 500,     // quiet window after stabilization before scanning
   tags: ['wcag22aa'],  // scope the ruleset; default = axe-core's full ruleset
   frameworkPrefixes: ['Nb', 'Mat', 'Cdk', 'Mdc'], // UI primitives to attribute past (default)
+  keyboard: true,      // also run the keyboard layer (see below); default false
 });
 ```
 
@@ -152,6 +155,37 @@ owning component. When a flagged control is itself a third-party UI primitive
 (e.g. `<button nbButton>`), attribution walks past the primitive to the app
 component that placed it and notes the primitive as `(via …)`.
 
+## Keyboard & Focus Mode (the ~2/3 axe can't test)
+
+axe covers the machine-testable third of WCAG. **Keyboard & Focus Mode** starts on
+the rest — keyboard operability — still naming the component that owns each issue.
+Turn it on with `keyboard: true` (provider / `runA11yScan` / `scan` / `scanPages`)
+or `--keyboard` on the CLI. It adds:
+
+- **Tab-order visualisation** (overlay): numbered badges at each tab stop and a
+  connector path showing the order focus actually moves. A positive-`tabindex` stop
+  is coloured as a warning, because it hijacks the natural order.
+- **Keyboard findings**, grouped and reported exactly like the axe violations:
+  - `ngbr/unreachable-control` — an interactive element (an ARIA role, or a runtime
+    `click` listener) that isn't a native control and has no `tabindex >= 0`, so the
+    keyboard can't reach it.
+  - `ngbr/click-without-key` — a focusable element with a `(click)` handler but no
+    keyboard handler, so Enter/Space may not activate it. This is read from
+    `window.ng.getListeners` — a **runtime** signal a static template lint can't see
+    (e.g. a handler added via `hostDirectives`).
+  - `ngbr/tab-order-mismatch` — the tab path jumps against the visual reading order
+    (needs real layout, so it fires in report-mode / a real browser).
+
+```bash
+# include the keyboard layer in a report-mode run
+npx ngbr-a11y-report --base http://localhost:4200 --route / --keyboard
+```
+
+**Honesty guardrail:** `click-without-key` and `tab-order-mismatch` are
+*heuristics* — labelled "verify manually", never reported as confirmed failures.
+(Next: M2 — an accessibility-tree preview, framed as a *computed approximation*,
+never "what a screen reader says".)
+
 ## What it checks (and what it can't)
 
 Under the hood this is [axe-core](https://github.com/dequelabs/axe-core) — the
@@ -191,11 +225,14 @@ npm run build   # tsc -> dist/ (ESM + .d.ts)
 
 ## Roadmap
 
-- Configurable framework-primitive prefixes (PrimeNG, Clarity, Ionic, …).
+- Keyboard & Focus Mode **M2** — accessibility-tree preview (role + accessible
+  name + state as you Tab), framed as a *computed approximation*.
+- Keyboard & Focus Mode **M3** — focus-trap *candidate* detection.
 - HTML report + baseline/diff mode for CI.
 - Per-component filtering and a violation-count badge.
 
 Done: component attribution (nearest app-owned, walking past UI primitives) ·
-directive / `hostDirectives` attribution · axe scan · grouped console reporter ·
-dev-only provider · in-app overlay · headless report mode (CLI + `./report`) ·
-CI prod-weight guard.
+directive / `hostDirectives` attribution · configurable framework prefixes · axe
+scan · grouped console reporter · dev-only provider · in-app overlay · headless
+report mode (CLI + `./report`) · **Keyboard & Focus Mode M1** (tab-order viz +
+keyboard-reachability findings) · CI prod-weight guard.

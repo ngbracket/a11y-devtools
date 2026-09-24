@@ -6,6 +6,7 @@ import {
   resolveDirectiveNames,
 } from './attribution.js';
 import { OVERLAY_EXCLUDE_SELECTOR } from './overlay.js';
+import { scanKeyboard } from './keyboard/keyboard-scan.js';
 
 export type Impact = 'minor' | 'moderate' | 'serious' | 'critical' | null;
 
@@ -18,6 +19,13 @@ export interface ScanOptions {
    * immediate owner — useful when scanning a component library's own code.
    */
   frameworkPrefixes?: readonly string[];
+  /**
+   * Also run the keyboard layer (part B): heuristic, `window.ng`-driven checks
+   * axe can't do — keyboard-unreachable interactive controls, click handlers
+   * with no keyboard handler, and visual-vs-tab-order mismatches. Emitted as
+   * `ngbr/*` findings alongside the axe violations. Default false.
+   */
+  keyboard?: boolean;
 }
 
 /** One axe violation node, enriched with the component that rendered it. */
@@ -93,6 +101,12 @@ async function runAxeOnce(
         html: node.html,
       });
     }
+  }
+
+  // The keyboard layer runs over the same root, in the page, and appends its own
+  // `ngbr/*` findings so they group and report exactly like the axe ones.
+  if (scanOptions?.keyboard) {
+    findings.push(...scanKeyboard(root, { frameworkPrefixes }));
   }
   return findings;
 }

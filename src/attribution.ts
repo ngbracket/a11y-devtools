@@ -14,6 +14,45 @@ export interface NgDebugGlobal {
   getComponent(element: Element): unknown;
   getOwningComponent(element: Element | object): unknown;
   getDirectives(element: Element | object): unknown[];
+  /**
+   * Listeners Angular bound to a node — template `(event)` bindings plus
+   * `@HostListener`s. Present on the dev global alongside the other helpers; the
+   * keyboard scan uses it to see, at runtime, which elements have a `click`
+   * handler but no keyboard handler — a case a static template lint can't catch
+   * (e.g. a listener added by a directive via `hostDirectives`).
+   */
+  getListeners?(element: Element): NgListener[];
+}
+
+/** Shape of an entry returned by `window.ng.getListeners`. */
+export interface NgListener {
+  name: string;
+  type?: 'dom' | 'output';
+  callback?: unknown;
+  useCapture?: boolean;
+}
+
+/**
+ * The DOM event names Angular has a listener bound for on `node` (template
+ * `(event)` bindings and `@HostListener`s), lowercased and de-duplicated. Empty
+ * when the debug global is absent (prod) or the node has none. Output/`@Output`
+ * emitters are excluded — only real DOM events matter for keyboard operability.
+ */
+export function resolveListenerEvents(node: Element): string[] {
+  const ng = ngDebug();
+  if (typeof ng?.getListeners !== 'function') return [];
+  let listeners: NgListener[];
+  try {
+    listeners = ng.getListeners(node) ?? [];
+  } catch {
+    return []; // node isn't part of a live view
+  }
+  const events = new Set<string>();
+  for (const listener of listeners) {
+    if (listener?.type === 'output') continue;
+    if (typeof listener?.name === 'string') events.add(listener.name.toLowerCase());
+  }
+  return [...events];
 }
 
 export function ngDebug(): NgDebugGlobal | undefined {

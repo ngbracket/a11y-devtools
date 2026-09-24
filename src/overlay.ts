@@ -1,4 +1,10 @@
 import type { A11yFinding, Impact } from './scan.js';
+import type { TabStop } from './keyboard/tab-sequence.js';
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+/** Tab-order path + badge colours: normal teal, warning orange for positive tabindex. */
+const TAB_ORDER_COLOR = '#0b8f8f';
+const TAB_ORDER_WARN_COLOR = '#e8710a';
 
 /**
  * Attribute marking the overlay's own DOM. `scan()` excludes anything under it
@@ -29,11 +35,25 @@ interface Highlight {
   box: HTMLElement;
 }
 
+/** A rendered tab-order badge paired with the stop it marks. */
+interface TabBadge {
+  stop: TabStop;
+  target: Element;
+  badge: HTMLElement;
+}
+
 export interface A11yOverlay {
   /** Draw a highlight over each finding's node, replacing the previous set. */
   render(findings: A11yFinding[]): void;
+  /**
+   * Draw the tab order as numbered badges plus a connector path, on a layer
+   * independent of the findings highlights. Replaces the previous tab-order set.
+   */
+  renderTabOrder(stops: TabStop[]): void;
   /** Remove all highlights but keep the overlay live. */
   clear(): void;
+  /** Remove the tab-order layer but keep the overlay live. */
+  clearTabOrder(): void;
   /** Tear down: remove the container and detach scroll/resize listeners. */
   destroy(): void;
 }
@@ -64,13 +84,47 @@ export function createOverlay(options: OverlayOptions = {}): A11yOverlay {
   });
   doc.body.appendChild(container);
 
+  // The tab-order connector lives on its own SVG layer under the badges, so the
+  // findings highlights and the tab-order path render and clear independently.
+  const svg = doc.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute(OVERLAY_ATTR, '');
+  Object.assign(svg.style, {
+    position: 'fixed',
+    inset: '0',
+    width: '100%',
+    height: '100%',
+    pointerEvents: 'none',
+    overflow: 'visible',
+  });
+  const connector = doc.createElementNS(SVG_NS, 'polyline');
+  connector.setAttribute('fill', 'none');
+  connector.setAttribute('stroke', TAB_ORDER_COLOR);
+  connector.setAttribute('stroke-width', '2');
+  connector.setAttribute('stroke-dasharray', '4 3');
+  connector.setAttribute('opacity', '0.7');
+  svg.appendChild(connector);
+  container.appendChild(svg); // under the badges, which are appended later
+
   let highlights: Highlight[] = [];
+  let tabBadges: TabBadge[] = [];
 
   const reposition = () => {
     for (const { target, box } of highlights) {
       positionBox(box, target);
     }
+    repositionTabOrder();
   };
+
+  function repositionTabOrder(): void {
+    const points: string[] = [];
+    for (const { target, badge } of tabBadges) {
+      const rect = target.getBoundingClientRect();
+      badge.style.top = `${rect.top}px`;
+      badge.style.left = `${rect.left}px`;
+      points.push(`${rect.left + rect.width / 2},${rect.top + rect.height / 2}`);
+    }
+    connector.setAttribute('points', points.join(' '));
+  }
 
   // rAF-throttle so a stream of scroll events collapses to one layout read.
   const raf = doc.defaultView?.requestAnimationFrame?.bind(doc.defaultView);
@@ -110,14 +164,65 @@ export function createOverlay(options: OverlayOptions = {}): A11yOverlay {
     }
   }
 
+  function clearTabOrder(): void {
+    for (const { badge } of tabBadges) badge.remove();
+    tabBadges = [];
+    connector.setAttribute('points', '');
+  }
+
+  function renderTabOrder(stops: TabStop[]): void {
+    clearTabOrder();
+    for (const stop of stops) {
+      const target = stop.element;
+      if (!target.isConnected) continue; // node gone since the sequence was computed
+      const badge = buildBadge(doc, stop);
+      container.appendChild(badge);
+      tabBadges.push({ stop, target, badge });
+    }
+    repositionTabOrder();
+  }
+
   function destroy(): void {
     clear();
+    clearTabOrder();
     win?.removeEventListener('scroll', onViewportChange, { capture: true } as EventListenerOptions);
     win?.removeEventListener('resize', onViewportChange);
     container.remove();
   }
 
-  return { render, clear, destroy };
+  return { render, renderTabOrder, clear, clearTabOrder, destroy };
+}
+
+/**
+ * A numbered badge marking one tab stop, anchored at the target's top-left
+ * corner. A positive-tabindex stop is coloured as a warning, since an explicit
+ * positive tabindex hijacks the natural order.
+ */
+function buildBadge(doc: Document, stop: TabStop): HTMLElement {
+  const color = stop.positive ? TAB_ORDER_WARN_COLOR : TAB_ORDER_COLOR;
+  const badge = doc.createElement('div');
+  badge.setAttribute('data-ngb-tab-order', String(stop.order));
+  const owner = stop.component ? ` · ${stop.component}` : '';
+  const ti = stop.positive ? ` · tabindex=${stop.tabindex} (hijacks order)` : '';
+  badge.title = `Tab stop ${stop.order}${owner}${ti}`;
+  badge.textContent = String(stop.order);
+  Object.assign(badge.style, {
+    position: 'fixed',
+    transform: 'translate(-50%, -50%)',
+    minWidth: '16px',
+    height: '16px',
+    padding: '0 3px',
+    boxSizing: 'border-box',
+    borderRadius: '8px',
+    font: '10px/16px ui-monospace, monospace',
+    fontWeight: '700',
+    textAlign: 'center',
+    color: '#fff',
+    background: color,
+    border: '1px solid rgba(255,255,255,0.85)',
+    pointerEvents: 'none',
+  });
+  return badge;
 }
 
 /** Resolve a finding's target selector to a node, tolerating a bad selector. */

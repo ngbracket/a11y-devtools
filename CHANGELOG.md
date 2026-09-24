@@ -3,6 +3,34 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.6.0
+
+### Added
+
+- **Keyboard & Focus Mode — M1: the keyboard layer.** The first checks for the
+  ~2/3 of accessibility axe can't test — keyboard operability — attributed to the
+  owning component like everything else. Opt in with `keyboard: true` (provider /
+  `runA11yScan` / `scan` / `scanPages`) or `--keyboard` on the CLI.
+  - **Tab-order visualisation** (overlay): numbered badges at each tab stop plus a
+    connector path showing the order focus actually moves; a positive-`tabindex`
+    stop is flagged as a warning because it hijacks the natural order.
+  - **Keyboard findings** (`ngbr/*` rule ids, grouped and reported like axe
+    violations):
+    - `ngbr/unreachable-control` (serious) — an interactive element (ARIA role or a
+      runtime `click` listener) that isn't a native control and has no
+      `tabindex >= 0`, so it can't be reached by keyboard.
+    - `ngbr/click-without-key` (moderate, heuristic) — a focusable element with a
+      `(click)` handler but no keyboard handler, so Enter/Space may not activate it.
+      Read from `window.ng.getListeners`, a **runtime** signal a static template
+      lint can't see (e.g. a listener added via `hostDirectives`).
+    - `ngbr/tab-order-mismatch` (moderate, heuristic) — the tab path jumps against
+      the visual reading order. Needs real layout (report-mode / a real browser).
+  - New public API: `tabSequence`, `scanKeyboard`, `isTabbable`,
+    `isNativelyFocusable`, `resolvedTabIndex`, `visualOrderJumps`,
+    `resolveListenerEvents`, and the `TabStop` / `NgListener` types.
+  - **Honesty guardrail:** the heuristic findings are labelled "verify manually",
+    never reported as confirmed failures.
+
 ## 0.5.0
 
 ### Added

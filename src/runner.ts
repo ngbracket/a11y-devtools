@@ -21,6 +21,12 @@ export interface RunOptions {
    * attribute to the immediate owner (e.g. when scanning a library's own code).
    */
   frameworkPrefixes?: readonly string[];
+  /**
+   * Also run the keyboard layer — heuristic `ngbr/*` findings for
+   * keyboard-unreachable controls, click-without-keyboard handlers, and
+   * tab-order mismatches. Default false.
+   */
+  keyboard?: boolean;
 }
 
 /** Scan `root`, optionally report, and return the findings. */
@@ -30,6 +36,7 @@ export async function runA11yScan(
 ): Promise<A11yFinding[]> {
   const findings = await scan(root ?? document, options.axe, {
     frameworkPrefixes: options.frameworkPrefixes,
+    keyboard: options.keyboard,
   });
   if (options.log !== false) {
     logFindings(findings, options.logger);

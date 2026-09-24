@@ -6,10 +6,22 @@ export {
   resolveOwningComponentName,
   resolveComponentPath,
   appComponentFromPath,
+  resolveListenerEvents,
   DEFAULT_FRAMEWORK_PREFIXES,
   ngDebug,
   type NgDebugGlobal,
+  type NgListener,
 } from './attribution.js';
+export {
+  tabSequence,
+  isTabbable,
+  isNativelyFocusable,
+  resolvedTabIndex,
+  visualOrderJumps,
+  type TabStop,
+  type TabSequenceOptions,
+} from './keyboard/tab-sequence.js';
+export { scanKeyboard, type KeyboardScanOptions } from './keyboard/keyboard-scan.js';
 export {
   createOverlay,
   OVERLAY_ATTR,

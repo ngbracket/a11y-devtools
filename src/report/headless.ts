@@ -32,6 +32,13 @@ export interface ScanPagesOptions {
    * library's own code (so it blames the library component, not a demo wrapper).
    */
   frameworkPrefixes?: readonly string[];
+  /**
+   * Also run the keyboard layer in-page — heuristic `ngbr/*` findings for
+   * keyboard-unreachable controls, click-without-keyboard handlers, and
+   * tab-order mismatches (the last needs real layout, which headless has).
+   * Default false.
+   */
+  keyboard?: boolean;
 }
 
 type PlaywrightModule = typeof import('playwright');
@@ -59,8 +66,17 @@ function inPageScriptPath(): string {
  * to the component that rendered it — with no change to the target app.
  */
 export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> {
-  const { baseUrl, routes, tags, waitMs = 1500, labels = {}, setup, headed = false, frameworkPrefixes } =
-    options;
+  const {
+    baseUrl,
+    routes,
+    tags,
+    waitMs = 1500,
+    labels = {},
+    setup,
+    headed = false,
+    frameworkPrefixes,
+    keyboard,
+  } = options;
   const axeOptions: AxeRunOptions | undefined = tags
     ? { runOnly: { type: 'tag', values: tags } }
     : undefined;
@@ -92,7 +108,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
             __ngbA11yScan: (a?: unknown, s?: unknown) => Promise<unknown>;
           };
           return w.__ngbA11yScan(args.axe, args.scan);
-        }, { axe: axeOptions, scan: { frameworkPrefixes } })) as A11yFinding[];
+        }, { axe: axeOptions, scan: { frameworkPrefixes, keyboard } })) as A11yFinding[];
         pages.push({ label, url: page.url(), findings });
       } catch (err) {
         // One bad route shouldn't sink the whole run — record it and continue.
