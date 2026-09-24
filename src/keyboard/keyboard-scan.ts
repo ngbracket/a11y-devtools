@@ -20,6 +20,7 @@ import {
 } from '../attribution.js';
 import type { A11yFinding } from '../scan.js';
 import {
+  hasFocusableDescendant,
   isNativelyFocusable,
   isTabbable,
   tabSequence,
@@ -124,6 +125,10 @@ export function scanKeyboard(
     const hasClick = events.includes('click');
     const interactiveByRole = INTERACTIVE_ROLES.has(role);
     if (!hasClick && !interactiveByRole) continue; // nothing marks this as interactive
+    // A click listener on a container of links/controls (no interactive role of
+    // its own) is event delegation, not a control — the controls inside are what
+    // the keyboard reaches.
+    if (!interactiveByRole && hasFocusableDescendant(element)) continue;
 
     const focusable = isTabbable(element, isVisible);
 

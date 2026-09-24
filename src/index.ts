@@ -14,12 +14,14 @@ export {
 } from './attribution.js';
 export {
   tabSequence,
+  hasFocusableDescendant,
   isTabbable,
   isNativelyFocusable,
   resolvedTabIndex,
   visualOrderJumps,
   type TabStop,
   type TabSequenceOptions,
+  type StopRect,
 } from './keyboard/tab-sequence.js';
 export { scanKeyboard, type KeyboardScanOptions } from './keyboard/keyboard-scan.js';
 export { findUncontainedModals, type UncontainedModal } from './keyboard/focus-trap.js';

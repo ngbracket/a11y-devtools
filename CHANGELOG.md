@@ -12,6 +12,17 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   Pages now also carry `colorScheme` and `darkOnly` when set.
 - **Baseline: a route that failed in the baseline is skipped** instead of counting
   everything on it as new. Re-record the baseline to cover it.
+- **`ngbr/tab-order-mismatch` no longer flags moving into the next column.** Tab
+  going up *and to the right* (from a sidebar into the main content, or across a
+  multi-column footer) is normal reading order. Up-and-left, and leftwards on the
+  same row, are still flagged. It also now compares where the previous stop *ends*
+  with where the next *starts*, using line boxes, so links in wrapped paragraph text
+  aren't misread. Found by running the tool on its own docs site. New export type:
+  `StopRect`.
+- **`ngbr/unreachable-control` / `ngbr/click-without-key` skip event delegation.** A
+  click listener on a container of links or controls (with no interactive role of
+  its own) handles clicks on those controls; it isn't a fake button. New export:
+  `hasFocusableDescendant`.
 
 ## 0.10.0
 

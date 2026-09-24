@@ -61,6 +61,22 @@ describe('scanKeyboard', () => {
     });
   });
 
+  it('does not flag a click listener on a container of links (event delegation)', () => {
+    const host = fixture(`<div id="prose"><p>See <a href="/docs">the docs</a>.</p></div>`);
+    const el = host.querySelector('#prose')!;
+    withNg(new Map([[el, ['click']]]), new Map([[el, 'DocsComponent']]), () => {
+      expect(scanKeyboard(host)).toEqual([]);
+    });
+  });
+
+  it('still flags a container with an interactive role, even if it holds a link', () => {
+    const host = fixture(`<div id="card" role="button">Open <a href="/x">details</a></div>`);
+    const el = host.querySelector('#card')!;
+    withNg(new Map([[el, ['click']]]), new Map(), () => {
+      expect(scanKeyboard(host).map((f) => f.id)).toContain('ngbr/unreachable-control');
+    });
+  });
+
   it('flags a focusable click target with no keyboard handler', () => {
     const host = fixture(`<div id="btn" tabindex="0" role="button">Go</div>`);
     const el = host.querySelector('#btn')!;

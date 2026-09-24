@@ -59,6 +59,15 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]',
 ].join(',');
 
+/**
+ * True when `element` contains something focusable (a link, control, or
+ * `tabindex` element). A click listener on such a container is almost always
+ * event delegation — handling clicks on the controls inside — not a fake button.
+ */
+export function hasFocusableDescendant(element: Element): boolean {
+  return element.querySelector(FOCUSABLE_SELECTOR) !== null;
+}
+
 /** A native default of 0 (focusable without a tabindex attribute), else -1. */
 function nativeTabIndex(element: Element): number {
   return isNativelyFocusable(element) ? 0 : -1;
@@ -196,27 +205,61 @@ export function tabSequence(
   });
 }
 
+/** Where a stop starts and ends on screen, for {@link visualOrderJumps}. */
+export interface StopRect {
+  /** Top-left of where the element starts (its first line box, for wrapped inline text). */
+  top: number;
+  left: number;
+  /** Right edge of the whole element. */
+  right?: number;
+  /** Top-left of where it ends (its last line box); defaults to `top`/`left`. */
+  endTop?: number;
+  endLeft?: number;
+}
+
+/**
+ * The default {@link StopRect}: an inline link that wraps across lines starts on
+ * one line and ends on the next, and its bounding box starts at the left edge —
+ * so compare line boxes, not the bounding box.
+ */
+function stopRect(el: Element): StopRect {
+  const box = el.getBoundingClientRect();
+  const lines = el.getClientRects();
+  if (lines.length === 0) return { top: box.top, left: box.left, right: box.right };
+  const first = lines[0];
+  const last = lines[lines.length - 1];
+  return { top: first.top, left: first.left, right: box.right, endTop: last.top, endLeft: last.left };
+}
+
 /**
  * Indices (0-based, into the sequence) where the tab path jumps *backward against
- * reading order* — a stop that sits clearly above, or well to the left on the
- * same row, of the stop before it. A heuristic signal that DOM/tabindex order
- * has drifted from the visual order a sighted keyboard user expects; always
- * "verify manually". `getRect` is injectable for tests.
+ * reading order* — a stop that sits clearly above the stop before it (without
+ * moving right), or well to the left on the same row. A heuristic signal that
+ * DOM/tabindex order has drifted from the visual order a sighted keyboard user
+ * expects; always "verify manually". `getRect` is injectable for tests.
+ *
+ * Moving up into the *next column* — starting right of where the previous stop
+ * ends, like a sidebar then the main content, or across a multi-column footer —
+ * is normal reading order, so it isn't a jump. (A stop that moves up but still
+ * overlaps the previous one horizontally is.)
  */
 export function visualOrderJumps(
   stops: readonly TabStop[],
-  getRect: (el: Element) => { top: number; left: number } = (el) =>
-    el.getBoundingClientRect(),
+  getRect: (el: Element) => StopRect = stopRect,
   rowThreshold = 8,
 ): number[] {
   const jumps: number[] = [];
   for (let i = 1; i < stops.length; i++) {
     const prev = getRect(stops[i - 1].element);
     const curr = getRect(stops[i].element);
-    const movedUp = curr.top < prev.top - rowThreshold;
+    // Compare where the previous stop *ends* with where this one *starts*.
+    const prevTop = prev.endTop ?? prev.top;
+    const prevLeft = prev.endLeft ?? prev.left;
+    const movedUp = curr.top < prevTop - rowThreshold;
+    const nextColumn = curr.left >= (prev.right ?? prev.left + rowThreshold);
     const sameRowMovedLeft =
-      Math.abs(curr.top - prev.top) <= rowThreshold && curr.left < prev.left - rowThreshold;
-    if (movedUp || sameRowMovedLeft) jumps.push(i);
+      Math.abs(curr.top - prevTop) <= rowThreshold && curr.left < prevLeft - rowThreshold;
+    if ((movedUp && !nextColumn) || sameRowMovedLeft) jumps.push(i);
   }
   return jumps;
 }

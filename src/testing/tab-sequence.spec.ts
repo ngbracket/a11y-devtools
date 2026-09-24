@@ -104,6 +104,51 @@ describe('tab-sequence', () => {
     expect(visualOrderJumps(stops, (el) => rects.get(el)!)).toEqual([2]);
   });
 
+  it('does not treat moving up into the next column as a jump', () => {
+    // A sidebar (left column) then the main content, or a multi-column footer:
+    // the last link of one column is followed by the top of the next.
+    const stops = [
+      { element: {} as Element },
+      { element: {} as Element },
+      { element: {} as Element },
+    ] as unknown as TabStop[];
+    const rects = new Map<Element, { top: number; left: number }>([
+      [stops[0].element, { top: 100, left: 80 }], // sidebar, near the top
+      [stops[1].element, { top: 800, left: 80 }], // sidebar, last link
+      [stops[2].element, { top: 120, left: 400 }], // main column, first link
+    ]);
+    expect(visualOrderJumps(stops, (el) => rects.get(el)!)).toEqual([]);
+  });
+
+  it('still flags moving up when the stop overlaps the previous one horizontally', () => {
+    const stops = [{ element: {} as Element }, { element: {} as Element }] as unknown as TabStop[];
+    const rects = new Map<Element, { top: number; left: number; right?: number }>([
+      [stops[0].element, { top: 400, left: 8, right: 140 }], // a wide button lower down
+      [stops[1].element, { top: 60, left: 30, right: 80 }], // up, slightly right, same column
+    ]);
+    expect(visualOrderJumps(stops, (el) => rects.get(el)!)).toEqual([1]);
+  });
+
+  it('compares where a wrapped link ends with where the next one starts', () => {
+    // Link 1 wraps: it starts at the end of line 1 and ends at the start of line 2;
+    // link 2 follows it on line 2. Its bounding box would start at the left edge.
+    const stops = [{ element: {} as Element }, { element: {} as Element }] as unknown as TabStop[];
+    const rects = new Map<Element, { top: number; left: number; right?: number; endTop?: number; endLeft?: number }>([
+      [stops[0].element, { top: 100, left: 600, right: 700, endTop: 128, endLeft: 300 }],
+      [stops[1].element, { top: 128, left: 420 }],
+    ]);
+    expect(visualOrderJumps(stops, (el) => rects.get(el)!)).toEqual([]);
+  });
+
+  it('still flags moving up and to the left', () => {
+    const stops = [{ element: {} as Element }, { element: {} as Element }] as unknown as TabStop[];
+    const rects = new Map<Element, { top: number; left: number }>([
+      [stops[0].element, { top: 500, left: 400 }],
+      [stops[1].element, { top: 100, left: 80 }],
+    ]);
+    expect(visualOrderJumps(stops, (el) => rects.get(el)!)).toEqual([1]);
+  });
+
   it('reports no jumps for a top-to-bottom order', () => {
     const stops = [{ element: {} as Element }, { element: {} as Element }] as unknown as TabStop[];
     const rects = new Map<Element, { top: number; left: number }>([
