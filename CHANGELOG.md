@@ -3,6 +3,18 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.7.2
+
+### Fixed
+
+- **Findings labels no longer cover each other.** Where several flagged nodes
+  cluster (or share a column), each finding's label was drawn at its box's
+  top-left corner, so the labels piled on the same spot and the later one hid the
+  earlier — e.g. a `color-contrast` label sitting behind a `region` label. The
+  overlay now runs a de-collision pass (`resolveLabelStack`) that walks labels
+  top-to-bottom and lifts each one until it clears the labels already placed, so
+  every finding stays readable. Runs on render and on scroll/resize.
+
 ## 0.7.1
 
 ### Fixed

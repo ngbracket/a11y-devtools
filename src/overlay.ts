@@ -9,6 +9,8 @@ const TAB_ORDER_WARN_COLOR = '#e8710a';
 /** How far outside a control's left edge the tab-order badge sits, and its min viewport x. */
 const TAB_BADGE_GUTTER = 10;
 const TAB_BADGE_MIN_X = 9;
+/** Highest a de-collided finding label may be pushed (viewport y), so labels stay on-screen. */
+const LABEL_MIN_TOP = 2;
 
 /**
  * Attribute marking the overlay's own DOM. `scan()` excludes anything under it
@@ -152,8 +154,35 @@ export function createOverlay(options: OverlayOptions = {}): A11yOverlay {
     for (const { target, box } of highlights) {
       positionBox(box, target);
     }
+    decollideLabels();
     repositionTabOrder();
   };
+
+  /**
+   * Push overlapping finding labels apart so none is hidden behind another —
+   * the demo (and any dense page) stacks several findings at the same top-left
+   * spot, and previously the later label simply covered the earlier one. Measures
+   * each label, resolves non-overlapping tops via {@link resolveLabelStack}, and
+   * applies the extra upward shift as a transform (the label's default is
+   * `translateY(-100%)`, sitting just above its box).
+   */
+  function decollideLabels(): void {
+    const labels: HTMLElement[] = [];
+    const boxes: LabelBox[] = [];
+    for (const { target, box } of highlights) {
+      const label = box.firstElementChild as HTMLElement | null;
+      if (!label) continue;
+      const rect = target.getBoundingClientRect();
+      labels.push(label);
+      boxes.push({ left: rect.left, width: label.offsetWidth, baseTop: rect.top - label.offsetHeight, height: label.offsetHeight });
+    }
+    const tops = resolveLabelStack(boxes);
+    for (let i = 0; i < labels.length; i++) {
+      const extraUp = boxes[i].baseTop - tops[i]; // >= 0
+      labels[i].style.transform =
+        extraUp > 0 ? `translateY(calc(-100% - ${extraUp}px))` : 'translateY(-100%)';
+    }
+  }
 
   function repositionTabOrder(): void {
     const points: string[] = [];
@@ -209,6 +238,7 @@ export function createOverlay(options: OverlayOptions = {}): A11yOverlay {
       positionBox(box, target);
       highlights.push({ finding, target, box });
     }
+    decollideLabels();
   }
 
   function clearTabOrder(): void {
@@ -366,6 +396,44 @@ function buildBox(doc: Document, finding: A11yFinding): HTMLElement {
   });
   box.appendChild(label);
   return box;
+}
+
+/** One finding label's box for stacking: its natural top-left and measured size. */
+export interface LabelBox {
+  /** Viewport left of the label (its box's left edge). */
+  left: number;
+  /** Measured label width. */
+  width: number;
+  /** The label's natural top (just above its box) with no de-collision shift. */
+  baseTop: number;
+  /** Measured label height. */
+  height: number;
+}
+
+/**
+ * Resolve overlapping finding labels to non-overlapping vertical positions,
+ * returning the adjusted top for each input (in input order). Labels are walked
+ * top-to-bottom and each is pushed *up* until it clears the ones already placed,
+ * so a cluster of flagged nodes stacks its labels instead of hiding them behind
+ * one another. Pure geometry — no DOM — so it's unit-testable. Pushing stops at
+ * `minTop` to keep labels on-screen (a dense cluster may then still overlap).
+ */
+export function resolveLabelStack(items: LabelBox[], minTop = LABEL_MIN_TOP): number[] {
+  const order = items.map((it, i) => ({ it, i })).sort((a, b) => a.it.baseTop - b.it.baseTop || a.it.left - b.it.left);
+  const placed: { left: number; right: number; top: number; bottom: number }[] = [];
+  const tops = new Array<number>(items.length);
+  for (const { it, i } of order) {
+    let top = it.baseTop;
+    const hits = (t: number): boolean =>
+      placed.some(
+        (p) => it.left < p.right && it.left + it.width > p.left && t < p.bottom && t + it.height > p.top,
+      );
+    let guard = 0;
+    while (hits(top) && top > minTop && guard++ < 60) top -= it.height + 2;
+    tops[i] = top;
+    placed.push({ left: it.left, right: it.left + it.width, top, bottom: top + it.height });
+  }
+  return tops;
 }
 
 /** Anchor `box` (position:fixed) over `target` using viewport coordinates. */

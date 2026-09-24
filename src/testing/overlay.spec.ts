@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createOverlay, OVERLAY_ATTR, type A11yOverlay } from '../overlay';
+import { createOverlay, OVERLAY_ATTR, resolveLabelStack, type A11yOverlay, type LabelBox } from '../overlay';
 import type { A11yFinding } from '../scan';
 import type { TabStop } from '../keyboard/tab-sequence';
 
@@ -107,6 +107,32 @@ describe('createOverlay', () => {
   it('removes its container on destroy', () => {
     overlay.destroy();
     expect(overlayRoot()).toBeNull();
+  });
+
+  describe('resolveLabelStack (findings labels never cover each other)', () => {
+    const box = (over: Partial<LabelBox>): LabelBox => ({ left: 100, width: 80, baseTop: 200, height: 16, ...over });
+
+    it('leaves a single label at its natural top', () => {
+      expect(resolveLabelStack([box({ baseTop: 200 })])).toEqual([200]);
+    });
+
+    it('pushes an overlapping label up so both stay readable', () => {
+      // Two labels at the same x, almost the same top → the second is lifted clear.
+      const tops = resolveLabelStack([box({ baseTop: 200, height: 16 }), box({ baseTop: 202, height: 16 })]);
+      expect(tops[0]).toBe(200); // first (topmost) stays put
+      expect(tops[1]).toBeLessThan(tops[0]); // second lifted above the first
+      expect(tops[1] + 16).toBeLessThanOrEqual(tops[0]); // …and no longer overlapping it
+    });
+
+    it('does not move labels that are far apart', () => {
+      expect(resolveLabelStack([box({ baseTop: 100 }), box({ baseTop: 400 })])).toEqual([100, 400]);
+    });
+
+    it('does not move labels that share a row but not a column', () => {
+      // Same top, but non-overlapping x-ranges → no collision.
+      const tops = resolveLabelStack([box({ left: 0, width: 50, baseTop: 300 }), box({ left: 200, width: 50, baseTop: 300 })]);
+      expect(tops).toEqual([300, 300]);
+    });
   });
 
   it('draws a numbered tab-order badge per stop, on the left edge of its target', () => {
