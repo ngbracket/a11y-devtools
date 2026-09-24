@@ -26,6 +26,9 @@ Options:
   --keyboard         Also run the keyboard layer: heuristic ngbr/* findings for
                      keyboard-unreachable controls, click-without-keyboard
                      handlers, and visual-vs-tab-order mismatches
+  --focus-traps      Also walk each route with real Tab presses to find keyboard
+                     traps — focus that cycles inside part of the page and
+                     never moves on (ngbr/focus-trap). Runs after the scan
   --headed           Launch a visible browser (debugging)
   -h, --help         Show this help
 `;
@@ -50,6 +53,7 @@ function parseArgs(argv) {
         break;
       case '--no-skip-primitives': opts.frameworkPrefixes = []; break;
       case '--keyboard': opts.keyboard = true; break;
+      case '--focus-traps': opts.focusTraps = true; break;
       case '--headed': opts.headed = true; break;
       case '-h': case '--help': opts.help = true; break;
       default: console.error(`Unknown argument: ${arg}\n`); opts.help = true;
@@ -73,6 +77,7 @@ const report = await scanPages({
   headed: opts.headed,
   frameworkPrefixes: opts.frameworkPrefixes,
   keyboard: opts.keyboard,
+  focusTraps: opts.focusTraps,
 });
 
 const allFindings = report.pages.flatMap((p) => p.findings);

@@ -24,6 +24,13 @@ export {
 export { scanKeyboard, type KeyboardScanOptions } from './keyboard/keyboard-scan.js';
 export { findUncontainedModals, type UncontainedModal } from './keyboard/focus-trap.js';
 export {
+  createFocusWalkProbe,
+  detectTabTrap,
+  type FocusObservation,
+  type FocusWalkProbe,
+  type TabWalkVerdict,
+} from './keyboard/focus-walk.js';
+export {
   describeElement,
   accessibleDescription,
   ariaStates,

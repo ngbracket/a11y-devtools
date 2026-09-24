@@ -62,7 +62,7 @@ const FOCUS_ORDER_URL = `${UNDERSTANDING}/focus-order.html`;
 const DIALOG_MODAL_URL = 'https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/';
 
 /** A short, human CSS-ish selector for our own findings (not an axe target). */
-function shortSelector(element: Element): string {
+export function shortSelector(element: Element): string {
   const tag = element.tagName.toLowerCase();
   if (element.id) return `${tag}#${element.id}`;
   const classes = (element.getAttribute('class') ?? '')
@@ -73,7 +73,8 @@ function shortSelector(element: Element): string {
   return classes.length ? `${tag}.${classes.join('.')}` : tag;
 }
 
-function shortHtml(element: Element): string {
+/** Truncated outerHTML for a finding's `html`. */
+export function shortHtml(element: Element): string {
   const html = element.outerHTML ?? '';
   return html.length > 160 ? `${html.slice(0, 159)}…` : html;
 }

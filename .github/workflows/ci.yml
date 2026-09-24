@@ -16,6 +16,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # The real-browser E2E spec (src/testing/e2e-report.spec.ts) skips itself
+      # without a Playwright Chromium — install one so it actually runs in CI.
+      - run: npx playwright install --with-deps chromium
       # Includes the production-weight guard (src/testing/prod-weight.spec.ts):
       # fails if axe-core ever becomes statically reachable from the entry.
       - run: npm test

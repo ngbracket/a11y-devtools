@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { RunOptions as AxeRunOptions } from 'axe-core';
 import type { Page } from 'playwright';
+import { detectTabTrap, type FocusObservation } from '../keyboard/focus-walk.js';
 import type { A11yFinding } from '../scan.js';
 import type { PageReport, ScanReport } from './format.js';
 
@@ -39,6 +40,14 @@ export interface ScanPagesOptions {
    * Default false.
    */
   keyboard?: boolean;
+  /**
+   * Also walk each route with **real** Tab presses to find keyboard traps —
+   * focus that cycles inside part of the page and never moves on (WCAG 2.1.2),
+   * reported as `ngbr/focus-trap`. Runs after the scan, since pressing Tab can
+   * change page state (focus handlers, menus). Focus cycling inside an open
+   * modal is containment, not a trap, and isn't reported. Default false.
+   */
+  focusTraps?: boolean;
 }
 
 type PlaywrightModule = typeof import('playwright');
@@ -59,6 +68,65 @@ function inPageScriptPath(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), '..', 'inpage.global.js');
 }
 
+interface InPageProbe {
+  probe(): { id: FocusObservation; iframe: boolean };
+  stopCount(): number;
+  trapFinding(cycle: readonly number[], shiftTabEscapes: boolean): A11yFinding | null;
+}
+type ProbeWindow = {
+  __ngbA11yCreateFocusProbe: (prefixes?: readonly string[]) => InPageProbe;
+  __ngbA11yFocusProbe: InPageProbe;
+};
+
+/**
+ * Press Tab through the page until focus either laps the page (no trap) or
+ * cycles inside part of it (a trap), then check whether Shift+Tab gets out.
+ * Needs the in-page bundle already injected. Returns null when there's no trap,
+ * or when the press budget runs out before a verdict (inconclusive — e.g. focus
+ * stuck inside an iframe the parent can't see into).
+ */
+async function walkForFocusTrap(
+  page: Page,
+  frameworkPrefixes: readonly string[] | undefined,
+): Promise<A11yFinding | null> {
+  const stops = await page.evaluate((prefixes) => {
+    const w = window as unknown as ProbeWindow;
+    w.__ngbA11yFocusProbe = w.__ngbA11yCreateFocusProbe(prefixes);
+    return w.__ngbA11yFocusProbe.stopCount();
+  }, frameworkPrefixes);
+  const probe = () =>
+    page.evaluate(() => (window as unknown as ProbeWindow).__ngbA11yFocusProbe.probe());
+
+  // Enough for two laps of the page, capped so a huge page can't run forever.
+  const budget = Math.min(stops * 2 + 10, 400);
+  const observations: FocusObservation[] = [];
+  const frames = new Set<number>();
+  for (let i = 0; i < budget; i++) {
+    await page.keyboard.press('Tab');
+    const { id, iframe } = await probe();
+    if (iframe && id !== null) frames.add(id);
+    observations.push(id);
+
+    const verdict = detectTabTrap(observations, frames);
+    if (verdict.kind === 'complete') return null;
+    if (verdict.kind === 'trap') {
+      const inCycle = new Set(verdict.cycle);
+      let shiftTabEscapes = false;
+      for (let j = 0; j < verdict.cycle.length + 2 && !shiftTabEscapes; j++) {
+        await page.keyboard.press('Shift+Tab');
+        const { id: back } = await probe();
+        shiftTabEscapes = back === null || !inCycle.has(back);
+      }
+      return page.evaluate(
+        ([cycle, escapes]) =>
+          (window as unknown as ProbeWindow).__ngbA11yFocusProbe.trapFinding(cycle, escapes),
+        [verdict.cycle, shiftTabEscapes] as const,
+      );
+    }
+  }
+  return null;
+}
+
 /**
  * Drive a real headless browser over a running Angular **dev** build and return
  * component-attributed findings per route. The scan runs *in the page* (via the
@@ -76,6 +144,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     headed = false,
     frameworkPrefixes,
     keyboard,
+    focusTraps,
   } = options;
   const axeOptions: AxeRunOptions | undefined = tags
     ? { runOnly: { type: 'tag', values: tags } }
@@ -109,6 +178,16 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
           };
           return w.__ngbA11yScan(args.axe, args.scan);
         }, { axe: axeOptions, scan: { frameworkPrefixes, keyboard } })) as A11yFinding[];
+        if (focusTraps) {
+          // A failed walk shouldn't throw away the scan's findings — warn and move on.
+          try {
+            const trap = await walkForFocusTrap(page, frameworkPrefixes);
+            if (trap) findings.push(trap);
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.warn(`ngbr-a11y-report: focus-trap walk failed on ${label}: ${message}`);
+          }
+        }
         pages.push({ label, url: page.url(), findings });
       } catch (err) {
         // One bad route shouldn't sink the whole run — record it and continue.

@@ -1,4 +1,5 @@
 import type { RunOptions as AxeRunOptions } from 'axe-core';
+import { createFocusWalkProbe } from './keyboard/focus-walk.js';
 import { scan, type A11yFinding, type ScanOptions } from './scan.js';
 
 /**
@@ -18,3 +19,9 @@ export type InPageScan = (
 const run: InPageScan = (options, scanOptions) => scan(document, options, scanOptions);
 
 (globalThis as unknown as { __ngbA11yScan: InPageScan }).__ngbA11yScan = run;
+
+// The in-page half of the focus-trap walk: the driver creates a probe, presses
+// real Tab keys, and asks the probe what has focus after each one.
+(globalThis as unknown as {
+  __ngbA11yCreateFocusProbe: (prefixes?: readonly string[]) => ReturnType<typeof createFocusWalkProbe>;
+}).__ngbA11yCreateFocusProbe = (prefixes) => createFocusWalkProbe(document, prefixes);

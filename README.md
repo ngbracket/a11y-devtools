@@ -194,8 +194,37 @@ It adds:
 npx ngbr-a11y-report --base http://localhost:4200 --route / --keyboard
 ```
 
-**Honesty guardrail:** `click-without-key` and `tab-order-mismatch` are
-*heuristics* — labelled "verify manually", never reported as confirmed failures.
+**Honesty guardrail:** `click-without-key`, `tab-order-mismatch`,
+`modal-focus-not-contained` and `focus-trap` are *heuristics*. They're labelled
+"verify manually" and never reported as confirmed failures.
+
+### Keyboard traps (report-mode, M3)
+
+A keyboard trap is focus you can Tab *into* but never Tab *out of*
+([WCAG 2.1.2](https://www.w3.org/WAI/WCAG22/Understanding/no-keyboard-trap.html)).
+You can't find one by reading the DOM. Script makes the trap, by intercepting Tab or
+re-focusing on blur, and synthetic key events don't move focus in a browser. So
+report-mode presses the **real** Tab key through each route:
+
+```bash
+npx ngbr-a11y-report --base http://localhost:4200 --route / --focus-traps
+```
+
+- If focus laps the page (passes `<body>` and comes back round), there's no trap.
+- If focus cycles inside part of the page without ever leaving, that's reported as
+  **`ngbr/focus-trap`**. The finding goes on the element that holds the cycle and
+  counts the tabbable controls that were never reached. The walk then tries
+  Shift+Tab: the finding is **serious** if that's stuck too, and **moderate** if
+  Shift+Tab gets out.
+- Focus cycling inside an open `aria-modal` / `<dialog>` is containment working,
+  so it isn't reported. Consecutive focus on an `<iframe>` (Tab moving inside the
+  frame) isn't read as a trap either.
+
+It's a separate flag (`focusTraps: true` in `scanPages`) because it's the one check
+that *changes the page*. Pressing Tab can fire focus handlers and open menus, so
+it runs after the scan. A widget that deliberately keeps Tab, like a code editor,
+is fine if it tells users how to leave (Escape, for example). That's why the finding
+says "verify manually".
 
 ### Accessibility-tree preview (M2)
 
@@ -248,14 +277,13 @@ static import (or adding a top-level side effect) fails the build.
 
 ```bash
 npm install --legacy-peer-deps
-npm test        # vitest + jsdom + Angular TestBed (real axe)
+npm test        # vitest + jsdom + Angular TestBed (real axe); the real-browser
+                # E2E spec runs after a build, once `npx playwright install chromium`
 npm run build   # tsc -> dist/ (ESM + .d.ts)
 ```
 
 ## Roadmap
 
-- Keyboard & Focus Mode **M3 (part 2)** — *bad-trap* detection ("you can Tab in but
-  never Tab out") via real Tab presses in headless report-mode.
 - Headless "linear walkthrough" — the tab sequence as an SR-ish reading list per
   route in report-mode (M2's preview is currently overlay-only).
 - HTML report + baseline/diff mode for CI.
@@ -266,4 +294,5 @@ directive / `hostDirectives` attribution · configurable framework prefixes · a
 scan · grouped console reporter · dev-only provider · in-app overlay · headless
 report mode (CLI + `./report`) · **Keyboard & Focus Mode M1** (tab-order viz +
 keyboard-reachability findings) · **M2** (focus-follow accessibility-tree preview) ·
-**M3 part 1** (missing focus-trap: uncontained `aria-modal`) · CI prod-weight guard.
+**M3** (missing focus-trap: uncontained `aria-modal`; keyboard-trap walk with real
+Tab presses) · CI prod-weight guard · real-browser E2E test.

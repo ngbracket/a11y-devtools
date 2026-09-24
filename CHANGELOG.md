@@ -3,6 +3,31 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.9.0
+
+### Added
+
+- **Keyboard & Focus Mode, M3 (part 2): keyboard-trap detection with real Tab
+  presses.** New opt-in report-mode flag `--focus-traps` (`focusTraps: true` in
+  `scanPages`). It walks each route with real Tab key presses and reports
+  **`ngbr/focus-trap`** when focus cycles inside part of the page and never moves on
+  ([WCAG 2.1.2 No Keyboard Trap](https://www.w3.org/WAI/WCAG22/Understanding/no-keyboard-trap.html)).
+  The finding goes on the element holding the cycle and counts the controls that
+  were never reached. It's **serious** when Shift+Tab is trapped too, and
+  **moderate** when Shift+Tab escapes.
+  - Focus cycling inside an open `aria-modal` / `<dialog>` is containment, not a
+    trap, so it isn't reported. Repeated focus on an `<iframe>` (tabbing inside the
+    frame) isn't read as a trap.
+  - The walk runs after the scan, since pressing Tab can change page state.
+  - New public API: `detectTabTrap` (pure walk classifier), `createFocusWalkProbe`,
+    and the `FocusObservation` / `TabWalkVerdict` / `FocusWalkProbe` types.
+  - **Honesty guardrail:** a candidate, labelled "verify manually". A widget that
+    keeps Tab on purpose (a code editor) is fine if it documents another exit.
+- **Real-browser E2E test.** `src/testing/e2e-report.spec.ts` drives the built
+  report-mode through Chromium over local fixture pages: axe, layout-dependent
+  tab order, and the trap walk. CI now installs Chromium so it runs there. It
+  skips itself when `dist/` or a Playwright Chromium is missing.
+
 ## 0.8.0
 
 ### Added
