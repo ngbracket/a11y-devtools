@@ -1,5 +1,6 @@
 import type { A11yFinding, Impact } from './scan.js';
 import type { TabStop } from './keyboard/tab-sequence.js';
+import type { AxDescription } from './keyboard/accname.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 /** Tab-order path + badge colours: normal teal, warning orange for positive tabindex. */
@@ -42,6 +43,14 @@ interface TabBadge {
   badge: HTMLElement;
 }
 
+/** The computed accessibility-tree info shown in the focus-follow panel. */
+export interface AxPanelData extends AxDescription {
+  /** Owning component of the focused element, or null. */
+  component: string | null;
+  /** Tag name of the focused element, for context (e.g. `div`, `button`). */
+  tag: string;
+}
+
 export interface A11yOverlay {
   /** Draw a highlight over each finding's node, replacing the previous set. */
   render(findings: A11yFinding[]): void;
@@ -50,6 +59,12 @@ export interface A11yOverlay {
    * independent of the findings highlights. Replaces the previous tab-order set.
    */
   renderTabOrder(stops: TabStop[]): void;
+  /**
+   * Show the accessibility-tree preview panel for the focused element, or hide it
+   * when passed `null`. Deliberately framed as a *computed approximation* — see
+   * the panel header — never as verbatim screen-reader output.
+   */
+  renderAxPanel(data: AxPanelData | null): void;
   /** Remove all highlights but keep the overlay live. */
   clear(): void;
   /** Remove the tab-order layer but keep the overlay live. */
@@ -104,6 +119,28 @@ export function createOverlay(options: OverlayOptions = {}): A11yOverlay {
   connector.setAttribute('opacity', '0.7');
   svg.appendChild(connector);
   container.appendChild(svg); // under the badges, which are appended later
+
+  // The accessibility-tree preview panel: a fixed card that follows focus. Hidden
+  // until renderAxPanel is called with data. Marked with OVERLAY_ATTR so scans
+  // never flag the tool's own UI.
+  const axPanel = doc.createElement('div');
+  axPanel.setAttribute(OVERLAY_ATTR, '');
+  Object.assign(axPanel.style, {
+    position: 'fixed',
+    right: '12px',
+    bottom: '12px',
+    maxWidth: '320px',
+    padding: '8px 10px',
+    borderRadius: '6px',
+    background: 'rgba(20,22,28,0.94)',
+    color: '#f4f4f5',
+    font: '12px/1.5 ui-sans-serif, system-ui, sans-serif',
+    boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
+    pointerEvents: 'none',
+    zIndex: '2147483647',
+    display: 'none',
+  });
+  container.appendChild(axPanel);
 
   let highlights: Highlight[] = [];
   let tabBadges: TabBadge[] = [];
@@ -182,15 +219,68 @@ export function createOverlay(options: OverlayOptions = {}): A11yOverlay {
     repositionTabOrder();
   }
 
+  function renderAxPanel(data: AxPanelData | null): void {
+    if (!data) {
+      axPanel.style.display = 'none';
+      axPanel.replaceChildren();
+      return;
+    }
+    axPanel.replaceChildren(...buildAxPanelContent(doc, data));
+    axPanel.style.display = 'block';
+  }
+
   function destroy(): void {
     clear();
     clearTabOrder();
+    renderAxPanel(null);
     win?.removeEventListener('scroll', onViewportChange, { capture: true } as EventListenerOptions);
     win?.removeEventListener('resize', onViewportChange);
     container.remove();
   }
 
-  return { render, renderTabOrder, clear, clearTabOrder, destroy };
+  return { render, renderTabOrder, renderAxPanel, clear, clearTabOrder, destroy };
+}
+
+/** The rows of the accessibility-tree preview panel, honesty header first. */
+function buildAxPanelContent(doc: Document, data: AxPanelData): HTMLElement[] {
+  const nodes: HTMLElement[] = [];
+
+  const header = doc.createElement('div');
+  header.textContent = 'Accessibility-tree preview — computed approximation';
+  Object.assign(header.style, {
+    fontWeight: '700',
+    fontSize: '10px',
+    letterSpacing: '0.02em',
+    textTransform: 'uppercase',
+    color: '#a9b0bd',
+    marginBottom: '4px',
+  });
+  header.title = 'A computed name/role/state — an approximation of what assistive tech announces, not any one screen reader.';
+  nodes.push(header);
+
+  const row = (label: string, value: string, muted = false): HTMLElement => {
+    const div = doc.createElement('div');
+    const key = doc.createElement('span');
+    key.textContent = `${label}: `;
+    key.style.color = '#a9b0bd';
+    const val = doc.createElement('span');
+    val.textContent = value;
+    if (muted) val.style.color = '#e8710a'; // draw the eye to a missing name
+    div.append(key, val);
+    return div;
+  };
+
+  nodes.push(row('role', data.role ?? `(none — <${data.tag}>)`));
+  nodes.push(
+    data.name
+      ? row('name', `"${data.name}"`)
+      : row('name', '(no accessible name)', true),
+  );
+  if (data.description) nodes.push(row('description', `"${data.description}"`));
+  if (data.states.length) nodes.push(row('states', data.states.join(', ')));
+  if (data.component) nodes.push(row('component', data.component));
+
+  return nodes;
 }
 
 /**

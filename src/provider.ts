@@ -11,8 +11,10 @@ import type { RunOptions as AxeRunOptions } from 'axe-core';
 import { debounceTime, filter } from 'rxjs';
 import { runA11yScan } from './runner.js';
 import type { Logger } from './report.js';
-import { createOverlay } from './overlay.js';
+import { createOverlay, OVERLAY_ATTR } from './overlay.js';
 import { tabSequence } from './keyboard/tab-sequence.js';
+import { describeElement } from './keyboard/accname.js';
+import { resolveOwningComponentName } from './attribution.js';
 
 export interface A11yDevtoolsOptions {
   /** Element/Document to scan. Defaults to `document`. */
@@ -85,6 +87,28 @@ export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): Environm
 
       const overlayView = overlay ? createOverlay() : undefined;
 
+      // Keyboard & Focus Mode, part C: a focus-follow accessibility-tree preview.
+      // As the user Tabs, show the focused control's computed role/name/state —
+      // the ~2/3 axe can't test — attributed to its component. Only meaningful
+      // with the visual overlay on.
+      let onFocusIn: ((event: FocusEvent) => void) | undefined;
+      if (overlayView && keyboard) {
+        onFocusIn = (event: FocusEvent) => {
+          const el = event.target;
+          if (!(el instanceof Element) || el.closest(`[${OVERLAY_ATTR}]`)) return; // skip our own UI
+          describeElement(el)
+            .then((desc) =>
+              overlayView.renderAxPanel({
+                ...desc,
+                component: resolveOwningComponentName(el, frameworkPrefixes),
+                tag: el.tagName.toLowerCase(),
+              }),
+            )
+            .catch(() => undefined);
+        };
+        document.addEventListener('focusin', onFocusIn, true);
+      }
+
       let scanning = false;
       const subscription = appRef.isStable
         .pipe(
@@ -113,6 +137,7 @@ export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): Environm
 
       destroyRef.onDestroy(() => {
         subscription.unsubscribe();
+        if (onFocusIn) document.removeEventListener('focusin', onFocusIn, true);
         overlayView?.destroy();
       });
     }),

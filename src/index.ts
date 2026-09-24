@@ -23,9 +23,16 @@ export {
 } from './keyboard/tab-sequence.js';
 export { scanKeyboard, type KeyboardScanOptions } from './keyboard/keyboard-scan.js';
 export {
+  describeElement,
+  accessibleDescription,
+  ariaStates,
+  type AxDescription,
+} from './keyboard/accname.js';
+export {
   createOverlay,
   OVERLAY_ATTR,
   OVERLAY_EXCLUDE_SELECTOR,
   type A11yOverlay,
   type OverlayOptions,
+  type AxPanelData,
 } from './overlay.js';

@@ -3,6 +3,24 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.7.0
+
+### Added
+
+- **Keyboard & Focus Mode — M2: the accessibility-tree preview.** With
+  `keyboard: true` **and** `overlay: true`, a panel now follows focus: as you Tab,
+  it shows the focused control's computed **role, accessible name, description, and
+  ARIA states**, attributed to the owning component.
+  - Name and role are computed by **axe-core's own accname commons** (one accname
+    source, not a second home-grown one). axe stays behind a dynamic import, so the
+    prod-weight guarantee is unchanged.
+  - **Honesty guardrail:** the panel is headed *"Accessibility-tree preview —
+    computed approximation"* and never branded as any specific screen reader's
+    output. A missing accessible name is flagged in warning colour.
+  - New public API: `describeElement` (async, axe-backed), `accessibleDescription`,
+    `ariaStates`, and the `AxDescription` / `AxPanelData` types; the overlay gains
+    `renderAxPanel`.
+
 ## 0.6.0
 
 ### Added

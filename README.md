@@ -19,8 +19,9 @@ Part of the `@ngbracket` Angular tooling family.
 Ships attribution — component **and** directive-level — + axe scan + grouped
 console reporter (with a summary line) + the dev-only provider + the visual in-app
 overlay (severity-coloured highlights, click-to-scroll) + headless report mode +
-**Keyboard & Focus Mode M1** (tab-order visualisation + keyboard-reachability
-findings — the part of accessibility axe can't test).
+**Keyboard & Focus Mode M1 + M2** — tab-order visualisation, keyboard-reachability
+findings, and a focus-follow accessibility-tree preview (the part of accessibility
+axe can't test).
 
 ## How the attribution works
 
@@ -183,8 +184,24 @@ npx ngbr-a11y-report --base http://localhost:4200 --route / --keyboard
 
 **Honesty guardrail:** `click-without-key` and `tab-order-mismatch` are
 *heuristics* — labelled "verify manually", never reported as confirmed failures.
-(Next: M2 — an accessibility-tree preview, framed as a *computed approximation*,
-never "what a screen reader says".)
+
+### Accessibility-tree preview (M2)
+
+With `keyboard: true` **and** `overlay: true`, a panel follows focus: as you Tab, it
+shows the focused control's computed **role, accessible name, description, and ARIA
+states** — attributed to its owning component. The name and role come from
+axe-core's own accessible-name commons (one accname source, shared with the scan),
+and a missing accessible name is flagged in warning colour.
+
+> **Accessibility-tree preview — computed approximation.** This is a *computed*
+> name/role/state, an approximation of what assistive tech announces — **not** what
+> any one screen reader says. Real output varies by screen reader (NVDA / JAWS /
+> VoiceOver), browse vs. focus mode, verbosity, and browser. Use it to catch
+> missing names and wrong roles fast; confirm the announcement with a real SR.
+
+The same computation is available programmatically via `describeElement(el)`
+(async — it loads axe on demand), plus the pure `ariaStates(el)` and
+`accessibleDescription(el)` helpers.
 
 ## What it checks (and what it can't)
 
@@ -225,9 +242,9 @@ npm run build   # tsc -> dist/ (ESM + .d.ts)
 
 ## Roadmap
 
-- Keyboard & Focus Mode **M2** — accessibility-tree preview (role + accessible
-  name + state as you Tab), framed as a *computed approximation*.
 - Keyboard & Focus Mode **M3** — focus-trap *candidate* detection.
+- Headless "linear walkthrough" — the tab sequence as an SR-ish reading list per
+  route in report-mode (M2's preview is currently overlay-only).
 - HTML report + baseline/diff mode for CI.
 - Per-component filtering and a violation-count badge.
 
@@ -235,4 +252,5 @@ Done: component attribution (nearest app-owned, walking past UI primitives) ·
 directive / `hostDirectives` attribution · configurable framework prefixes · axe
 scan · grouped console reporter · dev-only provider · in-app overlay · headless
 report mode (CLI + `./report`) · **Keyboard & Focus Mode M1** (tab-order viz +
-keyboard-reachability findings) · CI prod-weight guard.
+keyboard-reachability findings) · **M2** (focus-follow accessibility-tree preview) ·
+CI prod-weight guard.

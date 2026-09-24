@@ -148,4 +148,32 @@ describe('createOverlay', () => {
     expect(overlayRoot()!.querySelectorAll('[data-ngb-tab-order]')).toHaveLength(0);
     expect(overlayRoot()!.querySelectorAll('[data-impact]')).toHaveLength(1); // highlights untouched
   });
+
+  it('renders the accessibility-tree panel with an honest, non-SR header', () => {
+    overlay.renderAxPanel({
+      role: 'button',
+      name: 'Save',
+      description: '',
+      states: ['disabled'],
+      component: 'ToolbarComponent',
+      tag: 'div',
+    });
+    const text = overlayRoot()!.textContent ?? '';
+    expect(text.toLowerCase()).toContain('computed approximation'); // honesty guardrail
+    expect(text).toContain('button');
+    expect(text).toContain('"Save"');
+    expect(text).toContain('disabled');
+    expect(text).toContain('ToolbarComponent');
+  });
+
+  it('flags a missing accessible name in the panel', () => {
+    overlay.renderAxPanel({ role: 'button', name: '', description: '', states: [], component: null, tag: 'div' });
+    expect(overlayRoot()!.textContent).toContain('(no accessible name)');
+  });
+
+  it('hides the panel when passed null', () => {
+    overlay.renderAxPanel({ role: 'link', name: 'Home', description: '', states: [], component: null, tag: 'a' });
+    overlay.renderAxPanel(null);
+    expect(overlayRoot()!.textContent).not.toContain('Home');
+  });
 });
