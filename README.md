@@ -161,7 +161,15 @@ component that placed it and notes the primitive as `(via …)`.
 axe covers the machine-testable third of WCAG. **Keyboard & Focus Mode** starts on
 the rest — keyboard operability — still naming the component that owns each issue.
 Turn it on with `keyboard: true` (provider / `runA11yScan` / `scan` / `scanPages`)
-or `--keyboard` on the CLI. It adds:
+or `--keyboard` on the CLI.
+
+![Keyboard & Focus Mode over the demo page: numbered tab-order badges (badge 1 in
+orange flags a positive tabindex) joined by a connector path, severity-coloured
+finding highlights labelled with their owning component (including the ngbr/*
+keyboard findings), and the focus-follow accessibility-tree panel showing the
+focused button's computed role, name and states.](./demo/keyboard-layer-2026-09.png)
+
+It adds:
 
 - **Tab-order visualisation** (overlay): numbered badges at each tab stop and a
   connector path showing the order focus actually moves. A positive-`tabindex` stop
