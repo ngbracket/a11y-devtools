@@ -1,255 +1,54 @@
 # @ngbracket/a11y-devtools
 
-Dev-only, in-app accessibility auditing for Angular that maps each axe violation
-back to **the component that rendered it** — so you get
-`♿ UserCardComponent — 2 issue(s)`, not a wall of CSS selectors.
+Accessibility auditing for Angular that maps each axe violation back to **the
+component that rendered it**, so you get `♿ UserCardComponent — 2 issue(s)`, not a
+wall of CSS selectors. Run it as a dev overlay while you build, or headless in CI.
 
-The axe-based devtools in this space — [`@axe-core/react`](https://www.npmjs.com/package/@axe-core/react),
-[`axe-mode`](https://github.com/raunofreiberg/axe-mode), and
-[TanStack's a11y plugin](https://tanstack.com/devtools/latest/docs/plugins/a11y)
-(now cross-framework, with an Angular adapter too) — report the DOM node (selector,
-HTML, rule id) and highlight it, but we haven't seen one tie a violation back to the
-component that rendered it, by name. This does, through Angular's **documented** dev
-debug API (`window.ng`) rather than private framework internals.
+**📖 Documentation: [ngbracket.com/tools/a11y-devtools/docs](https://ngbracket.com/tools/a11y-devtools/docs/introduction)**
+(guides, every option and CLI flag, and the rule catalogue).
 
 Part of the `@ngbracket` Angular tooling family.
 
-## Status
+## Features
 
-Ships attribution — component **and** directive-level — + axe scan + grouped
-console reporter (with a summary line) + the dev-only provider + the visual in-app
-overlay (severity-coloured highlights, click-to-scroll) + headless report mode
-(Markdown / JSON / HTML, with a baseline so CI fails only on new issues) +
-**Keyboard & Focus Mode** — tab-order visualisation, keyboard-reachability
-findings, a focus-follow accessibility-tree preview, and focus-trap detection (the
-part of accessibility axe can't test).
-
-## How the attribution works
-
-Angular publishes debug helpers on the `window.ng` global in dev mode.
-`getOwningComponent(node)` returns the component whose view contains a DOM node,
-so any axe-flagged element resolves to its owning component; `getDirectives(node)`
-adds the directives applied to that node — including those pulled in via
-`hostDirectives` — which are the runtime cases a static ESLint pass can't see.
-These helpers exist **only in dev builds** — which is exactly right: the tool is
-dev-only, and the global's absence in prod is the signal to no-op.
+- **Component attribution**: every finding names the Angular component to fix,
+  walking past UI-library components (Material, CDK, Nebular, …) to yours. Uses
+  Angular's documented dev debug API (`window.ng`).
+- **In-app provider**: rescans as the app settles; grouped console output and an
+  optional on-page overlay.
+- **Report mode**: scan many routes headless from the CLI; Markdown, JSON and a
+  self-contained HTML report.
+- **CI gating with a baseline**: fail only on *new* issues, so an app with known
+  issues can adopt the gate today.
+- **Dark mode**: scan your dark theme too, whether it follows the OS setting, a
+  class, an attribute, or custom logic.
+- **Keyboard & Focus Mode**: tab-order visualisation, keyboard findings,
+  accessibility-tree preview, and keyboard-trap detection with real Tab presses.
+- **Zero production weight**: a no-op in production; axe-core is never loaded.
 
 ## Install
 
 ```bash
 npm i -D @ngbracket/a11y-devtools
+
+# for report mode only
+npm i -D playwright && npx playwright install chromium
 ```
 
-Peer deps: `@angular/core >=18`, `rxjs >=7`.
+Needs Angular 18+.
 
-## Usage
+## Quick start
+
+While you build:
 
 ```ts
-// app.config.ts (dev configuration)
+// app.config.ts
 import { provideA11yDevtools } from '@ngbracket/a11y-devtools';
 
-export const appConfig = {
-  providers: [
-    // ...your providers
-    provideA11yDevtools(),
-  ],
+export const appConfig: ApplicationConfig = {
+  providers: [provideA11yDevtools({ overlay: true, keyboard: true })],
 };
 ```
-
-It rescans whenever the app settles (zoneless-aware, via `ApplicationRef.isStable`)
-and logs violations grouped by owning component. Options:
-
-```ts
-provideA11yDevtools({
-  root: () => document.querySelector('main')!, // scan scope; default document
-  log: true,           // grouped console output; default true
-  overlay: true,       // in-app visual highlights over flagged nodes; default false
-  debounceMs: 500,     // quiet window after stabilization before scanning
-  tags: ['wcag22aa'],  // scope the ruleset; default = axe-core's full ruleset
-  frameworkPrefixes: ['Nb', 'Mat', 'Cdk', 'Mdc'], // UI primitives to attribute past (default)
-  keyboard: true,      // also run the keyboard layer (see below); default false
-});
-```
-
-**Framework prefixes.** Attribution walks *past* third-party UI primitives to the app
-component that placed them — a `<button nbButton>` with no name is blamed on your
-`HeaderComponent`, not `NbButtonComponent`. The default list is `Nb`/`Mat`/`Cdk`/`Mdc`;
-override `frameworkPrefixes` to add others (e.g. `['Nb','Mat','Nz','Clr','Ion']` — spread
-`DEFAULT_FRAMEWORK_PREFIXES` to extend), or pass `[]` to attribute to the **immediate**
-owner (useful when auditing a component library's *own* code). The same option is available
-on `scan`, `runA11yScan`, `scanPages`, and the CLI (`--framework-prefixes` / `--no-skip-primitives`).
-
-Findings are grouped by owning component, led by a summary line, and each node's
-directives are shown inline:
-
-```text
-♿ a11y-devtools: 2 issue(s) across 1 component(s)
-♿ UserCardComponent — 2 issue(s)
-    critical · image-alt: Images must have alternative text [via TooltipDirective]
-      img
-      https://dequeuniversity.com/rules/axe/4.13/image-alt
-    serious · color-contrast: Elements must meet minimum contrast
-      button.save
-      https://dequeuniversity.com/rules/axe/4.13/color-contrast
-```
-
-You can also scan on demand:
-
-```ts
-import { runA11yScan, scan } from '@ngbracket/a11y-devtools';
-
-const findings = await runA11yScan();      // scan + grouped log
-const raw = await scan(document.body);     // findings only
-```
-
-`scan()` and `runA11yScan()` also take full axe-core run options as a second
-argument (`scan(root, { runOnly: … })`) for finer control than the provider's
-`tags`.
-
-## Report mode (headless, CI-friendly)
-
-The provider is for while you're developing a page. **Report mode** turns the same
-engine on a whole running app from the outside: it drives a headless browser over
-your **dev** server, injects the same component-attributed scan, and writes a
-report grouped by owning component — with no change to the app under test. It needs
-a dev build, because that's what publishes `window.ng` for attribution; against a
-production build, attribution falls back to `(unknown component)`.
-
-Report mode is opt-in and needs Playwright, an **optional peer** you install
-yourself (so the base package stays weightless):
-
-```bash
-npm i -D playwright
-npx playwright install chromium
-```
-
-Start your app (`ng serve`), then point the CLI at it:
-
-```bash
-# writes a11y.md and a11y.json
-npx ngbr-a11y-report --base http://localhost:4200 --route / --route /dashboard --out a11y
-
-# …or pick formats: md, json, html (comma-separated), both (= md,json) or all
-npx ngbr-a11y-report --base http://localhost:4200 --route / --out a11y --format all
-
-# CI gate: exit non-zero on any serious/critical finding
-npx ngbr-a11y-report --base http://localhost:4200 --route / --fail-on serious
-```
-
-### HTML report
-
-`--format html` (or `all`) writes one self-contained `.html` file. It has no
-scripts and makes no external requests, so you can attach it to a CI run, email it,
-or open it offline. It has the same content as the Markdown report, and it's
-accessible itself: landmarks, a sequential heading outline, a real data table,
-severity written as text (not colour alone), and AA contrast in light and dark
-mode. Its own report-mode scan comes back clean.
-
-### Dark mode (and other colour schemes)
-
-By default the headless browser reports a **light** colour-scheme preference, so a
-dark theme is never switched on and its contrast is never checked. Pick the
-scheme(s) to scan with `--color-scheme`:
-
-```bash
-# dark theme driven by prefers-color-scheme (the OS setting)
-npx ngbr-a11y-report --base http://localhost:4200 --route / --color-scheme both
-```
-
-- `light` (default) or `dark` scans once in that scheme. Dark pages are labelled
-  `/route (dark)`.
-- `both` scans each route twice. To avoid listing everything twice, the dark page
-  shows only the issues that **don't also** appear in light mode (typically contrast
-  problems specific to the dark palette).
-
-Many apps switch themes with a class or attribute instead of the OS setting. For
-those, tell report mode what to set on `<html>` for the dark pass (either flag
-implies `--color-scheme both`):
-
-```bash
-npx ngbr-a11y-report --base http://localhost:4200 --route / --dark-class dark          # Tailwind-style
-npx ngbr-a11y-report --base http://localhost:4200 --route / --dark-attribute data-bs-theme=dark  # Bootstrap
-```
-
-For anything else (a theme picker, a setting in localStorage, a class on `<body>`),
-use the programmatic hooks. Both receive the pass's `colorScheme`:
-
-```ts
-await scanPages({
-  baseUrl: 'http://localhost:4200',
-  routes: ['/', '/settings'],
-  colorScheme: 'both',
-  // once per pass, e.g. pick the theme in a persisted setting
-  setup: async (page, { colorScheme }) => {
-    await page.evaluate((s) => localStorage.setItem('theme', s), colorScheme);
-  },
-  // after every route loads, for a theme that doesn't persist between pages
-  beforeScan: async (page, { colorScheme }) => {
-    if (colorScheme === 'dark') await page.click('button[aria-label="Dark theme"]');
-  },
-});
-```
-
-### Baseline: fail CI only on new issues
-
-An app with a backlog of known issues can't turn on `--fail-on` without every build
-failing. A **baseline** fixes that. Save one run's JSON report, commit it, and
-compare later runs against it:
-
-```bash
-# once: record today's state (commit a11y-baseline.json)
-npx ngbr-a11y-report --base http://localhost:4200 --route / --route /dashboard \
-  --out a11y-baseline --format json
-
-# in CI: fail only on findings that aren't in the baseline
-npx ngbr-a11y-report --base http://localhost:4200 --route / --route /dashboard \
-  --baseline a11y-baseline.json --fail-on serious --out a11y --format all
-```
-
-- With `--baseline`, `--fail-on` counts only **new** findings. Known ones don't fail
-  the build, and the report shows what's **new**, **fixed** and **unchanged**.
-- A finding's identity is its route, rule, owning component and element selector.
-  Angular's per-build `_ngcontent-…` style hashes are ignored, and so is reworded help
-  text after an axe upgrade.
-- A route the baseline never scanned counts as entirely new, so re-record the
-  baseline when you add routes. A route that fails to scan isn't reported as "fixed".
-- To ratchet down, re-record the baseline after fixing issues. The JSON from any run
-  (including a `--baseline` run) is itself a valid baseline.
-
-For apps gated behind a login or theme picker, use the programmatic API with a
-`setup` hook (run once before the routes are scanned):
-
-```ts
-import { scanPages, toMarkdown } from '@ngbracket/a11y-devtools/report';
-
-const report = await scanPages({
-  baseUrl: 'http://localhost:4200',
-  routes: ['/pages/dashboard'],
-  setup: async (page) => {
-    await page.goto('http://localhost:4200/login');
-    await page.fill('#email', 'demo@example.com');
-    await page.click('button[type=submit]');
-  },
-});
-console.log(toMarkdown(report));
-```
-
-The same pieces are exported for your own pipeline: `toJson`, `toHtml`,
-`parseBaseline` and `diffAgainstBaseline` (pass the diff as the second argument to
-`toMarkdown` / `toJson` / `toHtml`).
-
-The report leads with a summary of **distinct rules vs. raw node-instances** (a
-"54" is usually one rule firing dozens of times), then lists findings under each
-owning component. When a flagged control is itself a third-party UI primitive
-(e.g. `<button nbButton>`), attribution walks past the primitive to the app
-component that placed it and notes the primitive as `(via …)`.
-
-## Keyboard & Focus Mode (the ~2/3 axe can't test)
-
-axe covers the machine-testable third of WCAG. **Keyboard & Focus Mode** starts on
-the rest — keyboard operability — still naming the component that owns each issue.
-Turn it on with `keyboard: true` (provider / `runA11yScan` / `scan` / `scanPages`)
-or `--keyboard` on the CLI.
 
 ![Keyboard & Focus Mode over the demo page: numbered tab-order badges (badge 1 in
 orange flags a positive tabindex) joined by a connector path, severity-coloured
@@ -257,118 +56,39 @@ finding highlights labelled with their owning component (including the ngbr/*
 keyboard findings), and the focus-follow accessibility-tree panel showing the
 focused button's computed role, name and states.](./demo/keyboard-layer-2026-09.png)
 
-It adds:
-
-- **Tab-order visualisation** (overlay): numbered badges at each tab stop and a
-  connector path showing the order focus actually moves. A positive-`tabindex` stop
-  is coloured as a warning, because it hijacks the natural order.
-- **Keyboard findings**, grouped and reported exactly like the axe violations:
-  - `ngbr/unreachable-control` — an interactive element (an ARIA role, or a runtime
-    `click` listener) that isn't a native control and has no `tabindex >= 0`, so the
-    keyboard can't reach it.
-  - `ngbr/click-without-key` — a focusable element with a `(click)` handler but no
-    keyboard handler, so Enter/Space may not activate it. This is read from
-    `window.ng.getListeners` — a **runtime** signal a static template lint can't see
-    (e.g. a handler added via `hostDirectives`).
-  - `ngbr/tab-order-mismatch` — the tab path jumps against the visual reading order
-    (needs real layout, so it fires in report-mode / a real browser).
-  - `ngbr/modal-focus-not-contained` — an open `aria-modal="true"` whose focus isn't
-    contained: tabbable elements outside it are still reachable, so a keyboard user
-    can Tab out to the page behind. (A modal that correctly marks the background
-    `inert` is not flagged, since those elements are no longer tabbable.)
+In CI, against a running `ng serve`:
 
 ```bash
-# include the keyboard layer in a report-mode run
-npx ngbr-a11y-report --base http://localhost:4200 --route / --keyboard
+npx ngbr-a11y-report --base http://localhost:4200 --route / --route /settings \
+  --keyboard --baseline a11y-baseline.json --fail-on serious --out a11y --format all
 ```
 
-**Honesty guardrail:** `click-without-key`, `tab-order-mismatch`,
-`modal-focus-not-contained` and `focus-trap` are *heuristics*. They're labelled
-"verify manually" and never reported as confirmed failures.
+Next steps, in the docs:
+[Your first scan](https://ngbracket.com/tools/a11y-devtools/docs/first-scan) ·
+[Report mode](https://ngbracket.com/tools/a11y-devtools/docs/report-mode) ·
+[CI gating with a baseline](https://ngbracket.com/tools/a11y-devtools/docs/ci-baseline) ·
+[CLI reference](https://ngbracket.com/tools/a11y-devtools/docs/cli) ·
+[Findings & rules](https://ngbracket.com/tools/a11y-devtools/docs/findings)
 
-### Keyboard traps (report-mode, M3)
+## What it can't do
 
-A keyboard trap is focus you can Tab *into* but never Tab *out of*
-([WCAG 2.1.2](https://www.w3.org/WAI/WCAG22/Understanding/no-keyboard-trap.html)).
-You can't find one by reading the DOM. Script makes the trap, by intercepting Tab or
-re-focusing on blur, and synthetic key events don't move focus in a browser. So
-report-mode presses the **real** Tab key through each route:
-
-```bash
-npx ngbr-a11y-report --base http://localhost:4200 --route / --focus-traps
-```
-
-- If focus laps the page (passes `<body>` and comes back round), there's no trap.
-- If focus cycles inside part of the page without ever leaving, that's reported as
-  **`ngbr/focus-trap`**. The finding goes on the element that holds the cycle and
-  counts the tabbable controls that were never reached. The walk then tries
-  Shift+Tab: the finding is **serious** if that's stuck too, and **moderate** if
-  Shift+Tab gets out.
-- Focus cycling inside an open `aria-modal` / `<dialog>` is containment working,
-  so it isn't reported. Consecutive focus on an `<iframe>` (Tab moving inside the
-  frame) isn't read as a trap either.
-
-It's a separate flag (`focusTraps: true` in `scanPages`) because it's the one check
-that *changes the page*. Pressing Tab can fire focus handlers and open menus, so
-it runs after the scan. A widget that deliberately keeps Tab, like a code editor,
-is fine if it tells users how to leave (Escape, for example). That's why the finding
-says "verify manually".
-
-### Accessibility-tree preview (M2)
-
-With `keyboard: true` **and** `overlay: true`, a panel follows focus: as you Tab, it
-shows the focused control's computed **role, accessible name, description, and ARIA
-states** — attributed to its owning component. The name and role come from
-axe-core's own accessible-name commons (one accname source, shared with the scan),
-and a missing accessible name is flagged in warning colour.
-
-> **Accessibility-tree preview — computed approximation.** This is a *computed*
-> name/role/state, an approximation of what assistive tech announces — **not** what
-> any one screen reader says. Real output varies by screen reader (NVDA / JAWS /
-> VoiceOver), browse vs. focus mode, verbosity, and browser. Use it to catch
-> missing names and wrong roles fast; confirm the announcement with a real SR.
-
-The same computation is available programmatically via `describeElement(el)`
-(async — it loads axe on demand), plus the pure `ariaStates(el)` and
-`accessibleDescription(el)` helpers.
-
-## What it checks (and what it can't)
-
-Under the hood this is [axe-core](https://github.com/dequelabs/axe-core) — the
-scan runs axe's rules and enriches each violation with the owning component. By
-default it runs axe-core's full ruleset: the **machine-testable** rules across
-**WCAG 2.0, 2.1 and 2.2, Levels A & AA**, plus axe's *best-practice* rules. Scope
-it to a single conformance target with `tags` (e.g. `['wcag22aa']`) or
-`['wcag21aa', 'best-practice']`.
-
-Automated checks only cover the part of WCAG a machine can test — on the order of
-a third of the success criteria. Many WCAG 2.2 additions have **no automated rule
-at all** (target size 2.5.8, dragging 2.5.7, consistent help, redundant entry,
-accessible authentication), so a clean run is necessary, not sufficient — the rest
-needs keyboard, screen-reader and human testing. (WCAG 3.0 is still an early W3C
-draft with a different, non-final model; there's nothing to test against yet.)
-
-## Production weight
-
-In production `provideA11yDevtools()` is a **no-op** and axe-core is never loaded.
-axe-core is a **dynamic import**, so it lands in a lazy chunk that prod never
-fetches, and the package is `sideEffects: false` so an unused import tree-shakes
-away entirely. For a hard guarantee, include the provider only in your dev
-bootstrap config (e.g. behind `isDevMode()`).
-
-This is **enforced in CI**: `src/testing/prod-weight.spec.ts` bundles the entry
-with esbuild and walks the module graph — axe-core must be reachable *only*
-through a dynamic import, never a static one. Turning `import('axe-core')` into a
-static import (or adding a top-level side effect) fails the build.
+Automated checks cover part of WCAG, so a clean run is necessary, not sufficient:
+keyboard, screen-reader and human testing cover the rest. The keyboard findings are
+heuristics, labelled "verify manually". It helps you build toward supporting WCAG
+2.2 AA; it doesn't certify conformance. See
+[What it checks (and what it can't)](https://ngbracket.com/tools/a11y-devtools/docs/coverage).
 
 ## Develop
 
 ```bash
 npm install --legacy-peer-deps
+npm run build   # tsc -> dist/ (ESM + .d.ts) + the in-page bundle
 npm test        # vitest + jsdom + Angular TestBed (real axe); the real-browser
                 # E2E spec runs after a build, once `npx playwright install chromium`
-npm run build   # tsc -> dist/ (ESM + .d.ts)
 ```
+
+CI also runs a production-weight guard: a bundle-graph test that fails if axe-core
+ever becomes reachable through a static import.
 
 ## Roadmap
 
