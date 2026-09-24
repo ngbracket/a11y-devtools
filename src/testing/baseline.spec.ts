@@ -83,6 +83,36 @@ describe('diffAgainstBaseline', () => {
     expect(diff.fixed).toHaveLength(0);
   });
 
+  it("skips a route that failed in the baseline, rather than calling everything on it new", () => {
+    const diff = diffAgainstBaseline(
+      report([{ label: '/', url: 'u', findings: [finding()] }]),
+      { pages: [{ label: '/', findings: [], error: 'timeout' }] },
+    );
+    expect(diff).toEqual({ added: [], fixed: [], unchanged: 0 });
+  });
+
+  it('JSON keeps a failed route\'s error, so it never reads as a clean page', () => {
+    const run = report([
+      { label: '/ok', url: 'u', findings: [] },
+      { label: '/down', url: 'u', findings: [], error: 'net::ERR_CONNECTION_REFUSED' },
+    ]);
+    const pages = JSON.parse(toJson(run)).pages;
+    expect(pages[0].error).toBeUndefined();
+    expect(pages[1].error).toBe('net::ERR_CONNECTION_REFUSED');
+    expect(parseBaseline(toJson(run)).pages[1].error).toBe('net::ERR_CONNECTION_REFUSED');
+  });
+
+  it('JSON keeps colour-scheme and dark-only markers', () => {
+    const run = report([
+      { label: '/', url: 'u', findings: [], colorScheme: 'light' },
+      { label: '/ (dark)', url: 'u', findings: [], colorScheme: 'dark', darkOnly: true },
+    ]);
+    const pages = JSON.parse(toJson(run)).pages;
+    expect(pages[0]).toMatchObject({ colorScheme: 'light' });
+    expect(pages[0].darkOnly).toBeUndefined();
+    expect(pages[1]).toMatchObject({ colorScheme: 'dark', darkOnly: true });
+  });
+
   it('round-trips: a JSON report is a valid baseline for the same run', () => {
     const run = report([{ label: '/', url: 'u', findings: [finding(), finding({ id: 'label' })] }]);
     const diff = diffAgainstBaseline(run, parseBaseline(toJson(run)));

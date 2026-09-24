@@ -98,6 +98,10 @@ export function toJson(report: ScanReport, diff?: BaselineDiff): string {
       pages: report.pages.map((p) => ({
         label: p.label,
         url: p.url,
+        // A failed route must not read as a clean one: keep its error.
+        ...(p.error !== undefined && { error: p.error }),
+        ...(p.colorScheme && { colorScheme: p.colorScheme }),
+        ...(p.darkOnly && { darkOnly: true }),
         distinctRules: distinctRuleCount(p.findings),
         nodeInstances: p.findings.length,
         findings: p.findings,

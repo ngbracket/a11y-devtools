@@ -14,7 +14,7 @@ import type { ScanReport } from './format.js';
 
 /** The parts of a report the diff needs — satisfied by a parsed `toJson` report. */
 export interface BaselineReport {
-  pages: { label: string; findings: A11yFinding[] }[];
+  pages: { label: string; findings: A11yFinding[]; error?: string }[];
 }
 
 /** One finding that's in the current run but not the baseline. */
@@ -78,10 +78,13 @@ export function findingsNotIn(findings: A11yFinding[], reference: A11yFinding[])
  * leaves one new. Pages are matched by label; a route the baseline never
  * scanned counts entirely as new (add it to the baseline when you add it to CI).
  * Pages that failed to scan in the current run are skipped, so an outage
- * doesn't report everything on that page as fixed.
+ * doesn't report everything on that page as fixed. Pages that failed in the
+ * *baseline* are skipped too — there's nothing to compare against, so their
+ * current findings aren't counted as new (re-record the baseline to cover them).
  */
 export function diffAgainstBaseline(current: ScanReport, baseline: BaselineReport): BaselineDiff {
   const failed = new Set(current.pages.filter((p) => p.error).map((p) => p.label));
+  const baselineFailed = new Set(baseline.pages.filter((p) => p.error).map((p) => p.label));
 
   const remaining = new Map<string, NewFinding[]>();
   for (const page of baseline.pages) {
@@ -97,6 +100,7 @@ export function diffAgainstBaseline(current: ScanReport, baseline: BaselineRepor
   const added: NewFinding[] = [];
   let unchanged = 0;
   for (const page of current.pages) {
+    if (baselineFailed.has(page.label)) continue;
     for (const finding of page.findings) {
       const bucket = remaining.get(findingKey(page.label, finding));
       if (bucket && bucket.length > 0) {

@@ -3,6 +3,16 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.10.1
+
+### Fixed
+
+- **The JSON report now keeps a failed route's `error`.** Before, a route that
+  failed to scan appeared in the JSON as a page with 0 findings, which looks clean.
+  Pages now also carry `colorScheme` and `darkOnly` when set.
+- **Baseline: a route that failed in the baseline is skipped** instead of counting
+  everything on it as new. Re-record the baseline to cover it.
+
 ## 0.10.0
 
 ### Added
