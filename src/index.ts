@@ -22,6 +22,7 @@ export {
   type TabSequenceOptions,
 } from './keyboard/tab-sequence.js';
 export { scanKeyboard, type KeyboardScanOptions } from './keyboard/keyboard-scan.js';
+export { findUncontainedModals, type UncontainedModal } from './keyboard/focus-trap.js';
 export {
   describeElement,
   accessibleDescription,

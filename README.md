@@ -184,6 +184,10 @@ It adds:
     (e.g. a handler added via `hostDirectives`).
   - `ngbr/tab-order-mismatch` — the tab path jumps against the visual reading order
     (needs real layout, so it fires in report-mode / a real browser).
+  - `ngbr/modal-focus-not-contained` — an open `aria-modal="true"` whose focus isn't
+    contained: tabbable elements outside it are still reachable, so a keyboard user
+    can Tab out to the page behind. (A modal that correctly marks the background
+    `inert` is not flagged, since those elements are no longer tabbable.)
 
 ```bash
 # include the keyboard layer in a report-mode run
@@ -250,7 +254,8 @@ npm run build   # tsc -> dist/ (ESM + .d.ts)
 
 ## Roadmap
 
-- Keyboard & Focus Mode **M3** — focus-trap *candidate* detection.
+- Keyboard & Focus Mode **M3 (part 2)** — *bad-trap* detection ("you can Tab in but
+  never Tab out") via real Tab presses in headless report-mode.
 - Headless "linear walkthrough" — the tab sequence as an SR-ish reading list per
   route in report-mode (M2's preview is currently overlay-only).
 - HTML report + baseline/diff mode for CI.
@@ -261,4 +266,4 @@ directive / `hostDirectives` attribution · configurable framework prefixes · a
 scan · grouped console reporter · dev-only provider · in-app overlay · headless
 report mode (CLI + `./report`) · **Keyboard & Focus Mode M1** (tab-order viz +
 keyboard-reachability findings) · **M2** (focus-follow accessibility-tree preview) ·
-CI prod-weight guard.
+**M3 part 1** (missing focus-trap: uncontained `aria-modal`) · CI prod-weight guard.

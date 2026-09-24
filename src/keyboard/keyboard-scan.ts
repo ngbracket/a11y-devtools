@@ -25,6 +25,7 @@ import {
   tabSequence,
   visualOrderJumps,
 } from './tab-sequence.js';
+import { findUncontainedModals } from './focus-trap.js';
 
 export interface KeyboardScanOptions {
   /** UI-primitive prefixes to walk past during attribution; see the scan options. */
@@ -58,6 +59,7 @@ const KEY_EVENTS = ['keydown', 'keyup', 'keypress'];
 const UNDERSTANDING = 'https://www.w3.org/WAI/WCAG22/Understanding';
 const KEYBOARD_URL = `${UNDERSTANDING}/keyboard.html`;
 const FOCUS_ORDER_URL = `${UNDERSTANDING}/focus-order.html`;
+const DIALOG_MODAL_URL = 'https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/';
 
 /** A short, human CSS-ish selector for our own findings (not an axe target). */
 function shortSelector(element: Element): string {
@@ -156,6 +158,24 @@ export function scanKeyboard(
         ),
       );
     }
+  }
+
+  // Missing focus trap (M3): an open aria-modal whose focus isn't contained.
+  // Reuses the tab-order machinery (inert/hidden already excluded), so a modal
+  // that correctly inerts the background is not flagged.
+  for (const modal of findUncontainedModals(root, { frameworkPrefixes: prefixes, isVisible })) {
+    findings.push(
+      make(
+        modal.element,
+        'ngbr/modal-focus-not-contained',
+        'moderate',
+        `Possible missing focus trap: this element has aria-modal="true", but ` +
+          `${modal.outsideCount} tabbable element(s) outside it are still reachable, so a keyboard ` +
+          `user can Tab out of the modal to the page behind. Mark the background inert or trap ` +
+          `focus within the dialog. Heuristic — verify manually.`,
+        DIALOG_MODAL_URL,
+      ),
+    );
   }
 
   // Visual-vs-tab-order mismatch: a heuristic over the resolved sequence. Needs

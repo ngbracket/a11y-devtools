@@ -97,6 +97,20 @@ describe('scanKeyboard', () => {
     expect(Array.isArray(findings)).toBe(true);
   });
 
+  it('emits a focus-trap finding for an uncontained aria-modal', () => {
+    const host = fixture(`
+      <button id="behind">Behind</button>
+      <div id="dlg" role="dialog" aria-modal="true"><button>OK</button></div>
+    `);
+    const dlg = host.querySelector('#dlg')!;
+    withNg(new Map(), new Map([[dlg, 'ConfirmDialog']]), () => {
+      const finding = scanKeyboard(host).find((f) => f.id === 'ngbr/modal-focus-not-contained');
+      expect(finding).toBeDefined();
+      expect(finding!.impact).toBe('moderate');
+      expect(finding!.component).toBe('ConfirmDialog');
+    });
+  });
+
   it('stays silent for a plain non-interactive element with no listeners', () => {
     const host = fixture(`<div id="text">just text</div>`);
     const el = host.querySelector('#text')!;

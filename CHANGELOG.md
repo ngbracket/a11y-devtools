@@ -3,6 +3,21 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.8.0
+
+### Added
+
+- **Keyboard & Focus Mode — M3 (part 1): missing focus-trap detection.** A new
+  `ngbr/modal-focus-not-contained` finding (part of the `keyboard` layer) flags an
+  open `aria-modal="true"` whose focus isn't contained — i.e. tabbable elements
+  outside the modal are still reachable, so a keyboard user can Tab out to the page
+  behind it. Reuses the M1 tab-order machinery (which already drops `inert`/hidden
+  subtrees), so a modal that correctly inerts the background is **not** flagged.
+  - New public API: `findUncontainedModals` and the `UncontainedModal` type.
+  - **Honesty guardrail:** a candidate, labelled "verify manually", never a verdict.
+  - The *bad-trap* half of M3 ("you can Tab in but never Tab out") needs real Tab
+    key presses to observe and is a headless report-mode (Playwright) follow-up.
+
 ## 0.7.2
 
 ### Fixed
