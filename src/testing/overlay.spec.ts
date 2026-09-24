@@ -109,7 +109,7 @@ describe('createOverlay', () => {
     expect(overlayRoot()).toBeNull();
   });
 
-  it('draws a numbered tab-order badge per stop, centred on its target', () => {
+  it('draws a numbered tab-order badge per stop, on the left edge of its target', () => {
     const a = targetEl('a', { top: 100, left: 50, width: 20, height: 20 });
     const b = targetEl('b', { top: 200, left: 60, width: 20, height: 20 });
     overlay.renderTabOrder([stop(a, { order: 1 }), stop(b, { order: 2 })]);
@@ -118,8 +118,17 @@ describe('createOverlay', () => {
     expect(badges).toHaveLength(2);
     expect(badges[0].textContent).toBe('1');
     const first = badges[0] as HTMLElement;
-    expect(first.style.top).toBe('100px'); // anchored at the target's top-left
-    expect(first.style.left).toBe('50px');
+    // Just outside the left edge, vertically centred — clear of the findings
+    // labels at the top-left. x = left - gutter(10), y = top + height/2.
+    expect(first.style.top).toBe('110px');
+    expect(first.style.left).toBe('40px');
+  });
+
+  it('clamps a tab-order badge into the viewport for a control flush to the left', () => {
+    const a = targetEl('a', { top: 300, left: 2, width: 40, height: 20 });
+    overlay.renderTabOrder([stop(a, { order: 1 })]);
+    const badge = overlayRoot()!.querySelector('[data-ngb-tab-order]') as HTMLElement;
+    expect(badge.style.left).toBe('9px'); // clamped to min x, not 2 - 10 = -8
   });
 
   it('colours a positive-tabindex stop as a warning', () => {
@@ -130,12 +139,13 @@ describe('createOverlay', () => {
     expect(badge.title).toContain('hijacks order');
   });
 
-  it('draws a connector polyline through the stop centres', () => {
+  it('threads a connector polyline through the badge anchor points', () => {
     const a = targetEl('a', { top: 100, left: 50, width: 20, height: 20 });
     const b = targetEl('b', { top: 200, left: 60, width: 20, height: 20 });
     overlay.renderTabOrder([stop(a, { order: 1 }), stop(b, { order: 2 })]);
     const line = overlayRoot()!.querySelector('polyline') as SVGPolylineElement;
-    expect(line.getAttribute('points')).toBe('60,110 70,210');
+    // Anchors: (left - gutter(10), top + height/2) per stop.
+    expect(line.getAttribute('points')).toBe('40,110 50,210');
   });
 
   it('clears the tab-order layer independently of the findings highlights', () => {

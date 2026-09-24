@@ -3,6 +3,17 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.7.1
+
+### Fixed
+
+- **Tab-order badges no longer collide with the findings labels.** A numbered
+  tab-order badge was anchored on each control's top-left corner — exactly where
+  the severity-coloured finding labels sit — so on a flagged control the two
+  overlapped and obscured each other. Badges now sit just outside the control's
+  left edge, vertically centred (clamped into the viewport for controls flush to
+  the left), and the connector path threads those points.
+
 ## 0.7.0
 
 ### Added

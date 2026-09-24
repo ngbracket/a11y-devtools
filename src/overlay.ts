@@ -6,6 +6,9 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 /** Tab-order path + badge colours: normal teal, warning orange for positive tabindex. */
 const TAB_ORDER_COLOR = '#0b8f8f';
 const TAB_ORDER_WARN_COLOR = '#e8710a';
+/** How far outside a control's left edge the tab-order badge sits, and its min viewport x. */
+const TAB_BADGE_GUTTER = 10;
+const TAB_BADGE_MIN_X = 9;
 
 /**
  * Attribute marking the overlay's own DOM. `scan()` excludes anything under it
@@ -156,9 +159,16 @@ export function createOverlay(options: OverlayOptions = {}): A11yOverlay {
     const points: string[] = [];
     for (const { target, badge } of tabBadges) {
       const rect = target.getBoundingClientRect();
-      badge.style.top = `${rect.top}px`;
-      badge.style.left = `${rect.left}px`;
-      points.push(`${rect.left + rect.width / 2},${rect.top + rect.height / 2}`);
+      // Anchor the badge just OUTSIDE the left edge, vertically centred, so it
+      // clears the findings labels that sit along the top-left corner (a
+      // corner-anchored badge collided with them). Clamp x into the viewport so a
+      // control flush to the left edge still shows its badge. The connector
+      // threads these same points.
+      const y = rect.top + rect.height / 2;
+      const x = Math.max(TAB_BADGE_MIN_X, rect.left - TAB_BADGE_GUTTER);
+      badge.style.top = `${y}px`;
+      badge.style.left = `${x}px`;
+      points.push(`${x},${y}`);
     }
     connector.setAttribute('points', points.join(' '));
   }
