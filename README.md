@@ -284,15 +284,26 @@ npm run build   # tsc -> dist/ (ESM + .d.ts)
 
 ## Roadmap
 
+### Planned
+
 - Headless "linear walkthrough" — the tab sequence as an SR-ish reading list per
   route in report-mode (M2's preview is currently overlay-only).
 - HTML report + baseline/diff mode for CI.
 - Per-component filtering and a violation-count badge.
 
-Done: component attribution (nearest app-owned, walking past UI primitives) ·
-directive / `hostDirectives` attribution · configurable framework prefixes · axe
-scan · grouped console reporter · dev-only provider · in-app overlay · headless
-report mode (CLI + `./report`) · **Keyboard & Focus Mode M1** (tab-order viz +
-keyboard-reachability findings) · **M2** (focus-follow accessibility-tree preview) ·
-**M3** (missing focus-trap: uncontained `aria-modal`; keyboard-trap walk with real
-Tab presses) · CI prod-weight guard · real-browser E2E test.
+### Done
+
+- Component attribution — the nearest app-owned component, walking past UI primitives.
+- Directive and `hostDirectives` attribution.
+- Configurable framework prefixes.
+- axe scan.
+- Grouped console reporter.
+- Dev-only provider.
+- In-app overlay.
+- Headless report mode (CLI + `./report`).
+- **Keyboard & Focus Mode M1** — tab-order visualisation + keyboard-reachability findings.
+- **Keyboard & Focus Mode M2** — focus-follow accessibility-tree preview.
+- **Keyboard & Focus Mode M3** — missing focus-trap detection (uncontained
+  `aria-modal`) and the keyboard-trap walk with real Tab presses.
+- CI production-weight guard.
+- Real-browser E2E test.
