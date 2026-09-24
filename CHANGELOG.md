@@ -3,6 +3,35 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.10.0
+
+### Added
+
+- **Baseline mode: fail CI only on new issues.** `--baseline <file>` compares a run
+  with a previous run's JSON report (from `--out`) and reports what's **new**,
+  **fixed** and **unchanged**. With a baseline, `--fail-on` counts only new findings,
+  so an app with known issues can turn the gate on today and stop the count going up.
+  - A finding's identity is route + rule + owning component + element selector.
+    Angular `_ngcontent`/`_nghost` hashes are ignored (they change between builds),
+    and so are impact and help text (an axe upgrade rewording a message isn't "new").
+  - Matching counts duplicates. A route missing from the baseline is all new. A route
+    that fails to scan isn't reported as "fixed".
+  - A bad baseline path or a non-report file fails fast (exit 2), before the scan.
+  - Markdown gets a "Compared with baseline" section, and new findings are marked. JSON
+    gets a `baseline` block (counts + `newFindings`) and remains a valid baseline.
+  - New API from `./report`: `diffAgainstBaseline`, `parseBaseline`, `findingKey`, and
+    the `BaselineDiff` / `BaselineReport` / `NewFinding` types. `toMarkdown` / `toJson`
+    take the diff as an optional second argument.
+- **HTML report.** `--format html` (or `all`) writes one self-contained `.html` file:
+  inline CSS, no scripts, no external requests. It's accessible itself (landmarks,
+  sequential headings, a real data table, severity as text, AA contrast in light and
+  dark), and its own report-mode scan comes back clean. New `toHtml(report, diff?)`
+  export.
+- `--format` now takes a comma-separated list (`md,json,html`), plus `both` (md + json,
+  still the default) and `all`.
+- The real-browser E2E spec now runs the CLI itself: output formats and the baseline
+  gate (passes with no new issues, fails on a new serious one, rejects a bad baseline).
+
 ## 0.9.0
 
 ### Added

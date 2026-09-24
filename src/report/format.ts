@@ -1,4 +1,5 @@
 import type { A11yFinding, Impact } from '../scan.js';
+import type { BaselineDiff } from './baseline.js';
 
 /**
  * Pure formatting for report-mode: grouping + Markdown/JSON serialization. Kept
@@ -60,8 +61,12 @@ function impactRank(impact: Impact): number {
   return impact ? (IMPACT_RANK[impact] ?? 4) : 4;
 }
 
-/** Serialize a report to JSON, with per-page and overall summary counts. */
-export function toJson(report: ScanReport): string {
+/**
+ * Serialize a report to JSON, with per-page and overall summary counts. With a
+ * baseline `diff`, adds a `baseline` block (counts + the new findings). The
+ * output stays a valid baseline for the next run.
+ */
+export function toJson(report: ScanReport, diff?: BaselineDiff): string {
   const all = report.pages.flatMap((p) => p.findings);
   return JSON.stringify(
     {
@@ -71,6 +76,14 @@ export function toJson(report: ScanReport): string {
         distinctRules: distinctRuleCount(all),
         nodeInstances: all.length,
       },
+      ...(diff && {
+        baseline: {
+          new: diff.added.length,
+          fixed: diff.fixed.length,
+          unchanged: diff.unchanged,
+          newFindings: diff.added.map(({ page, finding }) => ({ page, ...finding })),
+        },
+      }),
       pages: report.pages.map((p) => ({
         label: p.label,
         url: p.url,
@@ -84,8 +97,29 @@ export function toJson(report: ScanReport): string {
   );
 }
 
-/** Render a human-readable Markdown report grouped by owning component. */
-export function toMarkdown(report: ScanReport): string {
+/** UI primitives and directives a finding came through, for a "via …" note. */
+export function viaNames(finding: A11yFinding): string[] {
+  // e.g. an `<button nbButton>` shows as "via NbButtonComponent" under its app owner.
+  const ownerIndex = finding.component ? finding.componentPath.indexOf(finding.component) : -1;
+  const wrappers = ownerIndex > 0 ? finding.componentPath.slice(0, ownerIndex) : [];
+  return [...wrappers, ...finding.directives];
+}
+
+/** Findings sorted most severe first (stable within an impact level). */
+export function bySeverity(findings: A11yFinding[]): A11yFinding[] {
+  return [...findings].sort((a, b) => impactRank(a.impact) - impactRank(b.impact));
+}
+
+/** A baseline diff's new findings, most severe first — what to look at first. */
+export function addedBySeverity(diff: BaselineDiff): BaselineDiff['added'] {
+  return [...diff.added].sort((a, b) => impactRank(a.finding.impact) - impactRank(b.finding.impact));
+}
+
+/**
+ * Render a human-readable Markdown report grouped by owning component. With a
+ * baseline `diff`, adds a comparison section and marks new findings.
+ */
+export function toMarkdown(report: ScanReport, diff?: BaselineDiff): string {
   const all = report.pages.flatMap((p) => p.findings);
   const lines: string[] = [];
 
@@ -109,6 +143,22 @@ export function toMarkdown(report: ScanReport): string {
     `| **Total** | **${distinctRuleCount(all)}** | **${all.length}** | **${groupByComponent(all).size}** |`,
   );
   lines.push('');
+
+  const added = new Set(diff?.added.map((a) => a.finding));
+  if (diff) {
+    lines.push('## Compared with baseline');
+    lines.push('');
+    lines.push(
+      `**${diff.added.length} new** · ${diff.fixed.length} fixed · ${diff.unchanged} unchanged`,
+    );
+    lines.push('');
+    for (const { page, finding } of addedBySeverity(diff)) {
+      lines.push(
+        `- 🆕 **${finding.impact ?? 'n/a'} · ${finding.id}** on ${page}, in ${finding.component ?? '(unknown component)'}: \`${finding.target}\``,
+      );
+    }
+    if (diff.added.length) lines.push('');
+  }
 
   for (const page of report.pages) {
     lines.push(`## ${page.label} — \`${page.url}\``);
@@ -134,15 +184,11 @@ export function toMarkdown(report: ScanReport): string {
     for (const [component, items] of byComponent) {
       lines.push(`### ♿ ${component} — ${items.length} issue(s)`);
       lines.push('');
-      const sorted = [...items].sort((a, b) => impactRank(a.impact) - impactRank(b.impact));
-      for (const finding of sorted) {
-        // UI primitives the app component rendered through, e.g. an `<button
-        // nbButton>` shows as "via NbButtonComponent" under its app owner.
-        const ownerIndex = finding.component ? finding.componentPath.indexOf(finding.component) : -1;
-        const wrappers = ownerIndex > 0 ? finding.componentPath.slice(0, ownerIndex) : [];
-        const via = [...wrappers, ...finding.directives];
+      for (const finding of bySeverity(items)) {
+        const via = viaNames(finding);
         const suffix = via.length ? ` _(via ${via.join(', ')})_` : '';
-        lines.push(`- **${finding.impact ?? 'n/a'} · ${finding.id}**: ${finding.help}${suffix}`);
+        const isNew = added.has(finding) ? '🆕 ' : '';
+        lines.push(`- ${isNew}**${finding.impact ?? 'n/a'} · ${finding.id}**: ${finding.help}${suffix}`);
         lines.push(`  - \`${finding.target}\``);
         lines.push(`  - ${finding.helpUrl}`);
       }

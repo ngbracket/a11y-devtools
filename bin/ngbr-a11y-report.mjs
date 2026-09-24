@@ -1,6 +1,13 @@
 #!/usr/bin/env node
-import { writeFileSync } from 'node:fs';
-import { scanPages, toJson, toMarkdown } from '../dist/report/index.js';
+import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  diffAgainstBaseline,
+  parseBaseline,
+  scanPages,
+  toHtml,
+  toJson,
+  toMarkdown,
+} from '../dist/report/index.js';
 
 const USAGE = `ngbr-a11y-report — component-attributed a11y scan of a running Angular dev build
 
@@ -11,11 +18,16 @@ Options:
   --base <url>       Origin of the running dev server (e.g. http://localhost:4200)
   --route <path>     Route to scan; repeat for multiple routes
   --tags <list>      Comma-separated axe tags to scope the ruleset (e.g. wcag22aa,best-practice)
-  --out <prefix>     Write <prefix>.md / <prefix>.json (default: print Markdown to stdout)
-  --format <fmt>     md | json | both (default: both when --out is set)
+  --out <prefix>     Write <prefix>.md / .json / .html (default: print Markdown to stdout)
+  --format <list>    Comma-separated: md, json, html — or both (= md,json) or all
+                     (default: both when --out is set)
   --wait <ms>        Settle time after load before scanning (default 1500)
   --fail-on <impact> Exit non-zero if any finding is at/above impact
-                     (minor | moderate | serious | critical) — for CI gating
+                     (minor | moderate | serious | critical) — for CI gating.
+                     With --baseline, only NEW findings count
+  --baseline <file>  Compare with a previous run's JSON report (from --out) and
+                     mark what's new, fixed and unchanged — so CI can fail only
+                     on regressions while known issues are worked down
   --framework-prefixes <list>
                      Comma-separated component-name prefixes to treat as
                      third-party UI primitives to walk past during attribution
@@ -48,6 +60,7 @@ function parseArgs(argv) {
       case '--format': opts.format = next(); break;
       case '--wait': opts.wait = Number(next()); break;
       case '--fail-on': opts.failOn = next(); break;
+      case '--baseline': opts.baseline = next(); break;
       case '--framework-prefixes':
         opts.frameworkPrefixes = next().split(',').map((s) => s.trim()).filter(Boolean);
         break;
@@ -69,6 +82,27 @@ if (opts.help || !opts.base || opts.routes.length === 0) {
   process.exit(opts.help ? 0 : 1);
 }
 
+const FORMATS = { md: ['md'], json: ['json'], html: ['html'], both: ['md', 'json'], all: ['md', 'json', 'html'] };
+const formats = new Set();
+for (const name of String(opts.format).split(',').map((s) => s.trim()).filter(Boolean)) {
+  if (!FORMATS[name]) {
+    process.stderr.write(`Invalid --format "${name}" (use md, json, html, both or all)\n`);
+    process.exit(2);
+  }
+  FORMATS[name].forEach((f) => formats.add(f));
+}
+
+// Read the baseline before the (slow) scan, so a bad path fails fast.
+let baseline;
+if (opts.baseline) {
+  try {
+    baseline = parseBaseline(readFileSync(opts.baseline, 'utf8'));
+  } catch (err) {
+    process.stderr.write(`Can't use --baseline ${opts.baseline}: ${err.message}\n`);
+    process.exit(2);
+  }
+}
+
 const report = await scanPages({
   baseUrl: opts.base,
   routes: opts.routes,
@@ -84,6 +118,12 @@ const allFindings = report.pages.flatMap((p) => p.findings);
 process.stderr.write(
   `Scanned ${report.pages.length} route(s) · ${allFindings.length} node-instance(s).\n`,
 );
+const diff = baseline ? diffAgainstBaseline(report, baseline) : undefined;
+if (diff) {
+  process.stderr.write(
+    `Compared with baseline: ${diff.added.length} new · ${diff.fixed.length} fixed · ${diff.unchanged} unchanged.\n`,
+  );
+}
 if (allFindings.length > 0 && allFindings.every((f) => f.component === null)) {
   process.stderr.write(
     'Note: no component attribution (window.ng absent) — is this a production build? Report mode names components only against a dev build.\n',
@@ -91,16 +131,12 @@ if (allFindings.length > 0 && allFindings.every((f) => f.component === null)) {
 }
 
 if (!opts.out) {
-  process.stdout.write(toMarkdown(report) + '\n');
+  process.stdout.write(toMarkdown(report, diff) + '\n');
 } else {
-  const format = opts.format ?? 'both';
-  if (format === 'md' || format === 'both') {
-    writeFileSync(`${opts.out}.md`, toMarkdown(report));
-    process.stderr.write(`Wrote ${opts.out}.md\n`);
-  }
-  if (format === 'json' || format === 'both') {
-    writeFileSync(`${opts.out}.json`, toJson(report));
-    process.stderr.write(`Wrote ${opts.out}.json\n`);
+  const render = { md: toMarkdown, json: toJson, html: toHtml };
+  for (const format of formats) {
+    writeFileSync(`${opts.out}.${format}`, render[format](report, diff));
+    process.stderr.write(`Wrote ${opts.out}.${format}\n`);
   }
 }
 
@@ -110,11 +146,12 @@ if (opts.failOn) {
     process.stderr.write(`Invalid --fail-on "${opts.failOn}" (use minor|moderate|serious|critical)\n`);
     process.exit(2);
   }
-  const worst = report.pages
-    .flatMap((p) => p.findings)
-    .reduce((max, f) => Math.max(max, IMPACT_RANK[f.impact] ?? 0), 0);
+  // With a baseline, only regressions fail the gate; known issues don't.
+  const gated = diff ? diff.added.map((a) => a.finding) : allFindings;
+  const worst = gated.reduce((max, f) => Math.max(max, IMPACT_RANK[f.impact] ?? 0), 0);
   if (worst >= threshold) {
-    process.stderr.write(`Failing: found violation(s) at or above "${opts.failOn}".\n`);
+    const which = diff ? 'new violation(s)' : 'violation(s)';
+    process.stderr.write(`Failing: found ${which} at or above "${opts.failOn}".\n`);
     process.exit(1);
   }
 }

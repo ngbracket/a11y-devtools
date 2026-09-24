@@ -11,15 +11,28 @@
  * specs. Skipped when `dist/` hasn't been built or no Playwright Chromium is
  * installed (`npx playwright install chromium`).
  */
-import { existsSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { dirname, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const distReport = resolve(root, 'dist/report/index.js');
+const cli = resolve(root, 'bin/ngbr-a11y-report.mjs');
+
+/** Run the CLI; resolves with its exit code and stderr (never rejects on a non-zero exit). */
+function runCli(args: string[]): Promise<{ code: number; stderr: string }> {
+  return new Promise((done) => {
+    execFile(process.execPath, [cli, ...args], { cwd: root }, (err, _stdout, stderr) => {
+      const code = err ? (typeof err.code === 'number' ? err.code : 1) : 0;
+      done({ code, stderr });
+    });
+  });
+}
 
 async function chromiumInstalled(): Promise<boolean> {
   try {
@@ -183,5 +196,53 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
   it('does not report focus correctly contained in an open modal', () => {
     expect(ids('/modal')).not.toContain('ngbr/focus-trap');
     expect(ids('/modal')).not.toContain('ngbr/modal-focus-not-contained');
+  });
+
+  describe('CLI: output formats and the baseline gate', () => {
+    let dir: string;
+    const scan = ['--wait', '50', '--keyboard', '--focus-traps'];
+
+    beforeAll(() => {
+      dir = mkdtempSync(join(tmpdir(), 'ngbr-a11y-e2e-'));
+    });
+    afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+    it('writes md, json and html with --format all', async () => {
+      const { code } = await runCli([
+        '--base', baseUrl, '--route', '/axe', '--route', '/trap', ...scan,
+        '--out', join(dir, 'baseline'), '--format', 'all',
+      ]);
+      expect(code).toBe(0);
+      expect(readFileSync(join(dir, 'baseline.md'), 'utf8')).toContain('# Accessibility report');
+      expect(JSON.parse(readFileSync(join(dir, 'baseline.json'), 'utf8')).pages).toHaveLength(2);
+      expect(readFileSync(join(dir, 'baseline.html'), 'utf8')).toMatch(/^<!doctype html>/);
+    }, 60_000);
+
+    it('passes the gate when nothing is new, even with known serious issues', async () => {
+      const { code, stderr } = await runCli([
+        '--base', baseUrl, '--route', '/axe', '--route', '/trap', ...scan,
+        '--baseline', join(dir, 'baseline.json'), '--fail-on', 'serious', '--out', join(dir, 'same'),
+      ]);
+      expect(stderr).toContain('0 new');
+      expect(code).toBe(0);
+    }, 60_000);
+
+    it('fails the gate on a new serious finding', async () => {
+      const { code, stderr } = await runCli([
+        '--base', baseUrl, '--route', '/axe', '--route', '/trap', '--route', '/editor', ...scan,
+        '--baseline', join(dir, 'baseline.json'), '--fail-on', 'serious', '--out', join(dir, 'worse'),
+      ]);
+      expect(stderr).toMatch(/[1-9]\d* new/);
+      expect(stderr).toContain('Failing: found new violation(s)');
+      expect(code).toBe(1);
+    }, 60_000);
+
+    it('refuses a baseline that is not a JSON report, before scanning', async () => {
+      const { code, stderr } = await runCli([
+        '--base', baseUrl, '--route', '/axe', '--baseline', join(dir, 'baseline.md'),
+      ]);
+      expect(code).toBe(2);
+      expect(stderr).toContain('not valid JSON');
+    });
   });
 });

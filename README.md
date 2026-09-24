@@ -18,10 +18,11 @@ Part of the `@ngbracket` Angular tooling family.
 
 Ships attribution — component **and** directive-level — + axe scan + grouped
 console reporter (with a summary line) + the dev-only provider + the visual in-app
-overlay (severity-coloured highlights, click-to-scroll) + headless report mode +
-**Keyboard & Focus Mode M1 + M2** — tab-order visualisation, keyboard-reachability
-findings, and a focus-follow accessibility-tree preview (the part of accessibility
-axe can't test).
+overlay (severity-coloured highlights, click-to-scroll) + headless report mode
+(Markdown / JSON / HTML, with a baseline so CI fails only on new issues) +
+**Keyboard & Focus Mode** — tab-order visualisation, keyboard-reachability
+findings, a focus-follow accessibility-tree preview, and focus-trap detection (the
+part of accessibility axe can't test).
 
 ## How the attribution works
 
@@ -128,9 +129,47 @@ Start your app (`ng serve`), then point the CLI at it:
 # writes a11y.md and a11y.json
 npx ngbr-a11y-report --base http://localhost:4200 --route / --route /dashboard --out a11y
 
+# …or pick formats: md, json, html (comma-separated), both (= md,json) or all
+npx ngbr-a11y-report --base http://localhost:4200 --route / --out a11y --format all
+
 # CI gate: exit non-zero on any serious/critical finding
 npx ngbr-a11y-report --base http://localhost:4200 --route / --fail-on serious
 ```
+
+### HTML report
+
+`--format html` (or `all`) writes one self-contained `.html` file. It has no
+scripts and makes no external requests, so you can attach it to a CI run, email it,
+or open it offline. It has the same content as the Markdown report, and it's
+accessible itself: landmarks, a sequential heading outline, a real data table,
+severity written as text (not colour alone), and AA contrast in light and dark
+mode. Its own report-mode scan comes back clean.
+
+### Baseline: fail CI only on new issues
+
+An app with a backlog of known issues can't turn on `--fail-on` without every build
+failing. A **baseline** fixes that. Save one run's JSON report, commit it, and
+compare later runs against it:
+
+```bash
+# once: record today's state (commit a11y-baseline.json)
+npx ngbr-a11y-report --base http://localhost:4200 --route / --route /dashboard \
+  --out a11y-baseline --format json
+
+# in CI: fail only on findings that aren't in the baseline
+npx ngbr-a11y-report --base http://localhost:4200 --route / --route /dashboard \
+  --baseline a11y-baseline.json --fail-on serious --out a11y --format all
+```
+
+- With `--baseline`, `--fail-on` counts only **new** findings. Known ones don't fail
+  the build, and the report shows what's **new**, **fixed** and **unchanged**.
+- A finding's identity is its route, rule, owning component and element selector.
+  Angular's per-build `_ngcontent-…` style hashes are ignored, and so is reworded help
+  text after an axe upgrade.
+- A route the baseline never scanned counts as entirely new, so re-record the
+  baseline when you add routes. A route that fails to scan isn't reported as "fixed".
+- To ratchet down, re-record the baseline after fixing issues. The JSON from any run
+  (including a `--baseline` run) is itself a valid baseline.
 
 For apps gated behind a login or theme picker, use the programmatic API with a
 `setup` hook (run once before the routes are scanned):
@@ -149,6 +188,10 @@ const report = await scanPages({
 });
 console.log(toMarkdown(report));
 ```
+
+The same pieces are exported for your own pipeline: `toJson`, `toHtml`,
+`parseBaseline` and `diffAgainstBaseline` (pass the diff as the second argument to
+`toMarkdown` / `toJson` / `toHtml`).
 
 The report leads with a summary of **distinct rules vs. raw node-instances** (a
 "54" is usually one rule firing dozens of times), then lists findings under each
@@ -288,7 +331,6 @@ npm run build   # tsc -> dist/ (ESM + .d.ts)
 
 - Headless "linear walkthrough" — the tab sequence as an SR-ish reading list per
   route in report-mode (M2's preview is currently overlay-only).
-- HTML report + baseline/diff mode for CI.
 - Per-component filtering and a violation-count badge.
 
 ### Done
@@ -301,6 +343,8 @@ npm run build   # tsc -> dist/ (ESM + .d.ts)
 - Dev-only provider.
 - In-app overlay.
 - Headless report mode (CLI + `./report`).
+- HTML report output.
+- Baseline/diff mode: CI fails only on new issues.
 - **Keyboard & Focus Mode M1** — tab-order visualisation + keyboard-reachability findings.
 - **Keyboard & Focus Mode M2** — focus-follow accessibility-tree preview.
 - **Keyboard & Focus Mode M3** — missing focus-trap detection (uncontained
