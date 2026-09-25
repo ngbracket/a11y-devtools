@@ -3,6 +3,22 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.12.2
+
+### Changed
+
+- **Every `ngbr/*` finding links to its own explanation.** `helpUrl` now points to
+  the rule's page in the docs (for example
+  `https://ngbracket.com/tools/a11y-devtools/docs/click-without-key`). Each page
+  explains what the message means, who it affects, exactly what triggers it, how
+  to fix it and how to check it yourself, and links the WCAG or APG reference. It
+  used to link straight to the WCAG page.
+- **Clearer messages.** Each now starts with what's wrong for the user, in plain
+  words. `ngbr/click-without-key` no longer calls itself a "possible keyboard
+  trap": a keyboard trap means you can't Tab away, and this rule is about a
+  control you can reach but may not be able to activate. `ngbr/focus-trap` now
+  starts "Keyboard trap:", which is what it finds.
+
 ## 0.12.1
 
 ### Fixed

@@ -76,7 +76,7 @@ describe('createFocusWalkProbe', () => {
     expect(finding!.target).toBe('div#widget');
     expect(finding!.help).toContain('Tab cycles through 2 controls');
     expect(finding!.help).toContain('1 tabbable control(s)'); // "after" was never reached
-    expect(finding!.helpUrl).toContain('no-keyboard-trap');
+    expect(finding!.helpUrl).toBe('https://ngbracket.com/tools/a11y-devtools/docs/focus-trap');
   });
 
   it('lowers the impact when Shift+Tab escapes', () => {

@@ -60,10 +60,11 @@ const INTERACTIVE_ROLES = new Set([
 
 const KEY_EVENTS = ['keydown', 'keyup', 'keypress'];
 
-const UNDERSTANDING = 'https://www.w3.org/WAI/WCAG22/Understanding';
-const KEYBOARD_URL = `${UNDERSTANDING}/keyboard.html`;
-const FOCUS_ORDER_URL = `${UNDERSTANDING}/focus-order.html`;
-const DIALOG_MODAL_URL = 'https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/';
+/**
+ * Each rule's page: what the message means, who it affects, exactly what
+ * triggers it, how to fix and check it, and the WCAG/APG reference.
+ */
+export const RULE_DOCS = 'https://ngbracket.com/tools/a11y-devtools/docs';
 
 /** A short, human CSS-ish selector for our own findings (not an axe target). */
 export function shortSelector(element: Element): string {
@@ -148,10 +149,10 @@ export function scanKeyboard(
           element,
           'ngbr/unreachable-control',
           'serious',
-          `Interactive element isn't reachable by keyboard — it ${reason} but is not a ` +
-            `native control and has no tabindex >= 0, so keyboard and screen-reader users ` +
-            `can't focus it. Add tabindex="0" (and a role, if missing), or use a <button>/<a>.`,
-          KEYBOARD_URL,
+          `Keyboard users can't reach this control: it ${reason}, but it isn't a native ` +
+            `control and has no tabindex="0", so Tab skips it. Use a <button> or <a href>, ` +
+            `or add tabindex="0" and Enter/Space handling.`,
+          `${RULE_DOCS}/unreachable-control`,
         ),
       );
       continue; // don't also report a weaker click-without-key on the same node
@@ -166,10 +167,10 @@ export function scanKeyboard(
           element,
           'ngbr/click-without-key',
           'moderate',
-          `Possible keyboard trap: this element has a (click) handler but no keyboard ` +
-            `handler (keydown/keyup) and isn't a native button/link, so Enter/Space may not ` +
-            `activate it. Verify by hand, then add a key handler or use a <button>.`,
-          KEYBOARD_URL,
+          `Keyboard users may not be able to activate this: Tab reaches it, but it only ` +
+            `listens for click, and Enter and Space don't fire click on a non-native element. ` +
+            `Use a <button>, or handle Enter and Space too. Heuristic — verify manually.`,
+          `${RULE_DOCS}/click-without-key`,
         ),
       );
     }
@@ -184,11 +185,11 @@ export function scanKeyboard(
         modal.element,
         'ngbr/modal-focus-not-contained',
         'moderate',
-        `Possible missing focus trap: this element has aria-modal="true", but ` +
-          `${modal.outsideCount} tabbable element(s) outside it are still reachable, so a keyboard ` +
-          `user can Tab out of the modal to the page behind. Mark the background inert or trap ` +
-          `focus within the dialog. Heuristic — verify manually.`,
-        DIALOG_MODAL_URL,
+        `Keyboard users can Tab out of this modal: it has aria-modal="true", but ` +
+          `${modal.outsideCount} control(s) outside it can still be reached with Tab. Open it ` +
+          `with <dialog>.showModal(), make the rest of the page inert, or trap focus. ` +
+          `Heuristic — verify manually.`,
+        `${RULE_DOCS}/modal-focus-not-contained`,
       ),
     );
   }
@@ -203,10 +204,10 @@ export function scanKeyboard(
         stop.element,
         'ngbr/tab-order-mismatch',
         'moderate',
-        `Possible tab-order mismatch: Tab reaches this control (stop ${stop.order}) after ` +
-          `one that sits below or to the right of it, so focus jumps against the visual ` +
-          `reading order. Heuristic — verify the order makes sense for a sighted keyboard user.`,
-        FOCUS_ORDER_URL,
+        `Tab order jumps backwards here: Tab reaches this control (stop ${stop.order}) after ` +
+          `one that sits below it or to its right, so focus moves against the reading order. ` +
+          `Heuristic — check the order makes sense to a sighted keyboard user.`,
+        `${RULE_DOCS}/tab-order-mismatch`,
       ),
     );
   }

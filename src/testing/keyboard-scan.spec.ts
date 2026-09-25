@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { scanKeyboard } from '../keyboard/keyboard-scan';
+import { RULE_DOCS, scanKeyboard } from '../keyboard/keyboard-scan';
 
 /**
  * Install a fake `window.ng` for a scan: `listeners` maps an element to the DOM
@@ -63,6 +63,25 @@ describe('scanKeyboard', () => {
         .filter((f) => f.id === 'ngbr/unreachable-control')
         .map((f) => f.target);
       expect(ids).toEqual(['div#inside']);
+    });
+  });
+
+  it("links each finding to its rule's docs page (slug = the id without ngbr/)", () => {
+    const host = fixture(`
+      <div id="fake" role="button">Save</div>
+      <div id="clicky" tabindex="0">Open</div>
+      <div role="dialog" aria-modal="true"><button>OK</button></div>
+      <button>Behind</button>
+    `);
+    const clicky = host.querySelector('#clicky')!;
+    withNg(new Map([[clicky, ['click']]]), new Map(), () => {
+      const findings = scanKeyboard(host);
+      expect(new Set(findings.map((f) => f.id))).toEqual(
+        new Set(['ngbr/unreachable-control', 'ngbr/click-without-key', 'ngbr/modal-focus-not-contained']),
+      );
+      for (const f of findings) {
+        expect(f.helpUrl).toBe(`${RULE_DOCS}/${f.id.replace('ngbr/', '')}`);
+      }
     });
   });
 

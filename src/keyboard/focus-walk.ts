@@ -95,7 +95,8 @@ export interface FocusWalkProbe {
   trapFinding(cycle: readonly number[], shiftTabEscapes: boolean): A11yFinding | null;
 }
 
-const NO_KEYBOARD_TRAP_URL = 'https://www.w3.org/WAI/WCAG22/Understanding/no-keyboard-trap.html';
+/** The rule's page: what the message means, how to fix and check it, and WCAG 2.1.2. */
+const FOCUS_TRAP_DOCS = 'https://ngbracket.com/tools/a11y-devtools/docs/focus-trap';
 
 /** The element that really has focus, through open shadow roots. */
 function deepActiveElement(doc: Document): Element | null {
@@ -183,10 +184,10 @@ export function createFocusWalkProbe(
         id: 'ngbr/focus-trap',
         impact: shiftTabEscapes ? 'moderate' : 'serious',
         help:
-          `Possible keyboard trap: ${where}${reach}.${shift} If this widget deliberately keeps ` +
+          `Keyboard trap: ${where}${reach}.${shift} If this widget deliberately keeps ` +
           `Tab (e.g. a code editor), it must tell users how to leave (such as Escape); otherwise ` +
           `let Tab move focus on. Found by real Tab presses — verify manually.`,
-        helpUrl: NO_KEYBOARD_TRAP_URL,
+        helpUrl: FOCUS_TRAP_DOCS,
         component: appComponentFromPath(componentPath, frameworkPrefixes),
         componentPath,
         directives: resolveDirectiveNames(owner),
