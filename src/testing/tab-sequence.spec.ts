@@ -82,6 +82,15 @@ describe('tab-sequence', () => {
     expect(ids).toEqual(['ok']);
   });
 
+  it("leaves out the devtools' own UI (the on/off pill)", () => {
+    const host = fixture(`
+      <button id="app">app</button>
+      <button id="pill" role="switch" data-ngb-a11y-overlay>a11y</button>
+    `);
+    const ids = tabSequence(host, { isVisible: alwaysVisible }).map((s) => s.element.id);
+    expect(ids).toEqual(['app']);
+  });
+
   it('isTabbable honours the visibility predicate', () => {
     const host = fixture(`<button id="b">b</button>`);
     const button = host.querySelector('#b')!;

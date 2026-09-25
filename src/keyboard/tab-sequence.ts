@@ -15,6 +15,7 @@ import {
   DEFAULT_FRAMEWORK_PREFIXES,
   resolveComponentPath,
 } from '../attribution.js';
+import { OVERLAY_EXCLUDE_SELECTOR } from '../overlay.js';
 
 /** One element in the resolved tab sequence, with its owning component. */
 export interface TabStop {
@@ -176,8 +177,10 @@ export function tabSequence(
   const isVisible = options.isVisible ?? defaultIsVisible;
   const prefixes = options.frameworkPrefixes ?? DEFAULT_FRAMEWORK_PREFIXES;
 
-  const candidates = [...root.querySelectorAll(FOCUSABLE_SELECTOR)].filter((el) =>
-    isTabbable(el, isVisible),
+  // The devtools' own UI (the on/off pill) is a real tab stop, but it isn't the
+  // app's: leave it out of the order, the tab-order layer and the modal check.
+  const candidates = [...root.querySelectorAll(FOCUSABLE_SELECTOR)].filter(
+    (el) => !el.closest(OVERLAY_EXCLUDE_SELECTOR) && isTabbable(el, isVisible),
   );
 
   const withMeta = candidates.map((element, domIndex) => ({

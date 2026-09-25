@@ -3,6 +3,32 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.11.0
+
+### Added
+
+- **Turn the devtools on and off without changing code.** An on/off pill sits in
+  the bottom-left corner, and **Alt+Shift+A** does the same from the keyboard. Off
+  means no scanning and nothing drawn, so it costs nothing while hidden. The choice
+  is remembered in `localStorage`, so it stays off across reloads until you turn it
+  back on.
+- New provider options: `enabled` (the starting state before a developer has
+  chosen; default `true`), `pill` (a corner, or `false` to hide it; default
+  `'bottom-left'`) and `shortcut` (e.g. `'Ctrl+Alt+K'`, or `false`; default
+  `'Alt+Shift+A'`). Letter and digit shortcuts match the physical key, so
+  Alt/Option combinations work on macOS.
+- The pill is a `role="switch"` button with visible on/off text and a 28px
+  target. It's excluded from scans and from the tab-order layer, like the rest of
+  the overlay. New exports: `createTogglePill`, `parseShortcut`, `matchesShortcut`,
+  `formatShortcut`, `readStoredEnabled`, `writeStoredEnabled`,
+  `DEFAULT_TOGGLE_SHORTCUT`, `TOGGLE_STORAGE_KEY` and their types.
+
+### Changed
+
+- `tabSequence` leaves out elements inside the overlay's own UI
+  (`[data-ngb-a11y-overlay]`), so the pill never appears as a tab stop or counts
+  as focus escaping a modal.
+
 ## 0.10.1
 
 ### Fixed

@@ -15,6 +15,15 @@ import { createOverlay, OVERLAY_ATTR } from './overlay.js';
 import { tabSequence } from './keyboard/tab-sequence.js';
 import { describeElement } from './keyboard/accname.js';
 import { resolveOwningComponentName } from './attribution.js';
+import {
+  createTogglePill,
+  DEFAULT_TOGGLE_SHORTCUT,
+  matchesShortcut,
+  parseShortcut,
+  readStoredEnabled,
+  writeStoredEnabled,
+  type PillPosition,
+} from './toggle.js';
 
 export interface A11yDevtoolsOptions {
   /** Element/Document to scan. Defaults to `document`. */
@@ -50,6 +59,22 @@ export interface A11yDevtoolsOptions {
    * Default false.
    */
   keyboard?: boolean;
+  /**
+   * Start switched on. Default true. Only used when the developer hasn't toggled
+   * it yet: once they switch it on or off (pill or shortcut), that choice is
+   * remembered in `localStorage` and wins over this default on reload.
+   */
+  enabled?: boolean;
+  /**
+   * Show the on/off pill. Default `'bottom-left'`; pass another corner to move
+   * it, or `false` to hide it (the shortcut still works).
+   */
+  pill?: PillPosition | false;
+  /**
+   * Keyboard shortcut that turns the devtools on/off. Default `'Alt+Shift+A'`.
+   * Modifiers: `Alt`, `Shift`, `Ctrl`, `Meta`. Pass `false` to disable it.
+   */
+  shortcut?: string | false;
 }
 
 /**
@@ -75,6 +100,9 @@ export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): Environm
     tags,
     frameworkPrefixes,
     keyboard = false,
+    enabled: enabledByDefault = true,
+    pill = 'bottom-left',
+    shortcut: shortcutText = DEFAULT_TOGGLE_SHORTCUT,
   } = options;
   const axe: AxeRunOptions | undefined = tags
     ? { runOnly: { type: 'tag', values: tags } }
@@ -87,6 +115,40 @@ export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): Environm
 
       const overlayView = overlay ? createOverlay() : undefined;
 
+      // On/off switch. Off = no scanning and nothing drawn, so it costs nothing
+      // while hidden. The developer's last choice is remembered per origin.
+      const storage = safeLocalStorage();
+      let enabled = readStoredEnabled(storage) ?? enabledByDefault;
+      const shortcut = shortcutText ? parseShortcut(shortcutText) : null;
+
+      const setEnabled = (next: boolean): void => {
+        if (next === enabled) return;
+        enabled = next;
+        writeStoredEnabled(storage, enabled);
+        pillView?.setEnabled(enabled);
+        if (enabled) {
+          scanNow(); // don't wait for the app's next stable moment
+        } else {
+          overlayView?.clear();
+          overlayView?.clearTabOrder();
+          overlayView?.renderAxPanel(null);
+        }
+      };
+
+      const pillView = pill
+        ? createTogglePill({ enabled, onToggle: setEnabled, shortcut, position: pill })
+        : undefined;
+
+      let onKeyDown: ((event: KeyboardEvent) => void) | undefined;
+      if (shortcut) {
+        onKeyDown = (event: KeyboardEvent) => {
+          if (!matchesShortcut(event, shortcut)) return;
+          event.preventDefault();
+          setEnabled(!enabled);
+        };
+        document.addEventListener('keydown', onKeyDown, true);
+      }
+
       // Keyboard & Focus Mode, part C: a focus-follow accessibility-tree preview.
       // As the user Tabs, show the focused control's computed role/name/state —
       // the ~2/3 axe can't test — attributed to its component. Only meaningful
@@ -94,52 +156,68 @@ export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): Environm
       let onFocusIn: ((event: FocusEvent) => void) | undefined;
       if (overlayView && keyboard) {
         onFocusIn = (event: FocusEvent) => {
+          if (!enabled) return;
           const el = event.target;
           if (!(el instanceof Element) || el.closest(`[${OVERLAY_ATTR}]`)) return; // skip our own UI
           describeElement(el)
-            .then((desc) =>
+            .then((desc) => {
+              if (!enabled) return; // switched off while describing
               overlayView.renderAxPanel({
                 ...desc,
                 component: resolveOwningComponentName(el, frameworkPrefixes),
                 tag: el.tagName.toLowerCase(),
-              }),
-            )
+              });
+            })
             .catch(() => undefined);
         };
         document.addEventListener('focusin', onFocusIn, true);
       }
 
       let scanning = false;
+      function scanNow(): void {
+        if (!enabled || scanning) return; // don't stack rescans while one is in flight
+        scanning = true;
+        runA11yScan(root?.(), { log, logger, axe, frameworkPrefixes, keyboard })
+          .then((findings) => {
+            if (!enabled) return; // switched off mid-scan: draw nothing
+            overlayView?.render(findings);
+            // Draw the tab-order path as its own overlay layer (independent of
+            // the findings highlights) when the keyboard layer is on.
+            if (overlayView && keyboard) {
+              overlayView.renderTabOrder(
+                tabSequence(root?.() ?? document, { frameworkPrefixes }),
+              );
+            }
+          })
+          .catch(() => undefined)
+          .finally(() => {
+            scanning = false;
+          });
+      }
+
       const subscription = appRef.isStable
         .pipe(
           filter((stable) => stable),
           debounceTime(debounceMs),
         )
-        .subscribe(() => {
-          if (scanning) return; // don't stack rescans while one is in flight
-          scanning = true;
-          runA11yScan(root?.(), { log, logger, axe, frameworkPrefixes, keyboard })
-            .then((findings) => {
-              overlayView?.render(findings);
-              // Draw the tab-order path as its own overlay layer (independent of
-              // the findings highlights) when the keyboard layer is on.
-              if (overlayView && keyboard) {
-                overlayView.renderTabOrder(
-                  tabSequence(root?.() ?? document, { frameworkPrefixes }),
-                );
-              }
-            })
-            .catch(() => undefined)
-            .finally(() => {
-              scanning = false;
-            });
-        });
+        .subscribe(scanNow);
 
       destroyRef.onDestroy(() => {
         subscription.unsubscribe();
         if (onFocusIn) document.removeEventListener('focusin', onFocusIn, true);
+        if (onKeyDown) document.removeEventListener('keydown', onKeyDown, true);
+        pillView?.destroy();
         overlayView?.destroy();
       });
     }),
   ]);
+}
+
+/** `window.localStorage`, or undefined where reading it throws (blocked storage). */
+function safeLocalStorage(): Storage | undefined {
+  try {
+    return globalThis.localStorage;
+  } catch {
+    return undefined;
+  }
 }

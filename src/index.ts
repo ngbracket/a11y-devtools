@@ -46,3 +46,17 @@ export {
   type OverlayOptions,
   type AxPanelData,
 } from './overlay.js';
+export {
+  createTogglePill,
+  parseShortcut,
+  matchesShortcut,
+  formatShortcut,
+  readStoredEnabled,
+  writeStoredEnabled,
+  DEFAULT_TOGGLE_SHORTCUT,
+  TOGGLE_STORAGE_KEY,
+  type PillPosition,
+  type Shortcut,
+  type TogglePill,
+  type TogglePillOptions,
+} from './toggle.js';

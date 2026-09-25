@@ -15,7 +15,8 @@ Part of the `@ngbracket` Angular tooling family.
   walking past UI-library components (Material, CDK, Nebular, …) to yours. Uses
   Angular's documented dev debug API (`window.ng`).
 - **In-app provider**: rescans as the app settles; grouped console output and an
-  optional on-page overlay.
+  optional on-page overlay. Switch it on and off with the on-page pill or
+  Alt+Shift+A; the choice is remembered.
 - **Report mode**: scan many routes headless from the CLI; Markdown, JSON and a
   self-contained HTML report.
 - **CI gating with a baseline**: fail only on *new* issues, so an app with known
