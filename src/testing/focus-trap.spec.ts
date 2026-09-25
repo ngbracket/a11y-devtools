@@ -31,6 +31,49 @@ describe('findUncontainedModals', () => {
     expect(found[0].outsideCount).toBe(1);
   });
 
+  it('does not flag a modal kept in by focus-trap sentinels (Angular CDK / Material dialogs)', () => {
+    // CDK's structure: anchors either side of the dialog; Tab onto one is sent
+    // back into the dialog, so the page behind is never reached.
+    const host = fixture(`
+      <button id="behind">Page button</button>
+      <div class="cdk-overlay-pane">
+        <div tabindex="0" class="cdk-focus-trap-anchor" aria-hidden="true"></div>
+        <div role="dialog" aria-modal="true"><input aria-label="Name" /><button>Save</button></div>
+        <div tabindex="0" class="cdk-focus-trap-anchor" aria-hidden="true"></div>
+      </div>
+    `);
+    expect(findUncontainedModals(host, alwaysVisible)).toEqual([]);
+  });
+
+  it('accepts data-focus-guard sentinels (the focus-lock pattern)', () => {
+    const host = fixture(`
+      <button>Page button</button>
+      <div data-focus-guard tabindex="0"></div>
+      <div role="dialog" aria-modal="true"><button>OK</button></div>
+      <div data-focus-guard tabindex="0"></div>
+    `);
+    expect(findUncontainedModals(host, alwaysVisible)).toEqual([]);
+  });
+
+  it('still flags a modal with a sentinel on one side only, or a "sentinel" with content', () => {
+    const oneSided = fixture(`
+      <button>Page button</button>
+      <div tabindex="0" aria-hidden="true"></div>
+      <div id="a" role="dialog" aria-modal="true"><button>OK</button></div>
+      <button>After</button>
+    `);
+    expect(findUncontainedModals(oneSided, alwaysVisible)).toHaveLength(1);
+    document.body.innerHTML = '';
+
+    const withText = fixture(`
+      <button>Page button</button>
+      <div tabindex="0" aria-hidden="true">Skip</div>
+      <div id="b" role="dialog" aria-modal="true"><button>OK</button></div>
+      <div tabindex="0" aria-hidden="true"></div>
+    `);
+    expect(findUncontainedModals(withText, alwaysVisible)).toHaveLength(1);
+  });
+
   it('does not flag a modal when the background is marked inert', () => {
     // A correctly-implemented modal inerts the rest of the page, so the outside
     // button is not tabbable and there is no leak. tabSequence drops inert subtrees.

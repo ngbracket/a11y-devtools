@@ -1,6 +1,7 @@
 import type { A11yFinding, Impact } from './scan.js';
 import type { TabStop } from './keyboard/tab-sequence.js';
 import type { AxDescription } from './keyboard/accname.js';
+import { keepInTopLayer } from './top-layer.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 /** Tab-order path + badge colours: normal teal, warning orange for positive tabindex. */
@@ -103,6 +104,9 @@ export function createOverlay(options: OverlayOptions = {}): A11yOverlay {
     zIndex: '2147483646',
   });
   doc.body.appendChild(container);
+  // Stay visible over native modal dialogs and CDK/Material popover overlays,
+  // which render in the browser's top layer above any z-index.
+  const releaseTopLayer = keepInTopLayer(container, { document: doc });
 
   // The tab-order connector lives on its own SVG layer under the badges, so the
   // findings highlights and the tab-order path render and clear independently.
@@ -275,6 +279,7 @@ export function createOverlay(options: OverlayOptions = {}): A11yOverlay {
     renderAxPanel(null);
     win?.removeEventListener('scroll', onViewportChange, { capture: true } as EventListenerOptions);
     win?.removeEventListener('resize', onViewportChange);
+    releaseTopLayer();
     container.remove();
   }
 

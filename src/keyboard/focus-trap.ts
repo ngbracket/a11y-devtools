@@ -33,6 +33,8 @@ export function findUncontainedModals(
   root: ParentNode = document,
   options: TabSequenceOptions = {},
 ): UncontainedModal[] {
+  // A modal kept in by a JS focus trap (CDK/Material) comes back from
+  // tabSequence with only its own stops, so it has no leak and isn't flagged.
   const stops = tabSequence(root, options);
   if (stops.length === 0) return [];
 

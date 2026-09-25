@@ -16,6 +16,7 @@ import {
   resolveComponentPath,
 } from '../attribution.js';
 import { OVERLAY_EXCLUDE_SELECTOR } from '../overlay.js';
+import { blockingModalDialog } from '../top-layer.js';
 
 /** One element in the resolved tab sequence, with its owning component. */
 export interface TabStop {
@@ -40,6 +41,49 @@ export interface TabSequenceOptions {
    * layout. Defaults to a computed-style + `inert`/`hidden`/`<details>` check.
    */
   isVisible?: (element: Element) => boolean;
+  /**
+   * Modal-dialog check override — for tests (jsdom has no `:modal`). Defaults to
+   * `dialog:modal`, i.e. opened with `showModal()`.
+   */
+  isModal?: (element: Element) => boolean;
+  /**
+   * Keep focus-trap sentinels (see {@link isFocusSentinel}) in the order. Off by
+   * default: focus never rests on them — the trap moves it straight on — so they
+   * aren't stops a user sees, and badging or order-checking them is noise.
+   */
+  includeSentinels?: boolean;
+}
+
+/**
+ * A focus-trap sentinel: an empty, script-driven tab stop that sends focus back
+ * into the modal when reached — Angular CDK / Material's `cdk-focus-trap-anchor`
+ * (`tabindex="0"`, `aria-hidden="true"`), or a `data-focus-guard` element (the
+ * focus-lock pattern). No text and no child elements, so it isn't real content.
+ */
+export function isFocusSentinel(el: Element): boolean {
+  if (el.childElementCount > 0 || (el.textContent ?? '').trim() !== '') return false;
+  return el.getAttribute('aria-hidden') === 'true' || el.hasAttribute('data-focus-guard');
+}
+
+/**
+ * The open `aria-modal` whose focus a JS trap keeps in, or null: its stops are
+ * one unbroken run in `order` with a sentinel directly before and after. The
+ * browser can reach those sentinels, but the trap sends focus from them back
+ * into the modal. Checked with real Tab presses on a CDK dialog: from the last
+ * control, Tab wraps to the first. With several, the last is the topmost.
+ */
+function sentinelTrappedModal(root: ParentNode, order: Element[]): Element | null {
+  const modals = [...root.querySelectorAll('[aria-modal="true"]')].reverse();
+  for (const modal of modals) {
+    const inside = order.map((el) => modal.contains(el));
+    const first = inside.indexOf(true);
+    const last = inside.lastIndexOf(true);
+    if (first === -1 || inside.slice(first, last + 1).includes(false)) continue;
+    const before = order[first - 1];
+    const after = order[last + 1];
+    if (before && after && isFocusSentinel(before) && isFocusSentinel(after)) return modal;
+  }
+  return null;
 }
 
 /** Elements that can hold focus and thus may appear in the tab order. */
@@ -177,11 +221,25 @@ export function tabSequence(
   const isVisible = options.isVisible ?? defaultIsVisible;
   const prefixes = options.frameworkPrefixes ?? DEFAULT_FRAMEWORK_PREFIXES;
 
+  // While a modal <dialog> is open the browser makes everything outside it
+  // inert, so only stops inside it are reachable.
+  const doc = root instanceof Document ? root : (root as Node).ownerDocument;
+  const modal = doc ? blockingModalDialog(doc, options.isModal) : null;
+
   // The devtools' own UI (the on/off pill) is a real tab stop, but it isn't the
   // app's: leave it out of the order, the tab-order layer and the modal check.
-  const candidates = [...root.querySelectorAll(FOCUSABLE_SELECTOR)].filter(
-    (el) => !el.closest(OVERLAY_EXCLUDE_SELECTOR) && isTabbable(el, isVisible),
+  let candidates = [...root.querySelectorAll(FOCUSABLE_SELECTOR)].filter(
+    (el) =>
+      !el.closest(OVERLAY_EXCLUDE_SELECTOR) &&
+      (!modal || modal.contains(el)) &&
+      isTabbable(el, isVisible),
   );
+  // A JS focus trap (Angular CDK / Material dialogs) doesn't make the page inert,
+  // but keeps Tab inside the modal just the same — so, like a native modal, only
+  // its stops are reachable.
+  const trapped = modal ? null : sentinelTrappedModal(root, candidates);
+  if (trapped) candidates = candidates.filter((el) => trapped.contains(el));
+  if (!options.includeSentinels) candidates = candidates.filter((el) => !isFocusSentinel(el));
 
   const withMeta = candidates.map((element, domIndex) => ({
     element,

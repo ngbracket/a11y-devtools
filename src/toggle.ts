@@ -1,4 +1,5 @@
 import { OVERLAY_ATTR } from './overlay.js';
+import { keepInTopLayer } from './top-layer.js';
 
 /** Default keyboard shortcut that turns the devtools on/off. */
 export const DEFAULT_TOGGLE_SHORTCUT = 'Alt+Shift+A';
@@ -208,10 +209,25 @@ export function createTogglePill(options: TogglePillOptions): TogglePill {
     options.onToggle(enabled);
   });
 
-  doc.body.appendChild(button);
+  // A click-through full-viewport layer holds the pill, so the layer (not the
+  // button) becomes the top-layer popover and the button keeps its corner.
+  const layer = doc.createElement('div');
+  layer.setAttribute(OVERLAY_ATTR, '');
+  Object.assign(layer.style, {
+    position: 'fixed',
+    inset: '0',
+    pointerEvents: 'none',
+    zIndex: '2147483647',
+  });
+  layer.appendChild(button);
+  doc.body.appendChild(layer);
+  const releaseTopLayer = keepInTopLayer(layer, { document: doc });
 
   return {
     setEnabled,
-    destroy: () => button.remove(),
+    destroy: () => {
+      releaseTopLayer();
+      layer.remove();
+    },
   };
 }

@@ -91,6 +91,42 @@ describe('tab-sequence', () => {
     expect(ids).toEqual(['app']);
   });
 
+  it('only counts stops inside an open modal dialog (the rest is inert)', () => {
+    const host = fixture(`
+      <button id="behind">behind</button>
+      <dialog open data-modal><button id="in">in</button></dialog>
+    `);
+    const isModal = (el: Element) => el.hasAttribute('data-modal');
+    const ids = tabSequence(host, { isVisible: alwaysVisible, isModal }).map((s) => s.element.id);
+    expect(ids).toEqual(['in']);
+  });
+
+  it('leaves out focus-trap sentinels unless asked (CDK anchors, focus guards)', () => {
+    const host = fixture(`
+      <div id="s1" tabindex="0" class="cdk-focus-trap-anchor" aria-hidden="true"></div>
+      <button id="real">Save</button>
+      <div id="s2" tabindex="0" data-focus-guard></div>
+      <div id="labelled" tabindex="0" aria-hidden="true">Not empty</div>
+    `);
+    const ids = (includeSentinels?: boolean) =>
+      tabSequence(host, { isVisible: alwaysVisible, includeSentinels }).map((s) => s.element.id);
+    expect(ids()).toEqual(['real', 'labelled']);
+    expect(ids(true)).toEqual(['s1', 'real', 's2', 'labelled']);
+  });
+
+  it('only counts stops inside an aria-modal kept in by a focus trap (CDK / Material)', () => {
+    const host = fixture(`
+      <button id="behind">behind</button>
+      <div class="cdk-overlay-pane">
+        <div tabindex="0" aria-hidden="true"></div>
+        <div role="dialog" aria-modal="true"><input id="name" /><button id="save">Save</button></div>
+        <div tabindex="0" aria-hidden="true"></div>
+      </div>
+    `);
+    const ids = tabSequence(host, { isVisible: alwaysVisible }).map((s) => s.element.id);
+    expect(ids).toEqual(['name', 'save']);
+  });
+
   it('isTabbable honours the visibility predicate', () => {
     const host = fixture(`<button id="b">b</button>`);
     const button = host.querySelector('#b')!;

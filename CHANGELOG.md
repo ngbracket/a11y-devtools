@@ -3,6 +3,30 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.11.1
+
+### Fixed
+
+- **The overlay and the on/off pill now show over modals.** Native
+  `<dialog>.showModal()` and popovers render in the browser's top layer, above
+  any z-index, and Angular CDK overlays use popovers by default from v22, so that
+  covers Material dialogs, menus and selects. The overlay was drawn underneath
+  them, and a modal `<dialog>` also made the pill unclickable. The overlay and the
+  pill are now top-layer popovers too: while a modal dialog is open they move
+  inside it, and they re-show whenever the app opens another popover so they stay
+  on top.
+- **No false `ngbr/modal-focus-not-contained` on Angular CDK / Material
+  dialogs.** CDK keeps focus in with a JS focus trap (empty `aria-hidden`
+  sentinels either side of the dialog) rather than making the page inert. A modal
+  bracketed by sentinels (`aria-hidden="true"` or `data-focus-guard`, with no
+  content) now counts as containing focus. Checked with real Tab presses on a CDK
+  dialog. A modal with no trap is still flagged.
+- **The tab order while a modal is open** only includes the modal's own stops,
+  for native modal dialogs and for trapped `aria-modal` dialogs. That removes
+  false `ngbr/tab-order-mismatch` findings and tab-order badges on the page behind
+  the modal. Focus-trap sentinels are left out of the tab order. Pass
+  `includeSentinels: true` to `tabSequence` to keep them.
+
 ## 0.11.0
 
 ### Added
