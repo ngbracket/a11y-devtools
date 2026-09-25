@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { provideA11yDevtools } from '../provider';
 import type { Logger } from '../report';
 import { TOGGLE_STORAGE_KEY } from '../toggle';
+import { SETTINGS_STORAGE_KEY } from '../settings';
 import { AppComponent } from './fixtures';
 
 const wait = (ms = 20): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -144,5 +145,63 @@ describe('provideA11yDevtools', () => {
     pill()!.click();
     expect(boxes()).toBe(0);
     expect(localStorage.getItem(TOGGLE_STORAGE_KEY)).toBe('off');
+  });
+
+  it('draws per the layer defaults, and a menu change redraws and is remembered', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideA11yDevtools({
+          root: () => host,
+          logger: makeLogger(),
+          debounceMs: 0,
+          overlay: true,
+          layers: { highlights: false },
+        }),
+      ],
+    });
+    const fixture = TestBed.createComponent(AppComponent);
+    host.appendChild(fixture.nativeElement);
+    await fixture.whenStable();
+
+    const menu = (): HTMLElement =>
+      document.getElementById(
+        document.querySelector('button[aria-label="a11y devtools settings"]')!.getAttribute('aria-controls')!,
+      )!;
+    // Scanned (the menu counts the issue) but nothing drawn: highlights are off.
+    await waitFor(() => /1 issue on this page/.test(menu().textContent ?? ''));
+    expect(document.querySelectorAll('[data-impact]').length).toBe(0);
+
+    const highlights = [...menu().querySelectorAll('label')].find((l) => l.textContent?.startsWith('Highlights'))!;
+    highlights.querySelector('input')!.click();
+    expect(document.querySelectorAll('[data-impact]').length).toBe(1); // redrawn, no rescan
+    expect(JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)!)).toEqual({ highlights: true });
+  });
+
+  it('filters highlights by the minimum severity chosen in the menu', async () => {
+    // A role="button" that can't be focused is a serious keyboard finding,
+    // next to the fixture's critical image-alt.
+    const fake = document.createElement('div');
+    fake.setAttribute('role', 'button');
+    fake.textContent = 'Fake button';
+    host.appendChild(fake);
+
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideA11yDevtools({ root: () => host, logger: makeLogger(), debounceMs: 0, overlay: true, keyboard: true }),
+      ],
+    });
+    const fixture = TestBed.createComponent(AppComponent);
+    host.appendChild(fixture.nativeElement);
+    await fixture.whenStable();
+    const count = (impact: string): number => document.querySelectorAll(`[data-impact="${impact}"]`).length;
+    await waitFor(() => count('critical') > 0 && count('serious') > 0);
+
+    const select = document.querySelector<HTMLSelectElement>('[data-ngb-a11y-overlay] select')!;
+    select.value = 'critical';
+    select.dispatchEvent(new Event('change'));
+    expect(count('serious')).toBe(0);
+    expect(count('critical')).toBe(1);
   });
 });

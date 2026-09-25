@@ -3,7 +3,25 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-## 0.11.1
+## 0.12.0
+
+### Added
+
+- **A settings menu on the pill.** The `⋯` button next to the on/off switch opens a
+  panel for choosing what's drawn, so you're not looking at everything at once:
+  - **Highlights**, **Tab order** and **Focus preview**, each on or off.
+  - **Show issues**: all, moderate and above, serious and above, or critical
+    only. It filters what's drawn on the page; the console still logs every issue.
+  - How many issues the page has and how many are shown.
+  - **Download report**: a self-contained HTML report (the same format as report
+    mode) for every route you've visited since the app loaded, labelled by route.
+  Each developer's choices are remembered in `localStorage`; only what differs
+  from the app's defaults is stored. Needs `overlay: true`.
+- New provider options set the defaults: `layers` (`{ highlights, tabOrder,
+  focusPreview }`) and `minImpact`. `highlights` defaults to `true`; `tabOrder`
+  and `focusPreview` follow `keyboard`, as before. Tab order and focus preview can
+  now also be turned on from the menu without `keyboard: true`, which still
+  controls the `ngbr/*` keyboard findings.
 
 ### Fixed
 

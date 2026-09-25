@@ -121,8 +121,9 @@ describe('createTogglePill', () => {
 
   it('reflects outside changes and is removed on destroy', () => {
     pill = createTogglePill({ enabled: false, onToggle: () => {}, position: 'top-right' });
-    expect(button().style.top).toBe('12px');
-    expect(button().style.right).toBe('12px');
+    const corner = button().parentElement!; // the pill's group holds the position
+    expect(corner.style.top).toBe('12px');
+    expect(corner.style.right).toBe('12px');
     pill.setEnabled(true);
     expect(button().getAttribute('aria-checked')).toBe('true');
     pill.destroy();

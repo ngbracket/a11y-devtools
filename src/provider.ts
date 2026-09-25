@@ -24,6 +24,17 @@ import {
   writeStoredEnabled,
   type PillPosition,
 } from './toggle.js';
+import {
+  readStoredSettings,
+  resolveSettings,
+  visibleFindings,
+  writeStoredSettings,
+  type DevtoolsSettings,
+  type MinImpact,
+  type OverlayLayers,
+} from './settings.js';
+import type { A11yFinding } from './scan.js';
+import type { PageReport } from './report/format.js';
 
 export interface A11yDevtoolsOptions {
   /** Element/Document to scan. Defaults to `document`. */
@@ -75,6 +86,18 @@ export interface A11yDevtoolsOptions {
    * Modifiers: `Alt`, `Shift`, `Ctrl`, `Meta`. Pass `false` to disable it.
    */
   shortcut?: string | false;
+  /**
+   * What the overlay draws by default. Developers can change each from the
+   * pill's menu; their choice is remembered and wins over these defaults.
+   * Defaults: `highlights: true`; `tabOrder` and `focusPreview` follow `keyboard`.
+   */
+  layers?: Partial<OverlayLayers>;
+  /**
+   * Lowest severity drawn on the page by default: `'minor'` (everything),
+   * `'moderate'`, `'serious'` or `'critical'`. The console still logs every
+   * issue. Developers can change it from the pill's menu. Default `'minor'`.
+   */
+  minImpact?: MinImpact;
 }
 
 /**
@@ -103,7 +126,15 @@ export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): Environm
     enabled: enabledByDefault = true,
     pill = 'bottom-left',
     shortcut: shortcutText = DEFAULT_TOGGLE_SHORTCUT,
+    layers = {},
+    minImpact = 'minor',
   } = options;
+  const defaultSettings: DevtoolsSettings = {
+    highlights: layers.highlights ?? true,
+    tabOrder: layers.tabOrder ?? keyboard,
+    focusPreview: layers.focusPreview ?? keyboard,
+    minImpact,
+  };
   const axe: AxeRunOptions | undefined = tags
     ? { runOnly: { type: 'tag', values: tags } }
     : undefined;
@@ -121,22 +152,76 @@ export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): Environm
       let enabled = readStoredEnabled(storage) ?? enabledByDefault;
       const shortcut = shortcutText ? parseShortcut(shortcutText) : null;
 
+      // What's drawn: the app's defaults, overridden by the developer's menu choices.
+      let settings = resolveSettings(defaultSettings, readStoredSettings(storage));
+
+      // The latest findings, kept so a settings change redraws without a rescan,
+      // and the latest findings per route visited, for the downloadable report.
+      let lastFindings: A11yFinding[] = [];
+      const visited = new Map<string, PageReport>();
+
+      /** Draw (or clear) each overlay layer from the last scan and the settings. */
+      function draw(): void {
+        const shown = settings.highlights ? visibleFindings(lastFindings, settings.minImpact) : [];
+        pillView?.setStatus({ found: lastFindings.length, shown: shown.length, pages: visited.size });
+        if (!overlayView) return;
+        if (!enabled) {
+          overlayView.clear();
+          overlayView.clearTabOrder();
+          overlayView.renderAxPanel(null);
+          return;
+        }
+        if (settings.highlights) overlayView.render(shown);
+        else overlayView.clear();
+        if (settings.tabOrder) {
+          overlayView.renderTabOrder(tabSequence(root?.() ?? document, { frameworkPrefixes }));
+        } else {
+          overlayView.clearTabOrder();
+        }
+        if (!settings.focusPreview) overlayView.renderAxPanel(null);
+      }
+
       const setEnabled = (next: boolean): void => {
         if (next === enabled) return;
         enabled = next;
         writeStoredEnabled(storage, enabled);
         pillView?.setEnabled(enabled);
-        if (enabled) {
-          scanNow(); // don't wait for the app's next stable moment
-        } else {
-          overlayView?.clear();
-          overlayView?.clearTabOrder();
-          overlayView?.renderAxPanel(null);
-        }
+        if (enabled) scanNow(); // don't wait for the app's next stable moment
+        else draw();
       };
 
+      const setSettings = (next: DevtoolsSettings): void => {
+        settings = next;
+        writeStoredSettings(storage, settings, defaultSettings);
+        draw();
+      };
+
+      const downloadReport = (): void => {
+        import('./report/html.js')
+          .then(({ toHtml }) => {
+            const html = toHtml({ generatedAt: new Date().toISOString(), pages: [...visited.values()] });
+            const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `a11y-report-${new Date().toISOString().slice(0, 10)}.html`;
+            link.setAttribute(OVERLAY_ATTR, '');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+          })
+          .catch(() => undefined);
+      };
+
+      // The settings menu needs the overlay: without it there's nothing to show or hide.
       const pillView = pill
-        ? createTogglePill({ enabled, onToggle: setEnabled, shortcut, position: pill })
+        ? createTogglePill({
+            enabled,
+            onToggle: setEnabled,
+            shortcut,
+            position: pill,
+            menu: overlayView ? { settings, onChange: setSettings, onDownload: downloadReport } : undefined,
+          })
         : undefined;
 
       let onKeyDown: ((event: KeyboardEvent) => void) | undefined;
@@ -151,17 +236,17 @@ export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): Environm
 
       // Keyboard & Focus Mode, part C: a focus-follow accessibility-tree preview.
       // As the user Tabs, show the focused control's computed role/name/state —
-      // the ~2/3 axe can't test — attributed to its component. Only meaningful
-      // with the visual overlay on.
+      // the ~2/3 axe can't test — attributed to its component. Needs the visual
+      // overlay; shown while the Focus preview setting is on.
       let onFocusIn: ((event: FocusEvent) => void) | undefined;
-      if (overlayView && keyboard) {
+      if (overlayView) {
         onFocusIn = (event: FocusEvent) => {
-          if (!enabled) return;
+          if (!enabled || !settings.focusPreview) return;
           const el = event.target;
           if (!(el instanceof Element) || el.closest(`[${OVERLAY_ATTR}]`)) return; // skip our own UI
           describeElement(el)
             .then((desc) => {
-              if (!enabled) return; // switched off while describing
+              if (!enabled || !settings.focusPreview) return; // switched off while describing
               overlayView.renderAxPanel({
                 ...desc,
                 component: resolveOwningComponentName(el, frameworkPrefixes),
@@ -180,14 +265,11 @@ export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): Environm
         runA11yScan(root?.(), { log, logger, axe, frameworkPrefixes, keyboard })
           .then((findings) => {
             if (!enabled) return; // switched off mid-scan: draw nothing
-            overlayView?.render(findings);
-            // Draw the tab-order path as its own overlay layer (independent of
-            // the findings highlights) when the keyboard layer is on.
-            if (overlayView && keyboard) {
-              overlayView.renderTabOrder(
-                tabSequence(root?.() ?? document, { frameworkPrefixes }),
-              );
-            }
+            lastFindings = findings;
+            const route = location.pathname + location.search;
+            // Label by route: a single-page app usually keeps one title on every route.
+            visited.set(route, { label: route, url: location.href, findings });
+            draw();
           })
           .catch(() => undefined)
           .finally(() => {

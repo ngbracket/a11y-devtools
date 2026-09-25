@@ -60,3 +60,4 @@ export {
   type TogglePill,
   type TogglePillOptions,
 } from './toggle.js';
+export type { DevtoolsSettings, MinImpact, OverlayLayers } from './settings.js';

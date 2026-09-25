@@ -1,5 +1,6 @@
 import { OVERLAY_ATTR } from './overlay.js';
 import { keepInTopLayer } from './top-layer.js';
+import { createPillMenu, type PillMenuOptions, type PillMenuStatus } from './pill-menu.js';
 
 /** Default keyboard shortcut that turns the devtools on/off. */
 export const DEFAULT_TOGGLE_SHORTCUT = 'Alt+Shift+A';
@@ -119,11 +120,15 @@ export interface TogglePillOptions {
   shortcut?: Shortcut | null;
   /** Default `bottom-left` (the focus-follow panel uses bottom-right). */
   position?: PillPosition;
+  /** Add the `⋯` settings menu next to the switch. */
+  menu?: Omit<PillMenuOptions, 'opensUp' | 'alignLeft'>;
 }
 
 export interface TogglePill {
   /** Reflect a state change made elsewhere (e.g. the keyboard shortcut). */
   setEnabled(enabled: boolean): void;
+  /** Update the menu's issue and page counts (no-op without a menu). */
+  setStatus(status: PillMenuStatus): void;
   destroy(): void;
 }
 
@@ -150,10 +155,6 @@ export function createTogglePill(options: TogglePillOptions): TogglePill {
   const keys = options.shortcut ? formatShortcut(options.shortcut) : null;
   if (keys) button.setAttribute('aria-keyshortcuts', keys);
   Object.assign(button.style, {
-    position: 'fixed',
-    [vertical]: '12px',
-    [horizontal]: '12px',
-    zIndex: '2147483647',
     display: 'inline-flex',
     alignItems: 'center',
     gap: '6px',
@@ -219,13 +220,30 @@ export function createTogglePill(options: TogglePillOptions): TogglePill {
     pointerEvents: 'none',
     zIndex: '2147483647',
   });
-  layer.appendChild(button);
+  // The switch, the optional menu button and its panel sit together in a corner.
+  const group = doc.createElement('div');
+  Object.assign(group.style, {
+    position: 'fixed',
+    [vertical]: '12px',
+    [horizontal]: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  });
+  group.appendChild(button);
+  const menu = options.menu
+    ? createPillMenu(doc, { ...options.menu, opensUp: vertical === 'bottom', alignLeft: horizontal === 'left' })
+    : undefined;
+  if (menu) group.append(menu.button, menu.panel);
+  layer.appendChild(group);
   doc.body.appendChild(layer);
   const releaseTopLayer = keepInTopLayer(layer, { document: doc });
 
   return {
     setEnabled,
+    setStatus: (status) => menu?.setStatus(status),
     destroy: () => {
+      menu?.destroy();
       releaseTopLayer();
       layer.remove();
     },

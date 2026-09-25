@@ -16,7 +16,9 @@ Part of the `@ngbracket` Angular tooling family.
   Angular's documented dev debug API (`window.ng`).
 - **In-app provider**: rescans as the app settles; grouped console output and an
   optional on-page overlay. Switch it on and off with the on-page pill or
-  Alt+Shift+A; the choice is remembered.
+  Alt+Shift+A; the pill's menu picks what's drawn (highlights, tab order, focus
+  preview, minimum severity) and downloads an HTML report of the routes you've
+  visited. Choices are remembered.
 - **Report mode**: scan many routes headless from the CLI; Markdown, JSON and a
   self-contained HTML report.
 - **CI gating with a baseline**: fail only on *new* issues, so an app with known
