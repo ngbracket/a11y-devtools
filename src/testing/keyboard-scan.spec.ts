@@ -52,6 +52,20 @@ describe('scanKeyboard', () => {
     });
   });
 
+  it('ignores controls behind an open modal dialog, but still checks inside it', () => {
+    const host = fixture(`
+      <div id="behind" role="button">Behind</div>
+      <dialog open data-modal><div id="inside" role="button">Inside</div></dialog>
+    `);
+    const isModal = (el: Element) => el.hasAttribute('data-modal');
+    withNg(new Map(), new Map(), () => {
+      const ids = scanKeyboard(host, { isModal })
+        .filter((f) => f.id === 'ngbr/unreachable-control')
+        .map((f) => f.target);
+      expect(ids).toEqual(['div#inside']);
+    });
+  });
+
   it('flags a div with a click handler but no way to focus it', () => {
     const host = fixture(`<div id="clicky">Click</div>`);
     const el = host.querySelector('#clicky')!;

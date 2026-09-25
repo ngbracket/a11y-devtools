@@ -204,4 +204,26 @@ describe('provideA11yDevtools', () => {
     expect(count('serious')).toBe(0);
     expect(count('critical')).toBe(1);
   });
+
+  it('rescans when a native dialog closes outside Angular (e.g. Escape)', async () => {
+    const logger = makeLogger();
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideA11yDevtools({ root: () => host, logger, debounceMs: 0 }),
+      ],
+    });
+    const fixture = TestBed.createComponent(AppComponent);
+    host.appendChild(fixture.nativeElement);
+    await fixture.whenStable();
+    const scans = (): number => (logger.groupCollapsed as ReturnType<typeof vi.fn>).mock.calls.length;
+    await waitFor(() => scans() > 0);
+    await wait(100);
+    const before = scans();
+
+    const dialog = document.createElement('dialog');
+    host.appendChild(dialog);
+    dialog.dispatchEvent(new Event('close')); // what Escape fires; Angular never sees it
+    await waitFor(() => scans() > before);
+  });
 });

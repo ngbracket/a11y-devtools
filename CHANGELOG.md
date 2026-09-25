@@ -15,6 +15,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   to `false` in production builds, so the whole implementation is tree-shaken:
   +0.2 KB raw (+0.05 KB gzipped). A new test bundles a production-style build
   and checks the overlay, pill, menu and axe-core are all absent.
+- **Rescans after top-layer changes Angular doesn't see.** Pressing Escape
+  closes a native `<dialog>` without any Angular event, so the page kept the
+  findings from while the modal was open until something else changed. The
+  devtools now also rescan when a dialog closes or a popover opens or closes. A
+  scan requested while one is running now runs once that one finishes, instead
+  of being dropped.
+- **Keyboard findings skip the page behind an open modal `<dialog>`.** The
+  browser makes it inert, and axe already skips it, so the keyboard checks no
+  longer report `ngbr/unreachable-control` and `ngbr/click-without-key` there.
 
 ## 0.12.0
 

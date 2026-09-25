@@ -27,12 +27,15 @@ import {
   visualOrderJumps,
 } from './tab-sequence.js';
 import { findUncontainedModals } from './focus-trap.js';
+import { blockingModalDialog } from '../top-layer.js';
 
 export interface KeyboardScanOptions {
   /** UI-primitive prefixes to walk past during attribution; see the scan options. */
   frameworkPrefixes?: readonly string[];
   /** Visibility predicate override (tests); see {@link tabSequence}. */
   isVisible?: (element: Element) => boolean;
+  /** Modal-dialog check override (tests; jsdom has no `:modal`). See {@link tabSequence}. */
+  isModal?: (element: Element) => boolean;
 }
 
 /** WAI-ARIA roles that make a non-native element behave as an interactive control. */
@@ -115,7 +118,13 @@ export function scanKeyboard(
     };
   };
 
+  // While a modal <dialog> is open the page behind it is inert: not reachable,
+  // and not something to report on (axe skips it too). Only check the modal.
+  const doc = root instanceof Document ? root : (root as Node).ownerDocument;
+  const modal = doc ? blockingModalDialog(doc, options.isModal) : null;
+
   for (const element of root.querySelectorAll('*')) {
+    if (modal && !modal.contains(element)) continue;
     // Native controls are keyboard-reachable and activate on Enter/Space on their
     // own, so they can't be the subject of either finding — skip them outright.
     if (isNativelyFocusable(element)) continue;
@@ -186,7 +195,7 @@ export function scanKeyboard(
 
   // Visual-vs-tab-order mismatch: a heuristic over the resolved sequence. Needs
   // real layout, so it no-ops where getBoundingClientRect returns zeros (jsdom).
-  const stops = tabSequence(root, { frameworkPrefixes: prefixes, isVisible });
+  const stops = tabSequence(root, { frameworkPrefixes: prefixes, isVisible, isModal: options.isModal });
   for (const jump of visualOrderJumps(stops)) {
     const stop = stops[jump];
     findings.push(

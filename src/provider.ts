@@ -271,8 +271,13 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
       }
 
       let scanning = false;
+      let rescanQueued = false;
       function scanNow(): void {
-        if (!enabled || scanning) return; // don't stack rescans while one is in flight
+        if (!enabled) return;
+        if (scanning) {
+          rescanQueued = true; // don't stack scans; run one more when this finishes
+          return;
+        }
         scanning = true;
         runA11yScan(root?.(), { log, logger, axe, frameworkPrefixes, keyboard })
           .then((findings) => {
@@ -286,8 +291,26 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
           .catch(() => undefined)
           .finally(() => {
             scanning = false;
+            if (rescanQueued) {
+              rescanQueued = false;
+              scanNow();
+            }
           });
       }
+
+      // Some top-layer changes happen outside Angular, so the app never becomes
+      // "unstable" and no rescan follows: Escape closing a native <dialog>, or a
+      // popover toggled by the browser. Rescan after those too (our own layers'
+      // toggles excepted).
+      let topLayerTimer: ReturnType<typeof setTimeout> | undefined;
+      const onTopLayerChange = (event: Event): void => {
+        const target = event.target;
+        if (target instanceof Element && target.hasAttribute(OVERLAY_ATTR)) return;
+        clearTimeout(topLayerTimer);
+        topLayerTimer = setTimeout(scanNow, debounceMs);
+      };
+      document.addEventListener('close', onTopLayerChange, true);
+      document.addEventListener('toggle', onTopLayerChange, true);
 
       const subscription = appRef.isStable
         .pipe(
@@ -300,6 +323,9 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
         subscription.unsubscribe();
         if (onFocusIn) document.removeEventListener('focusin', onFocusIn, true);
         if (onKeyDown) document.removeEventListener('keydown', onKeyDown, true);
+        document.removeEventListener('close', onTopLayerChange, true);
+        document.removeEventListener('toggle', onTopLayerChange, true);
+        clearTimeout(topLayerTimer);
         pillView?.destroy();
         overlayView?.destroy();
       });
