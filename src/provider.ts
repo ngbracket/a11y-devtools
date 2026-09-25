@@ -105,11 +105,23 @@ export interface A11yDevtoolsOptions {
  * settles (zoneless-aware, via `ApplicationRef.isStable`) and reports each
  * violation against the component that rendered it.
  *
- * In production this is a no-op and axe-core is never loaded, so it carries no
- * runtime weight. For a hard guarantee, include the provider only in your dev
- * bootstrap config.
+ * In production this is a no-op and axe-core is never loaded. The Angular CLI
+ * replaces `ngDevMode` with `false` in production builds, so the check below is
+ * constant and the bundler drops the whole implementation — about 0.3 KB is
+ * left, even when the provider is called unconditionally.
  */
 export function provideA11yDevtools(options: A11yDevtoolsOptions = {}): EnvironmentProviders {
+  // In an Angular production build `ngDevMode` is the constant `false`, so this
+  // folds to the empty branch and `devtoolsProviders` (overlay, pill, menu,
+  // scanning) is never referenced and gets tree-shaken. Keep it a ternary:
+  // bundlers fold a constant conditional expression before tree-shaking, but not
+  // an `if (…) return` followed by more code.
+  return typeof ngDevMode !== 'undefined' && !ngDevMode
+    ? makeEnvironmentProviders([])
+    : devtoolsProviders(options);
+}
+
+function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
   if (!isDevMode()) {
     return makeEnvironmentProviders([]);
   }

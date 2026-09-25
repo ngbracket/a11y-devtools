@@ -116,4 +116,48 @@ describe('production weight (axe-core stays out of the initial bundle)', () => {
     expect(output).not.toContain('getOwningComponent'); // attribution gone too
     expect(output).not.toContain('ngb-a11y-overlay'); // overlay gone too
   });
+
+  it('tree-shakes the whole implementation when called in a production build (ngDevMode = false)', async () => {
+    // The common setup: `provideA11yDevtools(...)` called unconditionally (or
+    // behind a runtime isDevMode() ternary). The Angular CLI defines ngDevMode
+    // as false in production, which makes the provider's early return constant.
+    const bundleApp = async (define: Record<string, string>): Promise<string> => {
+      const result = await build({
+        stdin: {
+          contents: `
+            import { provideA11yDevtools } from './index';
+            globalThis.providers = [provideA11yDevtools({ overlay: true, keyboard: true })];
+          `,
+          resolveDir: resolve(srcDir, '..'),
+          loader: 'ts',
+        },
+        bundle: true,
+        format: 'esm',
+        splitting: true, // as the Angular CLI does: dynamic imports become their own chunks
+        outdir: 'virtual-out',
+        entryNames: 'entry',
+        minify: true,
+        write: false,
+        external,
+        define,
+        logLevel: 'silent',
+      });
+      // Only the entry chunk is what the app downloads. esbuild still emits a
+      // chunk for a dynamic import that sits in dead code, but nothing loads it.
+      return result.outputFiles.find((f) => /entry\.js$/.test(f.path))!.text;
+    };
+
+    const prod = await bundleApp({ ngDevMode: 'false' });
+    expect(prod).not.toMatch(AXE);
+    expect(prod).not.toContain('ngb-a11y-overlay'); // overlay
+    expect(prod).not.toContain('ngbr-a11y-devtools'); // pill + settings storage
+    expect(prod).not.toContain('Download report'); // menu
+
+    expect(prod.length).toBeLessThan(2000); // just the provider shell
+
+    // Control: without the define (a dev build), the same code is all there.
+    const dev = await bundleApp({});
+    expect(dev).toContain('ngb-a11y-overlay');
+    expect(dev).toContain('Download report');
+  });
 });

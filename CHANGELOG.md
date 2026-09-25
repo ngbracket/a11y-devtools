@@ -3,6 +3,19 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.12.1
+
+### Fixed
+
+- **Production builds really drop the devtools now.** axe-core was never loaded
+  in production, but the devtools' own code (overlay, pill, menu) still ended up
+  in the app's main bundle when the provider was called unconditionally or behind
+  a runtime `isDevMode()` check: +28.5 KB raw (+10.4 KB gzipped) in 0.12.0 on the
+  admin example. The provider now checks `ngDevMode`, which the Angular CLI sets
+  to `false` in production builds, so the whole implementation is tree-shaken:
+  +0.2 KB raw (+0.05 KB gzipped). A new test bundles a production-style build
+  and checks the overlay, pill, menu and axe-core are all absent.
+
 ## 0.12.0
 
 ### Added
