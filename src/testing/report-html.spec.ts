@@ -49,10 +49,19 @@ describe('toHtml', () => {
   it('is a self-contained document: no scripts, no external stylesheets', () => {
     const doc = parse(toHtml(run));
     expect(doc.documentElement.lang).toBe('en');
-    expect(doc.title).toBe('Accessibility report');
+    expect(doc.title).toBe('Automated accessibility scan');
     expect(doc.querySelectorAll('script')).toHaveLength(0);
     expect(doc.querySelectorAll('link[rel="stylesheet"]')).toHaveLength(0);
     expect(doc.querySelector('style')).not.toBeNull();
+  });
+
+  it('says what it is not: no conformance report or VPAT/ACR, with the coverage docs link', () => {
+    const doc = parse(toHtml(run));
+    const scope = doc.querySelector('.scope')!;
+    expect(scope.textContent).toContain('not a conformance report or a VPAT/ACR');
+    expect(scope.querySelector('a')!.getAttribute('href')).toBe(
+      'https://ngbracket.com/tools/a11y-devtools/docs/coverage',
+    );
   });
 
   it('has a main landmark and a sequential heading outline', () => {
@@ -86,7 +95,7 @@ describe('toHtml', () => {
 
   it('shows empty and failed pages', () => {
     const doc = parse(toHtml(run));
-    expect(doc.querySelector('.ok')!.textContent).toBe('No violations found.');
+    expect(doc.querySelector('.ok')!.textContent).toBe('No automated violations found.');
     expect(doc.querySelector('.error')!.textContent).toBe('Scan failed: timeout');
   });
 
@@ -111,9 +120,9 @@ describe('toHtml', () => {
       generatedAt: 'x',
       pages: [{ label: 'p', url: 'u', findings: [finding({ helpUrl: 'javascript:alert(1)' })] }],
     }));
-    expect(doc.querySelectorAll('a')).toHaveLength(0);
+    expect(doc.querySelectorAll('.findings a')).toHaveLength(0);
     const linked = parse(toHtml(run));
-    const link = linked.querySelector('a')!;
+    const link = linked.querySelector('.findings a')!;
     expect(link.getAttribute('href')).toBe('https://example.test/image-alt');
     expect(link.textContent).toContain('Rule reference');
   });

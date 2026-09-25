@@ -1,7 +1,10 @@
 import type { BaselineDiff } from './baseline.js';
 import {
   addedBySeverity,
+  COVERAGE_URL,
   DARK_ONLY_NOTE,
+  REPORT_SCOPE_NOTE,
+  REPORT_TITLE,
   bySeverity,
   distinctRuleCount,
   groupByComponent,
@@ -59,7 +62,9 @@ main { max-width: 960px; margin: 0 auto; padding: 32px 16px 64px; }
 h1 { font-size: 1.6rem; margin: 0 0 4px; }
 h2 { font-size: 1.25rem; margin: 40px 0 12px; padding-top: 16px; border-top: 1px solid var(--line); }
 h3 { font-size: 1.05rem; margin: 0 0 4px; }
-.meta { color: var(--muted); margin: 0 0 24px; }
+.meta { color: var(--muted); margin: 0 0 12px; }
+.scope { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  margin: 0 0 24px; padding: 10px 14px; }
 a { color: var(--link); }
 code { font: 0.9em/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
 table { border-collapse: collapse; width: 100%; margin: 8px 0 16px; }
@@ -100,14 +105,17 @@ export function toHtml(report: ScanReport, diff?: BaselineDiff): string {
   out.push('<head>');
   out.push('<meta charset="utf-8">');
   out.push('<meta name="viewport" content="width=device-width, initial-scale=1">');
-  out.push('<title>Accessibility report</title>');
+  out.push(`<title>${REPORT_TITLE}</title>`);
   out.push(`<style>${STYLES}</style>`);
   out.push('</head>');
   out.push('<body>');
   out.push('<main>');
-  out.push('<h1>Accessibility report</h1>');
+  out.push(`<h1>${REPORT_TITLE}</h1>`);
   out.push(
     `<p class="meta">Generated <time datetime="${escapeHtml(report.generatedAt)}">${escapeHtml(report.generatedAt)}</time> · @ngbracket/a11y-devtools report-mode</p>`,
+  );
+  out.push(
+    `<p class="scope">${escapeHtml(REPORT_SCOPE_NOTE)} <a href="${COVERAGE_URL}">What automated checks cover</a>.</p>`,
   );
 
   // Summary — distinct rules next to raw node-instances, so the bigger number
@@ -162,7 +170,7 @@ export function toHtml(report: ScanReport, diff?: BaselineDiff): string {
       return;
     }
     if (page.findings.length === 0) {
-      out.push('<p class="ok">No violations found.</p>');
+      out.push('<p class="ok">No automated violations found.</p>');
       out.push('</section>');
       return;
     }

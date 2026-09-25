@@ -55,6 +55,17 @@ describe('createOverlay', () => {
     expect(overlayRoot()).not.toBeNull();
   });
 
+  it('hides its labels, badges and panel from assistive tech', () => {
+    targetEl('target');
+    overlay.render([finding({ target: '#target' })]);
+    overlay.renderTabOrder([stop(document.getElementById('target')!)]);
+
+    const root = overlayRoot()!;
+    expect(root.getAttribute('aria-hidden')).toBe('true');
+    // aria-hidden must never hide something focusable (axe aria-hidden-focus).
+    expect(root.querySelector('a, button, input, select, textarea, [tabindex]')).toBeNull();
+  });
+
   it('draws one box per finding, positioned over the target', () => {
     targetEl('target', { top: 15, left: 25, width: 120, height: 30 });
     overlay.render([finding({ target: '#target' })]);

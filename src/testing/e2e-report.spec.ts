@@ -293,7 +293,7 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
         '--out', join(dir, 'baseline'), '--format', 'all',
       ]);
       expect(code).toBe(0);
-      expect(readFileSync(join(dir, 'baseline.md'), 'utf8')).toContain('# Accessibility report');
+      expect(readFileSync(join(dir, 'baseline.md'), 'utf8')).toContain('# Automated accessibility scan');
       expect(JSON.parse(readFileSync(join(dir, 'baseline.json'), 'utf8')).pages).toHaveLength(2);
       expect(readFileSync(join(dir, 'baseline.html'), 'utf8')).toMatch(/^<!doctype html>/);
     }, 60_000);

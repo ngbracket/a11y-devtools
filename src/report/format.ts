@@ -29,6 +29,25 @@ export interface PageReport {
 export const DARK_ONLY_NOTE =
   'Dark mode: lists only issues that don’t also appear in light mode on this route.';
 
+/**
+ * Report title, shared by every format. Says "automated scan" on purpose: a file
+ * titled "Accessibility report" is easy to hand to procurement as if it were a
+ * conformance report.
+ */
+export const REPORT_TITLE = 'Automated accessibility scan';
+
+/** Docs page explaining what automated checks cover and what they can't. */
+export const COVERAGE_URL = 'https://ngbracket.com/tools/a11y-devtools/docs/coverage';
+
+/**
+ * What the report is and isn't, shown under the title in every format (and as
+ * `scope` in JSON). Automated checks cover part of WCAG; a clean run is not a
+ * conformance claim, and a VPAT/ACR needs a person to judge every criterion.
+ */
+export const REPORT_SCOPE_NOTE =
+  'Automated checks cover only part of WCAG. This is not a conformance report or a VPAT/ACR: ' +
+  'manual keyboard, screen-reader and content review is still required.';
+
 /** A whole report-mode run across one or more pages. */
 export interface ScanReport {
   /** ISO timestamp of the run. */
@@ -82,6 +101,7 @@ export function toJson(report: ScanReport, diff?: BaselineDiff): string {
   return JSON.stringify(
     {
       generatedAt: report.generatedAt,
+      scope: `${REPORT_SCOPE_NOTE} ${COVERAGE_URL}`,
       summary: {
         pages: report.pages.length,
         distinctRules: distinctRuleCount(all),
@@ -138,9 +158,11 @@ export function toMarkdown(report: ScanReport, diff?: BaselineDiff): string {
   const all = report.pages.flatMap((p) => p.findings);
   const lines: string[] = [];
 
-  lines.push('# Accessibility report');
+  lines.push(`# ${REPORT_TITLE}`);
   lines.push('');
   lines.push(`_Generated ${report.generatedAt} · @ngbracket/a11y-devtools report-mode_`);
+  lines.push('');
+  lines.push(`> ${REPORT_SCOPE_NOTE} [What automated checks cover](${COVERAGE_URL}).`);
   lines.push('');
 
   // Summary table — distinct rules alongside raw node-instances, so the headline
@@ -188,7 +210,7 @@ export function toMarkdown(report: ScanReport, diff?: BaselineDiff): string {
       continue;
     }
     if (page.findings.length === 0) {
-      lines.push('No violations found. ✅');
+      lines.push('No automated violations found. ✅');
       lines.push('');
       continue;
     }

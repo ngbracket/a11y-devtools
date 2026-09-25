@@ -97,6 +97,12 @@ export function createOverlay(options: OverlayOptions = {}): A11yOverlay {
 
   const container = doc.createElement('div');
   container.setAttribute(OVERLAY_ATTR, '');
+  // The highlights, badges and preview panel are a visual aid for sighted
+  // developers. Hide them from assistive tech so their text (rule ids, tab
+  // numbers, panel rows) doesn't pollute the page's own accessibility tree. The
+  // on/off pill lives in a separate layer and stays exposed. Nothing in here is
+  // focusable, so this can't create an aria-hidden focus trap.
+  container.setAttribute('aria-hidden', 'true');
   Object.assign(container.style, {
     position: 'fixed',
     inset: '0',

@@ -3,6 +3,27 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.12.3
+
+### Changed
+
+- **Reports say what they aren't.** The Markdown and HTML reports are now titled
+  "Automated accessibility scan" (was "Accessibility report") and open with a
+  scope note: automated checks cover only part of WCAG, and the report is not a
+  conformance report or a VPAT/ACR. The note links to
+  [What it checks (and what it can't)](https://ngbracket.com/tools/a11y-devtools/docs/coverage).
+  JSON reports carry the same note as a top-level `scope` field. A clean page now
+  reads "No automated violations found." The in-app **Download report** gets the
+  same changes.
+
+### Fixed
+
+- **The overlay no longer adds text to the page's accessibility tree.** Finding
+  labels, tab-order numbers and the accessibility-tree preview panel were exposed
+  to screen readers, mixing rule ids and badge numbers into the app being tested.
+  The overlay layer is now `aria-hidden`. The on/off pill and its menu are in a
+  separate layer and stay fully accessible.
+
 ## 0.12.2
 
 ### Changed

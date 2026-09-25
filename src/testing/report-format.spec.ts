@@ -70,6 +70,12 @@ const report: ScanReport = {
 };
 
 describe('toJson', () => {
+  it('carries a scope note so the file cannot pass as a conformance report', () => {
+    const parsed = JSON.parse(toJson(report));
+    expect(parsed.scope).toContain('not a conformance report or a VPAT/ACR');
+    expect(parsed.scope).toContain('/tools/a11y-devtools/docs/coverage');
+  });
+
   it('emits a summary with distinct rules vs node-instances', () => {
     const parsed = JSON.parse(toJson(report));
     expect(parsed.summary).toMatchObject({ pages: 2, distinctRules: 2, nodeInstances: 3 });
@@ -80,6 +86,11 @@ describe('toJson', () => {
 
 describe('toMarkdown', () => {
   const md = toMarkdown(report);
+
+  it('is titled as an automated scan and states its scope under the title', () => {
+    expect(md.startsWith('# Automated accessibility scan')).toBe(true);
+    expect(md).toContain('> Automated checks cover only part of WCAG. This is not a conformance report or a VPAT/ACR');
+  });
 
   it('shows distinct-rules alongside node-instances in the summary', () => {
     expect(md).toContain('| Page | Distinct rules | Node-instances | Components |');
@@ -93,7 +104,7 @@ describe('toMarkdown', () => {
   });
 
   it('reports a clean page as no violations', () => {
-    expect(md).toContain('No violations found. ✅');
+    expect(md).toContain('No automated violations found. ✅');
   });
 
   it('notes the UI primitive an app component rendered through', () => {
