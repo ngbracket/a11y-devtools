@@ -1,6 +1,6 @@
 # Demos
 
-Two ways to see `@ngbracket/a11y-devtools` working.
+Three ways to see `@ngbracket/a11y-devtools` working.
 
 ## 1. Standalone overlay (no Angular app needed)
 
@@ -60,7 +60,28 @@ the admin `/login` page after clearing every violation the tool found there:
 
 ![console reporting no violations after the fixes](login-no-violations-console-2026-09.png)
 
-### Local-link caveat (integrators)
+## 3. Report mode (headless, many routes)
+
+The same scan run from the CLI across a list of routes, here against the public
+demo at `https://a11y-demo.ngbracket.com`:
+
+```bash
+npx ngbr-a11y-report --base https://a11y-demo.ngbracket.com \
+  --route /a11y-demo --route /login --format html --out a11y
+```
+
+The self-contained HTML report opens with a summary per page, then groups each
+page's findings by the component that rendered them:
+
+![HTML report titled Automated accessibility scan: a summary table (/a11y-demo 5 rules, 21 node-instances, 1 component; /login 0), then the A11yDemo findings with critical image-alt, serious color-contrast and tabindex, and moderate region](html-report-2026-09.png)
+
+Every report (Markdown, JSON and HTML) states its scope up front: automated
+checks cover only part of WCAG, so it is not a conformance report or a VPAT/ACR,
+and manual keyboard, screen-reader and content review is still required:
+
+![Report header with the note: Automated checks cover only part of WCAG. This is not a conformance report or a VPAT/ACR: manual keyboard, screen-reader and content review is still required, with a link to What automated checks cover](report-scope-header-2026-09.png)
+
+## Local-link caveat (integrators)
 
 When **linking this package into an app locally** (not installing a published
 version), give it a real directory under the app's `node_modules` containing only
