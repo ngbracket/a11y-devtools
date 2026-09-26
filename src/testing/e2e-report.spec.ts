@@ -11,14 +11,15 @@
  * specs. Skipped when `dist/` hasn't been built or no Playwright Chromium is
  * installed (`npx playwright install chromium`).
  */
-import { execFile } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { execFile, spawn } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { isServing } from '../report/serve';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const distReport = resolve(root, 'dist/report/index.js');
@@ -340,5 +341,74 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
       expect(code).toBe(2);
       expect(stderr).toContain('not valid JSON');
     });
+  });
+
+  describe('CLI: --serve starts and stops the dev server', () => {
+    let dir: string;
+    let command: string;
+    let url: string;
+    beforeAll(async () => {
+      dir = mkdtempSync(join(tmpdir(), 'ngbr-a11y-serve-'));
+      const probe = createServer();
+      await new Promise<void>((r) => probe.listen(0, '127.0.0.1', r));
+      const { port } = probe.address() as AddressInfo;
+      await new Promise((r) => probe.close(r));
+      url = `http://127.0.0.1:${port}`;
+      // Stands in for `ng serve`: a short "build", then a page with an unlabelled image.
+      const script = join(dir, 'serve.cjs');
+      writeFileSync(
+        script,
+        `setTimeout(() => require('http').createServer((q, s) => {` +
+          `s.setHeader('content-type', 'text/html');` +
+          `s.end('<!doctype html><html lang="en"><title>t</title><main><h1>Serve</h1>` +
+          `<img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" width="10" height="10"></main>');` +
+          `}).listen(${port}, '127.0.0.1'), 500);`,
+      );
+      command = `"${process.execPath}" "${script}"`;
+    });
+    afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+    it('scans once the server answers, then stops it', async () => {
+      const { code, stderr } = await runCli([
+        '--serve', command, '--base', url, '--route', '/', '--wait', '50',
+        '--out', join(dir, 'served'), '--format', 'json',
+      ]);
+      expect(code).toBe(0);
+      expect(stderr).toContain(`Dev server is up at ${url}`);
+      expect(stderr).toContain('Stopped the dev server.');
+      const ids = JSON.parse(readFileSync(join(dir, 'served.json'), 'utf8')).pages[0].findings.map(
+        (f: { id: string }) => f.id,
+      );
+      expect(ids).toContain('image-alt');
+      expect(await isServing(url)).toBe(false);
+    }, 60_000);
+
+    it('Ctrl+C while the server is starting stops it too', async () => {
+      // Listens only after 3s; the CLI gets SIGINT at 1s, mid-startup.
+      const slow = join(dir, 'slow.cjs');
+      writeFileSync(
+        slow,
+        `setTimeout(() => require('http').createServer((q, s) => s.end('ok')).listen(${new URL(url).port}, '127.0.0.1'), 3000);`,
+      );
+      const cli_ = spawn(process.execPath, [cli, '--serve', `"${process.execPath}" "${slow}"`, '--base', url, '--route', '/'], {
+        cwd: root,
+        stdio: 'ignore',
+      });
+      await new Promise((r) => setTimeout(r, 1000));
+      cli_.kill('SIGINT');
+      const signal = await new Promise((r) => cli_.once('exit', (_code, sig) => r(sig)));
+      expect(signal).toBe('SIGINT');
+      await new Promise((r) => setTimeout(r, 3000));
+      expect(await isServing(url)).toBe(false);
+    }, 20_000);
+
+    it('exits 2 with the command output when the server never comes up', async () => {
+      const { code, stderr } = await runCli([
+        '--serve', `"${process.execPath}" -e "console.error('boom'); process.exit(1)"`,
+        '--base', url, '--route', '/',
+      ]);
+      expect(code).toBe(2);
+      expect(stderr).toMatch(/exited \(code 1\)[\s\S]*boom/);
+    }, 30_000);
   });
 });

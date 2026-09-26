@@ -23,3 +23,4 @@ export {
   type BaselineReport,
   type NewFinding,
 } from './baseline.js';
+export { isServing, startDevServer, type DevServer, type DevServerOptions } from './serve.js';

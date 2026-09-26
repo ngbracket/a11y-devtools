@@ -59,10 +59,10 @@ finding highlights labelled with their owning component (including the ngbr/*
 keyboard findings), and the focus-follow accessibility-tree panel showing the
 focused button's computed role, name and states.](./demo/keyboard-layer-2026-09.png)
 
-In CI, against a running `ng serve`:
+In CI (`--serve` starts `ng serve`, waits for it, and stops it after the scan):
 
 ```bash
-npx ngbr-a11y-report --base http://localhost:4200 --route / --route /settings \
+npx ngbr-a11y-report --serve "npx ng serve" --route / --route /settings \
   --keyboard --baseline a11y-baseline.json --fail-on serious --out a11y --format all
 ```
 

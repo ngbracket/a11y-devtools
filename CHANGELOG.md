@@ -3,6 +3,21 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.13.0
+
+### Added
+
+- **Report mode can start your dev server.** `--serve "<command>"` runs the
+  command (for example `--serve "npx ng serve"`), waits until `--base` answers,
+  scans, then stops the server and everything it started — even on Ctrl+C or a
+  cancelled CI job. `--base` defaults to `http://localhost:4200` with `--serve`.
+  If something already answers at `--base`, that server is scanned and nothing is
+  started, so the same command works locally with `ng serve` already running.
+  `--serve-timeout <seconds>` (default 180) sets how long to wait. If the command
+  exits early or never answers, the CLI exits with code `2` and prints the last
+  lines of its output. From code: `startDevServer()` and `isServing()` from
+  `@ngbracket/a11y-devtools/report`.
+
 ## 0.12.3
 
 ### Changed

@@ -4,6 +4,7 @@ import {
   diffAgainstBaseline,
   parseBaseline,
   scanPages,
+  startDevServer,
   toHtml,
   toJson,
   toMarkdown,
@@ -13,9 +14,16 @@ const USAGE = `ngbr-a11y-report — component-attributed a11y scan of a running 
 
 Usage:
   ngbr-a11y-report --base <url> --route <path> [--route <path> ...] [options]
+  ngbr-a11y-report --serve "<command>" --route <path> [...] [options]
 
 Options:
-  --base <url>       Origin of the running dev server (e.g. http://localhost:4200)
+  --base <url>       Origin of the running dev server (e.g. http://localhost:4200).
+                     With --serve, defaults to http://localhost:4200
+  --serve <command>  Start the dev server with this command, wait until --base
+                     answers, scan, then stop it — e.g. --serve "npx ng serve".
+                     If --base already answers, that server is used as-is
+  --serve-timeout <s>
+                     Seconds to wait for --serve to answer (default 180)
   --route <path>     Route to scan; repeat for multiple routes
   --tags <list>      Comma-separated axe tags to scope the ruleset (e.g. wcag22aa,best-practice)
   --out <prefix>     Write <prefix>.md / .json / .html (default: print Markdown to stdout)
@@ -63,6 +71,8 @@ function parseArgs(argv) {
     const next = () => argv[++i];
     switch (arg) {
       case '--base': opts.base = next(); break;
+      case '--serve': opts.serve = next(); break;
+      case '--serve-timeout': opts.serveTimeout = Number(next()); break;
       case '--route': opts.routes.push(next()); break;
       case '--tags': opts.tags = next().split(',').map((s) => s.trim()).filter(Boolean); break;
       case '--out': opts.out = next(); break;
@@ -88,6 +98,7 @@ function parseArgs(argv) {
 }
 
 const opts = parseArgs(process.argv.slice(2));
+if (opts.serve && !opts.base) opts.base = 'http://localhost:4200';
 
 if (opts.help || !opts.base || opts.routes.length === 0) {
   process.stderr.write(USAGE);
@@ -129,19 +140,52 @@ if (opts.baseline) {
   }
 }
 
-const report = await scanPages({
-  baseUrl: opts.base,
-  routes: opts.routes,
-  tags: opts.tags,
-  waitMs: opts.wait,
-  headed: opts.headed,
-  frameworkPrefixes: opts.frameworkPrefixes,
-  keyboard: opts.keyboard,
-  focusTraps: opts.focusTraps,
-  colorScheme: opts.colorScheme,
-  darkClass: opts.darkClass,
-  darkAttribute,
-});
+if (opts.serveTimeout !== undefined && !(opts.serveTimeout > 0)) {
+  process.stderr.write('Invalid --serve-timeout (use a number of seconds, e.g. 300)\n');
+  process.exit(2);
+}
+
+let server;
+if (opts.serve) {
+  process.stderr.write(`Starting dev server: ${opts.serve}\n`);
+  try {
+    server = await startDevServer({
+      command: opts.serve,
+      url: opts.base,
+      timeoutMs: opts.serveTimeout === undefined ? undefined : opts.serveTimeout * 1000,
+    });
+  } catch (err) {
+    process.stderr.write(`${err.message}\n`);
+    process.exit(2);
+  }
+  process.stderr.write(
+    server.reused
+      ? `${opts.base} is already serving; scanning that (nothing started).\n`
+      : `Dev server is up at ${opts.base}.\n`,
+  );
+}
+
+let report;
+try {
+  report = await scanPages({
+    baseUrl: opts.base,
+    routes: opts.routes,
+    tags: opts.tags,
+    waitMs: opts.wait,
+    headed: opts.headed,
+    frameworkPrefixes: opts.frameworkPrefixes,
+    keyboard: opts.keyboard,
+    focusTraps: opts.focusTraps,
+    colorScheme: opts.colorScheme,
+    darkClass: opts.darkClass,
+    darkAttribute,
+  });
+} finally {
+  if (server && !server.reused) {
+    await server.stop();
+    process.stderr.write('Stopped the dev server.\n');
+  }
+}
 
 const allFindings = report.pages.flatMap((p) => p.findings);
 process.stderr.write(
