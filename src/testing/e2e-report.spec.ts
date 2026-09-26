@@ -19,6 +19,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { axeRulesRun, loadAxeRules } from '../report/acr';
 import { isServing } from '../report/serve';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -278,6 +279,29 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
       expect(rules(r, '/dark-attr (dark)')).toContain('color-contrast');
     }, 60_000);
   });
+
+  it('the ACR worksheet knows exactly which axe rules a run used (default and with tags)', async () => {
+    const { chromium } = await import('playwright');
+    const browser = await chromium.launch();
+    try {
+      const page = await browser.newPage();
+      await page.setContent('<html lang="en"><title>t</title><main><h1>x</h1><button>b</button></main></html>');
+      await page.addScriptTag({ path: resolve(root, 'node_modules/axe-core/axe.min.js') });
+      for (const tags of [undefined, ['wcag2a'], ['wcag22aa'], ['wcag2aa', 'best-practice'], ['wcag2a', 'experimental']]) {
+        const ran = await page.evaluate(async (t) => {
+          const w = window as unknown as { axe: { run(d: Document, o?: object): Promise<Record<string, { id: string }[]>> } };
+          const r = await w.axe.run(document, t ? { runOnly: { type: 'tag', values: t } } : undefined);
+          return [...r.violations, ...r.passes, ...r.incomplete, ...r.inapplicable].map((x) => x.id).sort();
+        }, tags);
+        const predicted = axeRulesRun(loadAxeRules(), tags && { axeVersion: '', tags, keyboard: false, focusTraps: false })
+          .map((r) => r.ruleId)
+          .sort();
+        expect({ tags, rules: predicted }).toEqual({ tags, rules: ran });
+      }
+    } finally {
+      await browser.close();
+    }
+  }, 60_000);
 
   describe('CLI: output formats and the baseline gate', () => {
     let dir: string;

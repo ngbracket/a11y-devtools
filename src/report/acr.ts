@@ -77,19 +77,25 @@ const NGBR_RULES: Record<string, { criteria: string[]; ranWhen: keyof Pick<ScanC
   'ngbr/focus-trap': { criteria: ['2.1.2'], ranWhen: 'focusTraps' },
 };
 
-function loadAxeRules(): AxeRuleMeta[] {
+export function loadAxeRules(): AxeRuleMeta[] {
   const axe = createRequire(import.meta.url)('axe-core') as { getRules(): AxeRuleMeta[] };
   return axe.getRules();
 }
 
-/** The axe rules a run used: its tags if it had them, otherwise axe's default ruleset. */
-function axeRulesRun(rules: AxeRuleMeta[], checks?: ScanChecks): AxeRuleMeta[] {
+/**
+ * The axe rules a run used. Without tags: axe's default ruleset (enabled rules).
+ * With tags, axe runs every rule carrying one of them, even rules that are off
+ * by default (e.g. `target-size` under `wcag22aa`), but still skips
+ * experimental and deprecated rules unless those tags are asked for.
+ */
+export function axeRulesRun(rules: AxeRuleMeta[], checks?: ScanChecks): AxeRuleMeta[] {
   const tags = checks?.tags;
-  if (!tags) return rules.filter((r) => r.enabled !== false && !r.tags.includes('experimental'));
+  const skipped = (r: AxeRuleMeta, tag: string) => r.tags.includes(tag) && !tags?.includes(tag);
   return rules.filter(
     (r) =>
-      r.tags.some((t) => tags.includes(t)) &&
-      (!r.tags.includes('experimental') || tags.includes('experimental')),
+      (tags ? r.tags.some((t) => tags.includes(t)) : r.enabled !== false) &&
+      !skipped(r, 'experimental') &&
+      !skipped(r, 'deprecated'),
   );
 }
 

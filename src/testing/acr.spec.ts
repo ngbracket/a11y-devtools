@@ -30,7 +30,8 @@ const RULES: AxeRuleMeta[] = [
   { ruleId: 'color-contrast', tags: ['cat.color', 'wcag2aa', 'wcag143'], enabled: true },
   { ruleId: 'image-alt', tags: ['wcag2a', 'wcag111'], enabled: true },
   { ruleId: 'button-name', tags: ['wcag2a', 'wcag412'], enabled: true },
-  { ruleId: 'target-size', tags: ['wcag22aa', 'wcag258'], enabled: true },
+  { ruleId: 'target-size', tags: ['wcag22aa', 'wcag258'], enabled: false },
+  { ruleId: 'audio-caption', tags: ['wcag2a', 'wcag121', 'deprecated'], enabled: false },
   { ruleId: 'region', tags: ['best-practice'], enabled: true },
   { ruleId: 'color-contrast-enhanced', tags: ['wcag2aaa', 'wcag146'], enabled: false },
   { ruleId: 'p-as-heading', tags: ['wcag2a', 'wcag131', 'experimental'], enabled: false },
@@ -115,6 +116,15 @@ describe('buildAcrWorksheet', () => {
     expect(row(sheet.rows, '1.1.1').result).toBe('no-failures-detected');
     expect(row(sheet.rows, '1.4.3').result).toBe('not-checked'); // wcag2aa only
     expect(row(sheet.rows, '2.5.8').result).toBe('not-checked'); // wcag22aa only
+    // Deprecated rules don't run even when their tag is asked for.
+    expect(row(sheet.rows, '1.2.1').result).toBe('not-checked');
+  });
+
+  it('with tags, counts rules that are off by default (axe runs them), like target-size', () => {
+    const page = [{ label: '/', url: 'http://x/', findings: [] }];
+    expect(row(buildAcrWorksheet(report(page), RULES).rows, '2.5.8').result).toBe('not-checked');
+    const tagged = buildAcrWorksheet(report(page, { checks: { ...checks, tags: ['wcag22aa'] } }), RULES);
+    expect(row(tagged.rows, '2.5.8')).toMatchObject({ result: 'no-failures-detected', checkedBy: ['target-size'] });
   });
 
   it('counts keyboard rules as checks only when that layer ran', () => {
