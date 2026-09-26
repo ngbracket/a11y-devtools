@@ -66,10 +66,14 @@ npx ngbr-a11y-report --serve "npx ng serve" --route / --route /settings \
   --keyboard --baseline a11y-baseline.json --fail-on serious --out a11y --format all
 ```
 
+Preparing a VPAT/ACR? `--format acr` adds an evaluation worksheet: the results by WCAG 2.2
+A/AA criterion, with the conformance columns left for a person to fill in.
+
 Next steps, in the docs:
 [Your first scan](https://ngbracket.com/tools/a11y-devtools/docs/first-scan) ·
 [Report mode](https://ngbracket.com/tools/a11y-devtools/docs/report-mode) ·
 [CI gating with a baseline](https://ngbracket.com/tools/a11y-devtools/docs/ci-baseline) ·
+[ACR worksheet](https://ngbracket.com/tools/a11y-devtools/docs/acr-worksheet) ·
 [CLI reference](https://ngbracket.com/tools/a11y-devtools/docs/cli) ·
 [Findings & rules](https://ngbracket.com/tools/a11y-devtools/docs/findings)
 

@@ -27,7 +27,7 @@ import {
  * long report.
  */
 
-function escapeHtml(text: string): string {
+export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -37,11 +37,11 @@ function escapeHtml(text: string): string {
 }
 
 /** Only http(s) links are rendered as links; anything else stays plain text. */
-function safeHref(url: string): string | null {
+export function safeHref(url: string): string | null {
   return /^https?:\/\//i.test(url) ? escapeHtml(url) : null;
 }
 
-const STYLES = `
+export const STYLES = `
 :root {
   color-scheme: light dark;
   --bg: #ffffff; --fg: #1a1a1a; --muted: #555555; --line: #d9d9d9; --panel: #f6f6f6;

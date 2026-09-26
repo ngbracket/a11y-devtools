@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { RunOptions as AxeRunOptions } from 'axe-core';
@@ -6,7 +7,7 @@ import type { Browser, Page } from 'playwright';
 import { detectTabTrap, type FocusObservation } from '../keyboard/focus-walk.js';
 import type { A11yFinding } from '../scan.js';
 import { findingsNotIn } from './baseline.js';
-import type { PageReport, ScanReport } from './format.js';
+import type { PageReport, ScanChecks, ScanReport } from './format.js';
 
 /** A colour scheme a pass is scanned in. */
 export type ColorScheme = 'light' | 'dark';
@@ -315,5 +316,15 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     await browser.close();
   }
 
-  return { generatedAt: new Date().toISOString(), pages };
+  const checks: ScanChecks = {
+    axeVersion: axeVersion(),
+    ...(tags && { tags }),
+    keyboard: keyboard ?? false,
+    focusTraps,
+  };
+  return { generatedAt: new Date().toISOString(), checks, pages };
+}
+
+function axeVersion(): string {
+  return (createRequire(import.meta.url)('axe-core/package.json') as { version: string }).version;
 }

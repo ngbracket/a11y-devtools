@@ -3,6 +3,26 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.14.0
+
+### Added
+
+- **Evaluation worksheet for a VPAT/ACR.** `--format acr` writes
+  `<prefix>.acr.html` and `--format acr-md` writes `<prefix>.acr.md`: the scan
+  organised by WCAG 2.2 Level A and AA success criterion, one row per criterion.
+  Each row says what the scan found — "Automated failures found", "Possible
+  failures found — verify manually" (heuristic `ngbr/*` rules only), "No
+  automated failures detected — manual review required", or "No automated checks
+  — manual review required" — with the evidence (rule, impact, instances, pages,
+  components) or the rules that checked it. It never says "Supports": the
+  Conformance Level and Remarks columns, and the product, evaluator and date
+  fields, are left blank for a person. Findings from rules not mapped to an A/AA
+  criterion (best practices, AAA) are listed separately rather than dropped.
+  From code: `buildAcrWorksheet()`, `toAcrHtml()`, `toAcrMarkdown()`.
+- **Reports record what was checked.** `scanPages()` results and JSON reports
+  now carry `checks`: the axe-core version, any `--tags`, and whether keyboard
+  checks and the keyboard-trap walk ran.
+
 ## 0.13.0
 
 ### Added

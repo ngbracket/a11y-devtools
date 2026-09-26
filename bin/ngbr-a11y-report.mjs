@@ -5,6 +5,8 @@ import {
   parseBaseline,
   scanPages,
   startDevServer,
+  toAcrHtml,
+  toAcrMarkdown,
   toHtml,
   toJson,
   toMarkdown,
@@ -28,7 +30,10 @@ Options:
   --tags <list>      Comma-separated axe tags to scope the ruleset (e.g. wcag22aa,best-practice)
   --out <prefix>     Write <prefix>.md / .json / .html (default: print Markdown to stdout)
   --format <list>    Comma-separated: md, json, html — or both (= md,json) or all
-                     (default: both when --out is set)
+                     (= md,json,html). Default: both when --out is set.
+                     Also: acr (<prefix>.acr.html) and acr-md (<prefix>.acr.md) —
+                     an evaluation worksheet by WCAG 2.2 A/AA criterion, as input
+                     to a VPAT/ACR. Not a conformance report
   --wait <ms>        Settle time after load before scanning (default 1500)
   --fail-on <impact> Exit non-zero if any finding is at/above impact
                      (minor | moderate | serious | critical) — for CI gating.
@@ -105,14 +110,26 @@ if (opts.help || !opts.base || opts.routes.length === 0) {
   process.exit(opts.help ? 0 : 1);
 }
 
-const FORMATS = { md: ['md'], json: ['json'], html: ['html'], both: ['md', 'json'], all: ['md', 'json', 'html'] };
+const FORMATS = {
+  md: ['md'],
+  json: ['json'],
+  html: ['html'],
+  both: ['md', 'json'],
+  all: ['md', 'json', 'html'],
+  acr: ['acr'],
+  'acr-md': ['acr-md'],
+};
 const formats = new Set();
 for (const name of String(opts.format).split(',').map((s) => s.trim()).filter(Boolean)) {
   if (!FORMATS[name]) {
-    process.stderr.write(`Invalid --format "${name}" (use md, json, html, both or all)\n`);
+    process.stderr.write(`Invalid --format "${name}" (use md, json, html, both, all, acr or acr-md)\n`);
     process.exit(2);
   }
   FORMATS[name].forEach((f) => formats.add(f));
+}
+if (!opts.out && (formats.has('acr') || formats.has('acr-md'))) {
+  process.stderr.write('--format acr / acr-md writes a file: add --out <prefix>\n');
+  process.exit(2);
 }
 
 if (opts.colorScheme && !['light', 'dark', 'both'].includes(opts.colorScheme)) {
@@ -206,10 +223,17 @@ if (allFindings.length > 0 && allFindings.every((f) => f.component === null)) {
 if (!opts.out) {
   process.stdout.write(toMarkdown(report, diff) + '\n');
 } else {
-  const render = { md: toMarkdown, json: toJson, html: toHtml };
+  const render = {
+    md: [toMarkdown, 'md'],
+    json: [toJson, 'json'],
+    html: [toHtml, 'html'],
+    acr: [(r) => toAcrHtml(r), 'acr.html'],
+    'acr-md': [(r) => toAcrMarkdown(r), 'acr.md'],
+  };
   for (const format of formats) {
-    writeFileSync(`${opts.out}.${format}`, render[format](report, diff));
-    process.stderr.write(`Wrote ${opts.out}.${format}\n`);
+    const [fn, ext] = render[format];
+    writeFileSync(`${opts.out}.${ext}`, fn(report, diff));
+    process.stderr.write(`Wrote ${opts.out}.${ext}\n`);
   }
 }
 

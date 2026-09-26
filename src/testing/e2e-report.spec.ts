@@ -329,6 +329,46 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
       expect(pages[1].findings.map((f: { id: string }) => f.id)).toContain('color-contrast');
     }, 60_000);
 
+    it('--format acr,acr-md writes the evaluation worksheet, which itself scans clean', async () => {
+      const { code } = await runCli([
+        '--base', baseUrl, '--route', '/axe', '--route', '/editor', ...scan,
+        '--out', join(dir, 'acr'), '--format', 'json,acr,acr-md',
+      ]);
+      expect(code).toBe(0);
+      const json = JSON.parse(readFileSync(join(dir, 'acr.json'), 'utf8'));
+      expect(json.checks).toMatchObject({ keyboard: true, focusTraps: true, axeVersion: expect.any(String) });
+      const md = readFileSync(join(dir, 'acr.acr.md'), 'utf8');
+      expect(md).toContain('# Evaluation worksheet — not a conformance report');
+      expect(md).toMatch(/\| Keyboard checks \| on \|/);
+      // The editor page's Tab trap is evidence for 2.1.2.
+      expect(md).toMatch(/No Keyboard Trap\]\([^)]*\) \| A \| Possible failures found — verify manually \| ngbr\/focus-trap/);
+
+      // An accessibility tool's worksheet has to be accessible: scan it, light and dark.
+      const html = readFileSync(join(dir, 'acr.acr.html'), 'utf8');
+      const sheet = createServer((_q, res) => res.setHeader('content-type', 'text/html').end(html));
+      await new Promise<void>((r) => sheet.listen(0, '127.0.0.1', r));
+      try {
+        const sheetUrl = `http://127.0.0.1:${(sheet.address() as AddressInfo).port}`;
+        const self = await runCli([
+          '--base', sheetUrl, '--route', '/', '--wait', '50', '--keyboard', '--color-scheme', 'both',
+          '--out', join(dir, 'self'), '--format', 'json',
+        ]);
+        expect(self.code).toBe(0);
+        const pages = JSON.parse(readFileSync(join(dir, 'self.json'), 'utf8')).pages;
+        expect(pages).toHaveLength(2); // light + dark
+        expect(pages.map((p: { error?: string }) => p.error)).toEqual([undefined, undefined]);
+        expect(pages.flatMap((p: { findings: { id: string }[] }) => p.findings.map((f) => f.id))).toEqual([]);
+      } finally {
+        await new Promise((r) => sheet.close(r));
+      }
+    }, 90_000);
+
+    it('--format acr without --out is refused before scanning', async () => {
+      const { code, stderr } = await runCli(['--base', baseUrl, '--route', '/', '--format', 'acr']);
+      expect(code).toBe(2);
+      expect(stderr).toContain('add --out');
+    });
+
     it('rejects an invalid --color-scheme or --dark-attribute', async () => {
       expect((await runCli(['--base', baseUrl, '--route', '/', '--color-scheme', 'dim'])).code).toBe(2);
       expect((await runCli(['--base', baseUrl, '--route', '/', '--dark-attribute', 'dark'])).code).toBe(2);

@@ -48,10 +48,24 @@ export const REPORT_SCOPE_NOTE =
   'Automated checks cover only part of WCAG. This is not a conformance report or a VPAT/ACR: ' +
   'manual keyboard, screen-reader and content review is still required.';
 
+/** Which checks a run used — so a report can say what was and wasn't tested. */
+export interface ScanChecks {
+  /** axe-core version the scan ran. */
+  axeVersion: string;
+  /** axe tags the ruleset was restricted to; absent means axe's default ruleset. */
+  tags?: string[];
+  /** The keyboard layer's `ngbr/*` rules ran. */
+  keyboard: boolean;
+  /** The real-Tab keyboard-trap walk (`ngbr/focus-trap`) ran. */
+  focusTraps: boolean;
+}
+
 /** A whole report-mode run across one or more pages. */
 export interface ScanReport {
   /** ISO timestamp of the run. */
   generatedAt: string;
+  /** What the run checked. Set by `scanPages`; absent in hand-built reports. */
+  checks?: ScanChecks;
   pages: PageReport[];
 }
 
@@ -87,7 +101,7 @@ const IMPACT_RANK: Record<string, number> = {
   minor: 3,
 };
 
-function impactRank(impact: Impact): number {
+export function impactRank(impact: Impact): number {
   return impact ? (IMPACT_RANK[impact] ?? 4) : 4;
 }
 
@@ -102,6 +116,7 @@ export function toJson(report: ScanReport, diff?: BaselineDiff): string {
     {
       generatedAt: report.generatedAt,
       scope: `${REPORT_SCOPE_NOTE} ${COVERAGE_URL}`,
+      ...(report.checks && { checks: report.checks }),
       summary: {
         pages: report.pages.length,
         distinctRules: distinctRuleCount(all),
