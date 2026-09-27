@@ -123,6 +123,76 @@ describe('scanKeyboard', () => {
       withNg(new Map(), new Map(), () => expect(unreachable(host)).toEqual(['div#bare']));
     });
 
+    describe('a click-only part of a widget item (a tree expand/collapse arrow)', () => {
+      const twistyTree = (itemTabindex: string, siblingTabindex: string) =>
+        fixture(`
+          <div role="tree">
+            <div role="treeitem" tabindex="${itemTabindex}" aria-expanded="false">
+              <span id="twisty" aria-hidden="true">▸</span> Docs
+            </div>
+            <div role="treeitem" tabindex="${siblingTabindex}">Readme</div>
+          </div>`);
+      const clickOn = (host: HTMLElement) => new Map([[host.querySelector('#twisty')!, ['click']]]);
+
+      it.each([
+        ['the item is tabbable', '0', '-1'],
+        ['the item is reached with arrow keys (roving tabindex)', '-1', '0'],
+      ])('is not reported when %s', (_case, itemTabindex, siblingTabindex) => {
+        const host = twistyTree(itemTabindex, siblingTabindex);
+        withNg(clickOn(host), new Map(), () => {
+          const ids = scanKeyboard(host).map((f) => `${f.id} ${f.target}`);
+          expect(ids).toEqual([]);
+        });
+      });
+
+      it('is still reported when Tab can never enter the widget', () => {
+        const host = twistyTree('-1', '-1');
+        withNg(clickOn(host), new Map(), () => {
+          expect(unreachable(host)).toContain('span#twisty');
+        });
+      });
+
+      it('is still reported inside a control that is not a widget item', () => {
+        const host = fixture(`<div role="button" tabindex="0">Open <span id="twisty">▸</span></div>`);
+        withNg(clickOn(host), new Map(), () => {
+          expect(unreachable(host)).toEqual(['span#twisty']);
+        });
+      });
+    });
+
+    describe('a click-only part of a focusable widget that handles keys (chart marks)', () => {
+      const chart = () =>
+        fixture(`
+          <div id="plot" role="application" tabindex="0" aria-label="Sales">
+            <span id="bar-1">Q1</span><span id="bar-2">Q2</span>
+          </div>`);
+
+      it('is not reported when the widget handles keys itself', () => {
+        const host = chart();
+        const listeners = new Map<Element, string[]>([
+          [host.querySelector('#plot')!, ['keydown']],
+          [host.querySelector('#bar-1')!, ['click']],
+          [host.querySelector('#bar-2')!, ['click']],
+        ]);
+        withNg(listeners, new Map(), () => expect(unreachable(host)).toEqual([]));
+      });
+
+      it('is still reported when the focusable ancestor has no key handling', () => {
+        const host = chart();
+        const listeners = new Map<Element, string[]>([[host.querySelector('#bar-1')!, ['click']]]);
+        withNg(listeners, new Map(), () => expect(unreachable(host)).toEqual(['span#bar-1']));
+      });
+
+      it('does not count a page-wide key listener (body is never tabbable)', () => {
+        const host = fixture(`<div><span id="mark">x</span></div>`);
+        const listeners = new Map<Element, string[]>([
+          [document.body, ['keydown']],
+          [host.querySelector('#mark')!, ['click']],
+        ]);
+        withNg(listeners, new Map(), () => expect(unreachable(host)).toEqual(['span#mark']));
+      });
+    });
+
     it('still flags a tabindex="-1" control that is not in a composite widget', () => {
       const host = fixture(`<div><div role="button" tabindex="0">A</div><div id="lone" role="button" tabindex="-1">B</div></div>`);
       withNg(new Map(), new Map(), () => expect(unreachable(host)).toEqual(['div#lone']));
