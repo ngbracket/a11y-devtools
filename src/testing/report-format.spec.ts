@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   distinctRuleCount,
   groupByComponent,
+  parseReport,
   toJson,
   toMarkdown,
   type ScanReport,
@@ -81,6 +82,47 @@ describe('toJson', () => {
     expect(parsed.summary).toMatchObject({ pages: 2, distinctRules: 2, nodeInstances: 3 });
     expect(parsed.pages[0]).toMatchObject({ distinctRules: 2, nodeInstances: 3 });
     expect(parsed.pages[1].nodeInstances).toBe(0);
+  });
+});
+
+describe('parseReport', () => {
+  const full: ScanReport = {
+    generatedAt: report.generatedAt,
+    checks: { axeVersion: '4.13.0', tags: ['wcag22aa'], keyboard: true, focusTraps: false },
+    pages: [
+      ...report.pages,
+      { label: 'Admin', url: 'http://localhost:4200/admin', findings: [], error: 'Timeout 30000ms exceeded' },
+      {
+        label: 'Dashboard (dark)',
+        url: 'http://localhost:4200/pages/dashboard',
+        findings: [finding({ id: 'color-contrast', impact: 'serious' })],
+        colorScheme: 'dark',
+        darkOnly: true,
+      },
+    ],
+  };
+
+  it('reads back exactly what toJson wrote, without the derived fields', () => {
+    expect(parseReport(toJson(full))).toEqual(full);
+  });
+
+  it('re-serializes to the same JSON, so re-rendering changes nothing', () => {
+    const json = toJson(full);
+    expect(toJson(parseReport(json))).toBe(json);
+  });
+
+  it('keeps a report without checks (hand-built, or from before 0.14.0) as it is', () => {
+    expect(parseReport(toJson(report))).toEqual(report);
+    expect(parseReport(toJson(report)).checks).toBeUndefined();
+  });
+
+  it('refuses anything that is not a report, with a readable message', () => {
+    expect(() => parseReport('# Automated accessibility scan')).toThrow('not valid JSON');
+    expect(() => parseReport('null')).toThrow('not a report-mode JSON report');
+    expect(() => parseReport('{"pages": []}')).toThrow('not a report-mode JSON report');
+    expect(() => parseReport(`{"generatedAt": "x", "pages": [{"label": "A", "findings": []}]}`)).toThrow(
+      'not a report-mode JSON report',
+    );
   });
 });
 

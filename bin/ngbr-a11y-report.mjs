@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from 'node:fs';
 import {
+  axeVersion,
   diffAgainstBaseline,
   parseBaseline,
+  parseReport,
   scanPages,
   startDevServer,
   toAcrHtml,
@@ -17,6 +19,7 @@ const USAGE = `ngbr-a11y-report — component-attributed a11y scan of a running 
 Usage:
   ngbr-a11y-report --base <url> --route <path> [--route <path> ...] [options]
   ngbr-a11y-report --serve "<command>" --route <path> [...] [options]
+  ngbr-a11y-report --from <report.json> [--out <prefix>] [--format <list>] [--baseline <file>] [--fail-on <impact>]
 
 Options:
   --base <url>       Origin of the running dev server (e.g. http://localhost:4200).
@@ -27,6 +30,10 @@ Options:
   --serve-timeout <s>
                      Seconds to wait for --serve to answer (default 180)
   --route <path>     Route to scan; repeat for multiple routes
+  --from <file>      Don't scan: read a previous run's JSON report (from --out)
+                     and write it in the --format(s) asked for — e.g. add an
+                     HTML report or ACR worksheet later. --baseline and
+                     --fail-on work as usual; the scan options don't apply
   --tags <list>      Comma-separated axe tags to scope the ruleset (e.g. wcag22aa,best-practice)
   --out <prefix>     Write <prefix>.md / .json / .html (default: print Markdown to stdout)
   --format <list>    Comma-separated: md, json, html — or both (= md,json) or all
@@ -79,6 +86,7 @@ function parseArgs(argv) {
       case '--serve': opts.serve = next(); break;
       case '--serve-timeout': opts.serveTimeout = Number(next()); break;
       case '--route': opts.routes.push(next()); break;
+      case '--from': opts.from = next(); break;
       case '--tags': opts.tags = next().split(',').map((s) => s.trim()).filter(Boolean); break;
       case '--out': opts.out = next(); break;
       case '--format': opts.format = next(); break;
@@ -105,7 +113,25 @@ function parseArgs(argv) {
 const opts = parseArgs(process.argv.slice(2));
 if (opts.serve && !opts.base) opts.base = 'http://localhost:4200';
 
-if (opts.help || !opts.base || opts.routes.length === 0) {
+// Options that only mean something when scanning — refused with --from, rather
+// than silently ignored.
+const SCAN_ONLY = {
+  base: '--base', serve: '--serve', serveTimeout: '--serve-timeout', routes: '--route', tags: '--tags',
+  wait: '--wait', frameworkPrefixes: '--framework-prefixes / --no-skip-primitives', keyboard: '--keyboard',
+  focusTraps: '--focus-traps', colorScheme: '--color-scheme', darkClass: '--dark-class',
+  darkAttribute: '--dark-attribute', headed: '--headed',
+};
+if (opts.from && !opts.help) {
+  const clash = Object.keys(SCAN_ONLY).filter((k) => (k === 'routes' ? opts.routes.length > 0 : opts[k] !== undefined));
+  if (clash.length > 0) {
+    process.stderr.write(
+      `--from re-renders a saved report without scanning, so ${clash.map((k) => SCAN_ONLY[k]).join(', ')} can't be used with it.\n`,
+    );
+    process.exit(2);
+  }
+}
+
+if (opts.help || (!opts.from && (!opts.base || opts.routes.length === 0))) {
   process.stderr.write(USAGE);
   process.exit(opts.help ? 0 : 1);
 }
@@ -146,6 +172,29 @@ if (opts.darkAttribute) {
   darkAttribute = { name: opts.darkAttribute.slice(0, eq), value: opts.darkAttribute.slice(eq + 1) };
 }
 
+let saved;
+if (opts.from) {
+  try {
+    saved = parseReport(readFileSync(opts.from, 'utf8'));
+  } catch (err) {
+    process.stderr.write(`Can't use --from ${opts.from}: ${err.message}\n`);
+    process.exit(2);
+  }
+  if (formats.has('acr') || formats.has('acr-md')) {
+    // The worksheet lists which rules checked each criterion from the installed
+    // axe-core, so say when that isn't the version the scan ran.
+    if (!saved.checks) {
+      process.stderr.write(
+        `Note: ${opts.from} doesn't record what was checked (reports from before 0.14.0 don't), so the worksheet counts a rule as run only where it found something.\n`,
+      );
+    } else if (saved.checks.axeVersion !== axeVersion()) {
+      process.stderr.write(
+        `Note: the scan ran axe-core ${saved.checks.axeVersion}; the worksheet's rule lists come from the installed axe-core ${axeVersion()}.\n`,
+      );
+    }
+  }
+}
+
 // Read the baseline before the (slow) scan, so a bad path fails fast.
 let baseline;
 if (opts.baseline) {
@@ -182,31 +231,35 @@ if (opts.serve) {
   );
 }
 
-let report;
-try {
-  report = await scanPages({
-    baseUrl: opts.base,
-    routes: opts.routes,
-    tags: opts.tags,
-    waitMs: opts.wait,
-    headed: opts.headed,
-    frameworkPrefixes: opts.frameworkPrefixes,
-    keyboard: opts.keyboard,
-    focusTraps: opts.focusTraps,
-    colorScheme: opts.colorScheme,
-    darkClass: opts.darkClass,
-    darkAttribute,
-  });
-} finally {
-  if (server && !server.reused) {
-    await server.stop();
-    process.stderr.write('Stopped the dev server.\n');
+let report = saved;
+if (!report) {
+  try {
+    report = await scanPages({
+      baseUrl: opts.base,
+      routes: opts.routes,
+      tags: opts.tags,
+      waitMs: opts.wait,
+      headed: opts.headed,
+      frameworkPrefixes: opts.frameworkPrefixes,
+      keyboard: opts.keyboard,
+      focusTraps: opts.focusTraps,
+      colorScheme: opts.colorScheme,
+      darkClass: opts.darkClass,
+      darkAttribute,
+    });
+  } finally {
+    if (server && !server.reused) {
+      await server.stop();
+      process.stderr.write('Stopped the dev server.\n');
+    }
   }
 }
 
 const allFindings = report.pages.flatMap((p) => p.findings);
 process.stderr.write(
-  `Scanned ${report.pages.length} route(s) · ${allFindings.length} node-instance(s).\n`,
+  saved
+    ? `Read ${report.pages.length} route(s) · ${allFindings.length} node-instance(s) from ${opts.from} (scanned ${report.generatedAt}).\n`
+    : `Scanned ${report.pages.length} route(s) · ${allFindings.length} node-instance(s).\n`,
 );
 const diff = baseline ? diffAgainstBaseline(report, baseline) : undefined;
 if (diff) {
