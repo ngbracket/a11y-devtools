@@ -19,6 +19,7 @@ const finding = (over: Partial<A11yFinding>): A11yFinding => ({
   help: 'Images must have alternate text',
   helpUrl: 'https://example.test/image-alt',
   component: 'UserCardComponent',
+  componentPath: [],
   directives: [],
   target: '#target',
   html: '<img>',

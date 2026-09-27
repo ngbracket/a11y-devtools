@@ -16,6 +16,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # Vitest strips types without checking them, so type-check the specs here.
+      - run: npm run typecheck
       # The real-browser E2E spec (src/testing/e2e-report.spec.ts) skips itself
       # without a Playwright Chromium — install one so it actually runs in CI.
       - run: npx playwright install --with-deps chromium

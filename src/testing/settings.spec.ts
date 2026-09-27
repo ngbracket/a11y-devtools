@@ -18,6 +18,7 @@ const finding = (impact: A11yFinding['impact']): A11yFinding => ({
   help: '',
   helpUrl: '',
   component: null,
+  componentPath: [],
   directives: [],
   target: '#t',
   html: '',

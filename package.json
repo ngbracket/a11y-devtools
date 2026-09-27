@@ -50,6 +50,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/build-inpage.mjs",
     "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.spec.json --noEmit",
     "test:watch": "vitest",
     "demo:console": "vitest run --config vitest.demo.config.ts --disableConsoleIntercept",
     "prepublishOnly": "npm run build"
