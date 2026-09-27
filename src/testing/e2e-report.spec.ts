@@ -323,6 +323,18 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
       expect(readFileSync(join(dir, 'baseline.html'), 'utf8')).toMatch(/^<!doctype html>/);
     }, 60_000);
 
+    it('--from re-renders that real scan byte-for-byte, without scanning', async () => {
+      const { code } = await runCli([
+        '--from', join(dir, 'baseline.json'), '--out', join(dir, 'rerender'), '--format', 'all',
+      ]);
+      expect(code).toBe(0);
+      for (const ext of ['md', 'json', 'html']) {
+        expect(readFileSync(join(dir, `rerender.${ext}`), 'utf8')).toBe(
+          readFileSync(join(dir, `baseline.${ext}`), 'utf8'),
+        );
+      }
+    });
+
     it('passes the gate when nothing is new, even with known serious issues', async () => {
       const { code, stderr } = await runCli([
         '--base', baseUrl, '--route', '/axe', '--route', '/trap', ...scan,

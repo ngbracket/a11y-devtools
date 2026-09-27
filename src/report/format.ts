@@ -147,6 +147,45 @@ export function toJson(report: ScanReport, diff?: BaselineDiff): string {
   );
 }
 
+/**
+ * Read a report back from its JSON text (a `toJson` report), so it can be
+ * rendered in another format without scanning again. The derived fields
+ * (`summary`, per-page counts, `scope`, `baseline`) are dropped — every format
+ * recomputes them. Throws a readable error for anything that isn't a report.
+ */
+export function parseReport(json: string): ScanReport {
+  let data: unknown;
+  try {
+    data = JSON.parse(json);
+  } catch {
+    throw new Error('not valid JSON — pass a report written by `--out` (the .json file).');
+  }
+  const { generatedAt, checks, pages } = (data ?? {}) as {
+    generatedAt?: unknown;
+    checks?: ScanChecks;
+    pages?: unknown;
+  };
+  const isPage = (p: unknown): p is PageReport =>
+    typeof (p as PageReport)?.label === 'string' &&
+    typeof (p as PageReport).url === 'string' &&
+    Array.isArray((p as PageReport).findings);
+  if (typeof generatedAt !== 'string' || !Array.isArray(pages) || !pages.every(isPage)) {
+    throw new Error('not a report-mode JSON report — pass a report written by `--out` (the .json file).');
+  }
+  return {
+    generatedAt,
+    ...(checks && { checks }),
+    pages: pages.map((p) => ({
+      label: p.label,
+      url: p.url,
+      findings: p.findings,
+      ...(p.error !== undefined && { error: p.error }),
+      ...(p.colorScheme && { colorScheme: p.colorScheme }),
+      ...(p.darkOnly && { darkOnly: true }),
+    })),
+  };
+}
+
 /** UI primitives and directives a finding came through, for a "via …" note. */
 export function viaNames(finding: A11yFinding): string[] {
   // e.g. an `<button nbButton>` shows as "via NbButtonComponent" under its app owner.

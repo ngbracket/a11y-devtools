@@ -1,4 +1,5 @@
 export {
+  axeVersion,
   scanPages,
   type ColorScheme,
   type ScanPagesOptions,
@@ -7,6 +8,7 @@ export {
 export {
   groupByComponent,
   distinctRuleCount,
+  parseReport,
   toJson,
   toMarkdown,
   DARK_ONLY_NOTE,

@@ -67,7 +67,8 @@ npx ngbr-a11y-report --serve "npx ng serve" --route / --route /settings \
 ```
 
 Preparing a VPAT/ACR? `--format acr` adds an evaluation worksheet: the results by WCAG 2.2
-A/AA criterion, with the conformance columns left for a person to fill in.
+A/AA criterion, with the conformance columns left for a person to fill in. Already scanned?
+`--from a11y.json --out a11y --format acr` writes it from the saved JSON report.
 
 Next steps, in the docs:
 [Your first scan](https://ngbracket.com/tools/a11y-devtools/docs/first-scan) ·
@@ -135,3 +136,4 @@ ever becomes reachable through a static import.
 - Real-browser E2E tests, including component attribution in a real Angular app.
 - Report mode can start the dev server (`--serve`).
 - ACR evaluation worksheet by WCAG 2.2 A/AA criterion (`--format acr`).
+- Re-render a saved JSON report in any format without scanning (`--from`).

@@ -325,6 +325,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
   return { generatedAt: new Date().toISOString(), checks, pages };
 }
 
-function axeVersion(): string {
+/** Version of the installed axe-core — the one a scan run now would use. */
+export function axeVersion(): string {
   return (createRequire(import.meta.url)('axe-core/package.json') as { version: string }).version;
 }

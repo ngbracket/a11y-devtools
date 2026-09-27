@@ -3,6 +3,26 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.15.0
+
+### Added
+
+- **Re-render a saved report without scanning.** `--from <report.json>` reads
+  a previous run's JSON report (from `--out`) and writes it in whatever
+  `--format`s you ask for, so you can add an HTML report or an ACR worksheet
+  later without running the scan again. `--baseline` and `--fail-on` work as
+  usual; scan options such as `--route` or `--keyboard` are refused. The
+  output is byte-for-byte what the original scan would have written. For the
+  ACR worksheet, it notes when the report's axe-core version differs from the
+  installed one, or when the report predates `checks` (0.14.0).
+  From code: `parseReport()`, plus `axeVersion()` for the installed axe-core.
+
+### Changed
+
+- Type-checking: the specs are now type-checked in CI, and the browser source
+  compiles without Node types (report mode has its own tsconfig). No change to
+  the published output.
+
 ## 0.14.1
 
 ### Fixed
