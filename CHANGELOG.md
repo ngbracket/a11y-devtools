@@ -3,6 +3,22 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.15.1
+
+### Fixed
+
+- **Collapsed sidebars no longer cause false tab-order findings.** A
+  `<details>` nested inside a closed `<details>` (a group inside a collapsed
+  sidebar section) had its summary counted as a tab stop, although it's hidden
+  and Tab can't reach it. The next section's summary then looked like a jump
+  back up the page, so `ngbr/tab-order-mismatch` fired once per section. Every
+  closed `<details>` up the tree now counts. This also fixes the tab-order
+  badges in the overlay. Found on our own docs site.
+- **`ngbr/unreachable-control` skips hidden controls.** A custom control inside
+  a closed `<details>`, a `[hidden]` or `inert` subtree, or `display: none` was
+  reported as unreachable. Tab can't reach it because it isn't shown, which
+  isn't a problem; it's checked once it's shown.
+
 ## 0.15.0
 
 ### Added

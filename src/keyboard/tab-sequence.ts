@@ -173,11 +173,24 @@ function isDisabled(element: Element): boolean {
  * layout: inside an `[inert]` or `[hidden]` subtree, or non-summary content of a
  * closed `<details>`. Kept separate from the layout check so the injectable
  * visibility predicate only ever overrides computed-style visibility.
+ *
+ * Every closed `<details>` up the tree counts, not just the nearest: a nested
+ * `<details>` (a sidebar group inside a collapsed section) has its own summary,
+ * but that summary is hidden too while an outer one is closed.
  */
 function isStructurallyHidden(element: Element): boolean {
   if (element.closest('[inert]') || element.closest('[hidden]')) return true;
-  const closedDetails = element.closest('details:not([open])');
-  return closedDetails !== null && element.closest('summary') === null && element !== closedDetails;
+  for (
+    let details = element.closest('details:not([open])');
+    details;
+    details = details.parentElement?.closest('details:not([open])') ?? null
+  ) {
+    if (details === element) continue;
+    // Only this <details>' own summary (its first <summary> child) stays shown.
+    const summary = [...details.children].find((child) => child.tagName.toLowerCase() === 'summary');
+    if (!summary?.contains(element)) return true;
+  }
+  return false;
 }
 
 /** Layout-aware default visibility: computed `display`/`visibility` up the tree. */
@@ -190,6 +203,15 @@ function defaultIsVisible(element: Element): boolean {
     if (style.visibility === 'hidden' || style.visibility === 'collapse') return false;
   }
   return true;
+}
+
+/**
+ * True when `element` isn't shown at all: structurally hidden (see
+ * {@link isStructurallyHidden}) or hidden by layout. A hidden control is out of
+ * the tab order because nobody can see it, not because it's unreachable.
+ */
+export function isHidden(element: Element, isVisible: (el: Element) => boolean = defaultIsVisible): boolean {
+  return isStructurallyHidden(element) || !isVisible(element);
 }
 
 /**

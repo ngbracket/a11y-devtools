@@ -66,6 +66,23 @@ describe('scanKeyboard', () => {
     });
   });
 
+  it("doesn't call a hidden control unreachable (closed <details>, nested or not, and [hidden])", () => {
+    const host = fixture(`
+      <details><summary>A</summary><div id="in-closed" role="button" tabindex="0">x</div></details>
+      <details open><summary>B</summary>
+        <details><summary>C</summary><div id="in-nested" role="button" tabindex="0">x</div></details>
+      </details>
+      <div hidden><div id="in-hidden" role="button">x</div></div>
+      <details open><summary>D</summary><div id="shown" role="button">x</div></details>
+    `);
+    withNg(new Map(), new Map(), () => {
+      const ids = scanKeyboard(host)
+        .filter((f) => f.id === 'ngbr/unreachable-control')
+        .map((f) => f.target);
+      expect(ids).toEqual(['div#shown']);
+    });
+  });
+
   it("links each finding to its rule's docs page (slug = the id without ngbr/)", () => {
     const host = fixture(`
       <div id="fake" role="button">Save</div>

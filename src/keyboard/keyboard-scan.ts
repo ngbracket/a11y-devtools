@@ -21,6 +21,7 @@ import {
 import type { A11yFinding } from '../scan.js';
 import {
   hasFocusableDescendant,
+  isHidden,
   isNativelyFocusable,
   isTabbable,
   tabSequence,
@@ -139,6 +140,9 @@ export function scanKeyboard(
     // its own) is event delegation, not a control — the controls inside are what
     // the keyboard reaches.
     if (!interactiveByRole && hasFocusableDescendant(element)) continue;
+    // Hidden (a closed <details>, [hidden], display:none): not reachable because
+    // it isn't shown. Check it when it is.
+    if (isHidden(element, isVisible)) continue;
 
     const focusable = isTabbable(element, isVisible);
 
