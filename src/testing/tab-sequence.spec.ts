@@ -82,6 +82,35 @@ describe('tab-sequence', () => {
     expect(ids).toEqual(['ok']);
   });
 
+  it('only counts the summary of a closed <details>, not its content', () => {
+    const host = fixture(`
+      <details><summary id="closed">Closed</summary><a id="in-closed" href="#">x</a></details>
+      <details open><summary id="open">Open</summary><a id="in-open" href="#">x</a></details>
+    `);
+    const ids = tabSequence(host, { isVisible: alwaysVisible }).map((s) => s.element.id);
+    expect(ids).toEqual(['closed', 'open', 'in-open']);
+  });
+
+  it('leaves out a nested <details> summary while an outer <details> is closed', () => {
+    // A docs sidebar: packs that group pages into sections, each a <details>.
+    const host = fixture(`
+      <details id="pack-a">
+        <summary id="pack-a-summary">Pack A</summary>
+        <details><summary id="group-summary">Group</summary><a id="page" href="#">Page</a></details>
+      </details>
+      <details open>
+        <summary id="pack-b-summary">Pack B</summary>
+        <details><summary id="open-group-summary">Group</summary><a id="closed-page" href="#">x</a></details>
+      </details>
+    `);
+    const ids = () => tabSequence(host, { isVisible: alwaysVisible }).map((s) => s.element.id);
+    expect(ids()).toEqual(['pack-a-summary', 'pack-b-summary', 'open-group-summary']);
+
+    // Opening the outer pack reveals the group's summary, but not its closed content.
+    host.querySelector('#pack-a')!.setAttribute('open', '');
+    expect(ids()).toEqual(['pack-a-summary', 'group-summary', 'pack-b-summary', 'open-group-summary']);
+  });
+
   it("leaves out the devtools' own UI (the on/off pill)", () => {
     const host = fixture(`
       <button id="app">app</button>

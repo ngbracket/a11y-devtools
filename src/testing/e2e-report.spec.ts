@@ -149,6 +149,24 @@ const PAGES: Record<string, string> = {
       <button>Top</button>
       <p style="margin-top: 200px"><button tabindex="1">Bottom, but first</button></p>
     </main>`,
+
+  // A docs sidebar: collapsible sections of collapsible groups. While a section is
+  // closed its groups' summaries are hidden and not tab stops, so they mustn't
+  // make the next section look like a jump back up the page.
+  '/sidebar': `
+    <nav aria-label="Docs">
+      <details><summary>Section A</summary>
+        <details><summary>Group 1</summary><a href="#a1">Page</a></details>
+        <details><summary>Group 2</summary><a href="#a2">Page</a></details>
+      </details>
+      <details><summary>Section B</summary>
+        <details><summary>Group 3</summary><a href="#b1">Page</a></details>
+      </details>
+      <details open><summary>Section C</summary>
+        <details><summary>Group 4</summary><a href="#c1">Page</a></details>
+      </details>
+    </nav>
+    <main><h1>Sidebar</h1></main>`,
 };
 
 function html(body: string): string {
@@ -198,6 +216,10 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
   it('reports axe violations and layout-dependent keyboard findings', () => {
     expect(ids('/axe')).toContain('image-alt');
     expect(ids('/axe')).toContain('ngbr/tab-order-mismatch');
+  });
+
+  it('does not count summaries inside a closed <details> as tab stops (nested sidebar)', () => {
+    expect(ids('/sidebar')).toEqual([]);
   });
 
   it('finds no trap on a healthy page, iframe included', () => {
