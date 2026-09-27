@@ -7,8 +7,8 @@
  * walk, which synthetic events can't exercise).
  *
  * The pages are plain HTML, so there's no `window.ng` and findings are
- * unattributed (component null) — attribution itself is covered by the jsdom
- * specs. Skipped when `dist/` hasn't been built or no Playwright Chromium is
+ * unattributed (component null) — attribution in a real Angular app is covered
+ * by e2e-angular.spec.ts. Skipped when `dist/` hasn't been built or no Playwright Chromium is
  * installed (`npx playwright install chromium`).
  */
 import { execFile, spawn } from 'node:child_process';

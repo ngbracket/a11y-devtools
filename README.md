@@ -91,7 +91,16 @@ heuristics, labelled "verify manually". It helps you build toward supporting WCA
 npm install --legacy-peer-deps
 npm run build   # tsc -> dist/ (ESM + .d.ts) + the in-page bundle
 npm test        # vitest + jsdom + Angular TestBed (real axe); the real-browser
-                # E2E spec runs after a build, once `npx playwright install chromium`
+                # E2E specs run after a build, once `npx playwright install chromium`
+```
+
+The real-browser specs are `src/testing/e2e-report.spec.ts` (report mode against plain-HTML
+pages) and `src/testing/e2e-angular.spec.ts` (component attribution against a real Angular
+app). The second builds the fixture app in `e2e/angular-app` itself, with `@angular/build`
+(no Angular CLI needed). To build it by hand, for example to open it in a browser:
+
+```bash
+node scripts/build-angular-fixture.mjs   # → e2e/angular-app/dist/{dev,prod}/browser
 ```
 
 CI also runs a production-weight guard: a bundle-graph test that fails if axe-core
@@ -123,4 +132,6 @@ ever becomes reachable through a static import.
 - **Keyboard & Focus Mode M3** — missing focus-trap detection (uncontained
   `aria-modal`) and the keyboard-trap walk with real Tab presses.
 - CI production-weight guard.
-- Real-browser E2E test.
+- Real-browser E2E tests, including component attribution in a real Angular app.
+- Report mode can start the dev server (`--serve`).
+- ACR evaluation worksheet by WCAG 2.2 A/AA criterion (`--format acr`).
