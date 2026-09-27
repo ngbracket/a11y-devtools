@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, type Mock } from 'vitest';
 import { logFindings, type Logger } from '../report';
 import type { A11yFinding } from '../scan';
 
@@ -8,15 +8,16 @@ const finding = (over: Partial<A11yFinding>): A11yFinding => ({
   help: 'Images must have alternate text',
   helpUrl: 'https://example.test/image-alt',
   component: 'UserCardComponent',
+  componentPath: [],
   directives: [],
   target: 'img',
   html: '<img>',
   ...over,
 });
 
-function fakeLogger(): Logger & { groupCollapsed: ReturnType<typeof vi.fn> } {
+function fakeLogger(): Logger & { groupCollapsed: Mock<Logger['groupCollapsed']> } {
   return {
-    groupCollapsed: vi.fn(),
+    groupCollapsed: vi.fn<Logger['groupCollapsed']>(),
     groupEnd: vi.fn(),
     warn: vi.fn(),
     info: vi.fn(),
