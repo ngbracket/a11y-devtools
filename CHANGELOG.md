@@ -3,6 +3,20 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.15.3
+
+### Fixed
+
+- **`ngbr/unreachable-control` no longer flags mouse shortcuts inside a
+  keyboard-operated widget.** A click-only element with no role of its own is
+  skipped when it's part of something the keyboard already operates: a
+  composite-widget item Tab or arrow keys reach (a tree's expand/collapse arrow
+  inside its treeitem, which ←/→ expand), or the nearest Tab-reachable ancestor
+  that handles keys itself (the bars, slices and points of a focusable chart
+  that moves between them with arrow keys). A page-wide key listener doesn't
+  count, and a click target inside a focusable ancestor with no key handling is
+  still reported. Found on our own docs (dev build): 83 false positives → 0.
+
 ## 0.15.2
 
 ### Fixed

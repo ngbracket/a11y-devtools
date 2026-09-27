@@ -98,6 +98,30 @@ function reachedWithinWidget(element: Element, isVisible?: (el: Element) => bool
   return isTabbable(widget, isVisible) || controllers.length > 0 || hasTabbableDescendant(widget, isVisible);
 }
 
+const ITEM_SELECTOR = [...INTERACTIVE_ROLES].map((role) => `[role="${role}"]`).join(',');
+
+/**
+ * True when `element` is a click-only part of something the keyboard already
+ * operates, so the click is a mouse shortcut, not a control of its own:
+ * - a composite-widget item that the keyboard can reach, such as a tree's
+ *   expand/collapse arrow inside its treeitem (←/→ on the treeitem); or
+ * - the nearest Tab-reachable ancestor that handles keys itself, such as a
+ *   chart's bars inside a focusable chart that moves between them with arrow
+ *   keys. `<body>` is never tabbable, so a page-wide shortcut listener doesn't
+ *   count.
+ */
+function partOfKeyboardOperatedWidget(element: Element, isVisible?: (el: Element) => boolean): boolean {
+  const item = element.parentElement?.closest(ITEM_SELECTOR);
+  if (item?.parentElement?.closest(COMPOSITE_SELECTOR)) {
+    if (isTabbable(item, isVisible) || reachedWithinWidget(item, isVisible)) return true;
+  }
+  for (let el = element.parentElement; el; el = el.parentElement) {
+    if (!isTabbable(el, isVisible)) continue;
+    return resolveListenerEvents(el).some((e) => KEY_EVENTS.includes(e));
+  }
+  return false;
+}
+
 /**
  * Each rule's page: what the message means, who it affects, exactly what
  * triggers it, how to fix and check it, and the WCAG/APG reference.
@@ -180,6 +204,7 @@ export function scanKeyboard(
     // Hidden (a closed <details>, [hidden], display:none): not reachable because
     // it isn't shown. Check it when it is.
     if (isHidden(element, isVisible)) continue;
+    if (!interactiveByRole && partOfKeyboardOperatedWidget(element, isVisible)) continue;
 
     const focusable = isTabbable(element, isVisible);
 
