@@ -21,6 +21,7 @@ import {
 import type { A11yFinding } from '../scan.js';
 import {
   hasFocusableDescendant,
+  hasTabbableDescendant,
   isHidden,
   isNativelyFocusable,
   isTabbable,
@@ -60,6 +61,42 @@ const INTERACTIVE_ROLES = new Set([
 ]);
 
 const KEY_EVENTS = ['keydown', 'keyup', 'keypress'];
+
+/**
+ * Composite widgets: Tab reaches the widget once, and arrow keys move between
+ * its items (WAI-ARIA APG "Keyboard navigation inside components").
+ */
+const COMPOSITE_SELECTOR = ['tablist', 'toolbar', 'menu', 'menubar', 'radiogroup', 'listbox', 'tree', 'treegrid', 'grid']
+  .map((role) => `[role="${role}"]`)
+  .join(',');
+
+/**
+ * True when `element` is an item that its composite widget reaches with arrow
+ * keys, so Tab skipping it is correct:
+ * - **aria-activedescendant**: focus stays on the widget (or on a combobox that
+ *   controls it) and points at the item; or
+ * - **roving tabindex**: the item has a tabindex (usually -1), so script can
+ *   focus it, and Tab can get into the widget: one of its items is tabbable,
+ *   the widget itself is, or another element controls it (a menu or listbox
+ *   popup, which gets focus when it opens).
+ * An item with neither, or a widget Tab can't enter at all, is still reported.
+ */
+function reachedWithinWidget(element: Element, isVisible?: (el: Element) => boolean): boolean {
+  const widget = element.parentElement?.closest(COMPOSITE_SELECTOR);
+  if (!widget) return false;
+  const controllers = widget.id
+    ? [...(widget.ownerDocument ?? document).querySelectorAll('[aria-controls], [aria-owns]')].filter((el) =>
+        `${el.getAttribute('aria-controls') ?? ''} ${el.getAttribute('aria-owns') ?? ''}`
+          .split(/\s+/)
+          .includes(widget.id),
+      )
+    : [];
+  if ([widget, ...controllers].some((el) => el.hasAttribute('aria-activedescendant'))) return true;
+
+  const tabindex = element.getAttribute('tabindex');
+  if (tabindex === null || Number.isNaN(Number.parseInt(tabindex, 10))) return false;
+  return isTabbable(widget, isVisible) || controllers.length > 0 || hasTabbableDescendant(widget, isVisible);
+}
 
 /**
  * Each rule's page: what the message means, who it affects, exactly what
@@ -147,6 +184,7 @@ export function scanKeyboard(
     const focusable = isTabbable(element, isVisible);
 
     if (!focusable) {
+      if (interactiveByRole && reachedWithinWidget(element, isVisible)) continue;
       const reason = interactiveByRole ? `has role="${role}"` : 'has a click handler';
       findings.push(
         make(

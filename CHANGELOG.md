@@ -3,6 +3,22 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.15.2
+
+### Fixed
+
+- **`ngbr/unreachable-control` no longer flags items that arrow keys reach.**
+  In a composite widget (a tab list, toolbar, menu, menubar, radio group,
+  listbox, tree, treegrid or grid), Tab reaches the widget once and arrow keys
+  move between its items, so the other items are correctly out of the tab
+  order. They were reported as serious. An item is now skipped when the widget
+  (or a combobox that controls it) uses `aria-activedescendant`, or when the
+  item has a `tabindex` and Tab can get into the widget: one item is tabbable,
+  the widget is, or another element controls it (a menu button). A widget Tab
+  can't enter at all, and an item script can't focus, are still reported.
+  Found on our own docs: 9 false positives across the listbox, tree and
+  selectable-list pages.
+
 ## 0.15.1
 
 ### Fixed
