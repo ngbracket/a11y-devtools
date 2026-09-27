@@ -113,6 +113,14 @@ export function hasFocusableDescendant(element: Element): boolean {
   return element.querySelector(FOCUSABLE_SELECTOR) !== null;
 }
 
+/** True when something inside `element` is reachable with Tab. */
+export function hasTabbableDescendant(
+  element: Element,
+  isVisible: (el: Element) => boolean = defaultIsVisible,
+): boolean {
+  return [...element.querySelectorAll(FOCUSABLE_SELECTOR)].some((el) => isTabbable(el, isVisible));
+}
+
 /** A native default of 0 (focusable without a tabindex attribute), else -1. */
 function nativeTabIndex(element: Element): number {
   return isNativelyFocusable(element) ? 0 : -1;

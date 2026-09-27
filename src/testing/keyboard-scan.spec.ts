@@ -66,6 +66,69 @@ describe('scanKeyboard', () => {
     });
   });
 
+  describe('composite widgets (arrow keys move between items)', () => {
+    const unreachable = (host: HTMLElement) =>
+      scanKeyboard(host)
+        .filter((f) => f.id === 'ngbr/unreachable-control')
+        .map((f) => f.target);
+
+    it.each([
+      ['tablist', 'tab'],
+      ['listbox', 'option'],
+      ['tree', 'treeitem'],
+      ['radiogroup', 'radio'],
+      ['menubar', 'menuitem'],
+      ['toolbar', 'button'],
+    ])('roving tabindex: a %s whose other %s items are tabindex="-1"', (widget, item) => {
+      const host = fixture(`
+        <div role="${widget}">
+          <div role="${item}" tabindex="0">One</div>
+          <div role="${item}" tabindex="-1">Two</div>
+          <div role="${item}" tabindex="-1">Three</div>
+        </div>`);
+      withNg(new Map(), new Map(), () => expect(unreachable(host)).toEqual([]));
+    });
+
+    it('aria-activedescendant on the widget: items need no tabindex', () => {
+      const host = fixture(`
+        <div role="listbox" tabindex="0" aria-activedescendant="o1">
+          <div role="option" id="o1">One</div><div role="option" id="o2">Two</div>
+        </div>`);
+      withNg(new Map(), new Map(), () => expect(unreachable(host)).toEqual([]));
+    });
+
+    it('aria-activedescendant on a combobox that controls the listbox popup', () => {
+      const host = fixture(`
+        <input role="combobox" aria-controls="lb" aria-activedescendant="" aria-label="Fruit" />
+        <div role="listbox" id="lb"><div role="option">Apple</div><div role="option">Pear</div></div>`);
+      withNg(new Map(), new Map(), () => expect(unreachable(host)).toEqual([]));
+    });
+
+    it('a menu popup opened by a button: every item tabindex="-1"', () => {
+      const host = fixture(`
+        <button aria-haspopup="menu" aria-controls="m">Actions</button>
+        <div role="menu" id="m"><div role="menuitem" tabindex="-1">Edit</div><div role="menuitem" tabindex="-1">Delete</div></div>`);
+      withNg(new Map(), new Map(), () => expect(unreachable(host)).toEqual([]));
+    });
+
+    it('still flags a widget Tab can never enter (every item tabindex="-1")', () => {
+      const host = fixture(`
+        <div role="tablist"><div id="t1" role="tab" tabindex="-1">A</div><div id="t2" role="tab" tabindex="-1">B</div></div>`);
+      withNg(new Map(), new Map(), () => expect(unreachable(host)).toEqual(['div#t1', 'div#t2']));
+    });
+
+    it('still flags an item script cannot focus (no tabindex, no aria-activedescendant)', () => {
+      const host = fixture(`
+        <div role="tablist"><div role="tab" tabindex="0">A</div><div id="bare" role="tab">B</div></div>`);
+      withNg(new Map(), new Map(), () => expect(unreachable(host)).toEqual(['div#bare']));
+    });
+
+    it('still flags a tabindex="-1" control that is not in a composite widget', () => {
+      const host = fixture(`<div><div role="button" tabindex="0">A</div><div id="lone" role="button" tabindex="-1">B</div></div>`);
+      withNg(new Map(), new Map(), () => expect(unreachable(host)).toEqual(['div#lone']));
+    });
+  });
+
   it("doesn't call a hidden control unreachable (closed <details>, nested or not, and [hidden])", () => {
     const host = fixture(`
       <details><summary>A</summary><div id="in-closed" role="button" tabindex="0">x</div></details>
