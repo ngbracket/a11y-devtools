@@ -73,6 +73,36 @@ describe('attribution', () => {
     }
   });
 
+  it('lists each component once, even when projection brings it back up the tree', () => {
+    // <app-panel><img></app-panel> in a HomePage template: the DOM path runs
+    // img (HomePage) → section (Panel) → <app-panel> host (HomePage) → root.
+    const panelHost = document.createElement('app-panel');
+    const section = document.createElement('section');
+    const img = document.createElement('img');
+    section.appendChild(img);
+    panelHost.appendChild(section);
+    host.appendChild(panelHost);
+
+    const owner = new Map<Element, string>([
+      [img, 'HomePageComponent'],
+      [section, 'PanelComponent'],
+      [panelHost, 'HomePageComponent'],
+    ]);
+    const original = (globalThis as { ng?: unknown }).ng;
+    (globalThis as { ng?: unknown }).ng = {
+      getComponent: () => null,
+      getOwningComponent: (el: Element) => ({ constructor: { name: owner.get(el) ?? 'AppComponent' } }),
+      getDirectives: () => [],
+    };
+    try {
+      expect(resolveComponentPath(img)).toEqual(['HomePageComponent', 'PanelComponent', 'AppComponent']);
+      expect(resolveOwningComponentName(img)).toBe('HomePageComponent');
+    } finally {
+      (globalThis as { ng?: unknown }).ng = original;
+      host.remove();
+    }
+  });
+
   it('treats a partial ng global (no debug helpers) as no attribution', () => {
     // A production build can leave `window.ng` present but without getComponent/
     // getOwningComponent — must not throw mid-scan.

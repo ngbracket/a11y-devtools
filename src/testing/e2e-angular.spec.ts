@@ -120,8 +120,8 @@ describe.skipIf(!ready)('attribution in a real Angular app (E2E)', () => {
     it('attributes projected content to the template that declared it, not the host', () => {
       const projected = find(page('/').findings, 'image-alt', 'projected');
       expect(projected.component).toBe('HomePageComponent');
-      // The path follows the DOM, so the panel it's projected through appears too.
-      expect(projected.componentPath).toEqual(['HomePageComponent', 'PanelComponent', 'HomePageComponent', 'AppComponent']);
+      // The path follows the DOM, so the panel it's projected through appears too — each component once.
+      expect(projected.componentPath).toEqual(['HomePageComponent', 'PanelComponent', 'AppComponent']);
     });
 
     it('walks past a UI-library primitive to the component that used it', () => {

@@ -102,7 +102,8 @@ function isPrimitiveComponent(name: string, prefixes: readonly string[]): boolea
 
 /**
  * The chain of owning components from the flagged node up to the root, nearest
- * first and de-duplicated. Built by walking DOM ancestors and asking Angular's
+ * first, each listed once (content projection can bring a component back up the
+ * DOM path; only its nearest position is kept). Built by walking DOM ancestors and asking Angular's
  * debug API who owns each, so a control that is itself a library primitive still
  * reveals the app component that placed it. Empty when the global is absent (prod).
  */
@@ -123,7 +124,7 @@ export function resolveComponentPath(node: Element): string[] {
       owner = null; // node isn't part of a live view
     }
     const name = nameOf(owner);
-    if (name && name !== path[path.length - 1]) path.push(name);
+    if (name && !path.includes(name)) path.push(name);
     el = el.parentElement;
   }
   return path;

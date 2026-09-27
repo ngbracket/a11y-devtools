@@ -37,7 +37,7 @@ export interface A11yFinding {
   helpUrl: string;
   /** Owning component name, or null when attribution isn't available (prod). */
   component: string | null;
-  /** Owning components from the flagged node up to the root, nearest first; [] in prod. */
+  /** Owning components from the flagged node up to the root, nearest first, each once; [] in prod. */
   componentPath: string[];
   /** Directives on the flagged node (incl. hostDirectives); [] when none/unavailable. */
   directives: string[];

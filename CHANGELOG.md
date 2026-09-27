@@ -3,6 +3,17 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.14.1
+
+### Fixed
+
+- **`componentPath` lists each component once.** With content projection, a
+  finding's path could repeat a component, e.g.
+  `HomePageComponent > PanelComponent > HomePageComponent > AppComponent` for an
+  image projected into a panel. It's now
+  `HomePageComponent > PanelComponent > AppComponent`. The attributed
+  `component`, "via" notes and baseline matching are unchanged.
+
 ## 0.14.0
 
 ### Added
