@@ -48,7 +48,7 @@
     "node": "^20.19.0 || ^22.12.0 || >=24.0.0"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/build-inpage.mjs",
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.report.json && node scripts/build-inpage.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.spec.json --noEmit",
     "test:watch": "vitest",
