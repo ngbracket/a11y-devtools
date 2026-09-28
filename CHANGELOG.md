@@ -3,6 +3,32 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.15.4
+
+### Fixed
+
+- **`ngbr/unreachable-control` checks that arrow keys are handled before
+  skipping a roving-tabindex item.** 0.15.2 skipped an item with
+  `tabindex="-1"` whenever Tab could get into its composite widget, so a half-built
+  tab list (the first tab at `tabindex="0"`, the rest at `-1`, no arrow-key
+  handling) passed silently. The item is now skipped only when something handles
+  keys: the widget, anything inside it, an element that controls it, or an
+  element around it up to and including the nearest component's host (so an app
+  shell's shortcut listener doesn't count). When nothing does, it's reported as
+  moderate, to verify by hand. Without Angular's dev-mode debug API (a
+  production build), listeners can't be read, so these items are still skipped.
+- **Key listeners bound with modifiers now count as key handling.** Angular
+  reports `(keydown.enter)` as `keydown.enter`, which wasn't recognised, so
+  `ngbr/click-without-key` flagged a control with `(click)`, `(keydown.enter)`
+  and `(keydown.space)`: the fix its own docs recommend. The same applies to
+  `(keydown.arrowRight)` and friends in the checks above.
+- **The mouse-shortcut skip no longer hides `ngbr/click-without-key`.** 0.15.3's
+  skip for click-only parts of a keyboard-operated widget ran before the
+  Tab-reachability check, so a click-only element Tab *does* reach, inside such a
+  widget, got no finding at all. The skip now applies only to elements Tab can't
+  reach.
+- `--from` with `--serve` no longer also names `--base` in its error message.
+
 ## 0.15.3
 
 ### Fixed

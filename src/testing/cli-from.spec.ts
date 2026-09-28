@@ -101,6 +101,12 @@ describe.skipIf(!built)('CLI: --from re-renders a saved report', () => {
     expect(stderr).toContain("--route, --keyboard can't be used with it");
   });
 
+  it('names only --serve, not a defaulted --base, when --serve is used with it', async () => {
+    const { code, stderr } = await runCli(['--from', saved, '--serve', 'npx ng serve']);
+    expect(code).toBe(2);
+    expect(stderr).toContain("so --serve can't be used with it");
+  });
+
   it('refuses a file that is not a JSON report', async () => {
     const md = join(dir, 'report.md');
     writeFileSync(md, toMarkdown(report));

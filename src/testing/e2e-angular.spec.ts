@@ -143,6 +143,18 @@ describe.skipIf(!ready)('attribution in a real Angular app (E2E)', () => {
       );
     });
 
+    it('counts listeners with key modifiers, like (keydown.enter), as key handling', () => {
+      const on = (marker: string) => page('/').findings.filter((f) => f.html.includes(marker)).map((f) => f.id);
+      expect(on('key-modifiers')).toEqual([]);
+      expect(on('roving-tab')).toEqual([]);
+    });
+
+    it('flags a roving-tabindex tab when nothing handles the arrow keys, as moderate', () => {
+      const tab = find(page('/').findings, 'ngbr/unreachable-control', 'half-built-tab');
+      expect(tab.impact).toBe('moderate');
+      expect(tab.component).toBe('HomePageComponent');
+    });
+
     it('attributes findings on a second route to that route’s page component', () => {
       expect(find(page('/settings').findings, 'color-contrast', 'faint').component).toBe('SettingsPageComponent');
     });

@@ -11,10 +11,11 @@ function withNg(
   listeners: Map<Element, string[]>,
   owners: Map<Element, string>,
   fn: () => void,
+  hosts: ReadonlySet<Element> = new Set(),
 ): void {
   const original = (globalThis as { ng?: unknown }).ng;
   (globalThis as { ng?: unknown }).ng = {
-    getComponent: () => null,
+    getComponent: (el: Element) => (hosts.has(el) ? {} : null),
     getOwningComponent: (el: Element) =>
       owners.has(el) ? { constructor: { name: owners.get(el) } } : null,
     getDirectives: () => [],
@@ -86,7 +87,93 @@ describe('scanKeyboard', () => {
           <div role="${item}" tabindex="-1">Two</div>
           <div role="${item}" tabindex="-1">Three</div>
         </div>`);
-      withNg(new Map(), new Map(), () => expect(unreachable(host)).toEqual([]));
+      const keys = new Map([[host.querySelector(`[role="${widget}"]`)!, ['keydown']]]);
+      withNg(keys, new Map(), () => expect(unreachable(host)).toEqual([]));
+    });
+
+    describe('roving tabindex needs something to handle the arrow keys', () => {
+      const tabs = () =>
+        fixture(`
+          <div id="wrap">
+            <div role="tablist" id="tl">
+              <div role="tab" id="t1" tabindex="0">One</div>
+              <div role="tab" id="t2" tabindex="-1">Two</div>
+              <div role="tab" id="t3" tabindex="-1">Three</div>
+            </div>
+          </div>`);
+
+      it('flags the out-of-order items as a moderate, verify-by-hand finding when nothing handles keys', () => {
+        const host = tabs();
+        withNg(new Map(), new Map(), () => {
+          const found = scanKeyboard(host).filter((f) => f.id === 'ngbr/unreachable-control');
+          expect(found.map((f) => f.target)).toEqual(['div#t2', 'div#t3']);
+          expect(found.every((f) => f.impact === 'moderate')).toBe(true);
+          expect(found[0].help).toContain('nothing in or around its widget handles keys');
+          expect(found[0].help).toContain('Heuristic — verify manually');
+        });
+      });
+
+      it.each([
+        ['the widget', '#tl'],
+        ['an item', '#t1'],
+        ['a wrapper around the widget (Angular Material tabs)', '#wrap'],
+      ])('counts key handling on %s', (_where, selector) => {
+        const host = tabs();
+        withNg(new Map([[host.querySelector(selector)!, ['keydown']]]), new Map(), () =>
+          expect(unreachable(host)).toEqual([]),
+        );
+      });
+
+      it('counts key listeners with modifiers, like (keydown.arrowRight)', () => {
+        const host = tabs();
+        withNg(new Map([[host.querySelector('#tl')!, ['keydown.arrowright', 'keydown.arrowleft']]]), new Map(), () =>
+          expect(unreachable(host)).toEqual([]),
+        );
+      });
+
+      it('counts key handling on an element that controls the widget', () => {
+        const host = fixture(`
+          <button aria-haspopup="menu" aria-controls="m">Actions</button>
+          <div role="menu" id="m"><div role="menuitem" tabindex="-1">Edit</div><div role="menuitem" tabindex="-1">Delete</div></div>`);
+        withNg(new Map([[host.querySelector('button')!, ['keydown']]]), new Map(), () =>
+          expect(unreachable(host)).toEqual([]),
+        );
+      });
+
+      it('looks no further up than the nearest component host', () => {
+        // <app-shell (keydown)> → <app-tabs> → <div role="tablist">: the shell's
+        // shortcut listener mustn't vouch for the tab list inside another component.
+        const host = fixture(`
+          <div id="shell"><div id="tabs-host">
+            <div role="tablist"><div role="tab" tabindex="0">A</div><div id="b" role="tab" tabindex="-1">B</div></div>
+          </div></div>`);
+        const shell = host.querySelector('#shell')!;
+        const tabsHost = host.querySelector('#tabs-host')!;
+        const hosts = new Set([shell, tabsHost]);
+        withNg(new Map([[shell, ['keydown']]]), new Map(), () => expect(unreachable(host)).toEqual(['div#b']), hosts);
+        withNg(new Map([[tabsHost, ['keydown']]]), new Map(), () => expect(unreachable(host)).toEqual([]), hosts);
+      });
+
+      it('does not count a page-wide key listener on <body>', () => {
+        const host = tabs();
+        withNg(new Map([[document.body, ['keydown']]]), new Map(), () =>
+          expect(unreachable(host)).toEqual(['div#t2', 'div#t3']),
+        );
+      });
+
+      it.each([
+        ['no window.ng', undefined],
+        ['a window.ng without getListeners', {}],
+      ])('gives the benefit of the doubt when listeners cannot be read (%s)', (_case, ng) => {
+        const host = tabs();
+        const original = (globalThis as { ng?: unknown }).ng;
+        (globalThis as { ng?: unknown }).ng = ng; // production builds
+        try {
+          expect(unreachable(host)).toEqual([]);
+        } finally {
+          (globalThis as { ng?: unknown }).ng = original;
+        }
+      });
     });
 
     it('aria-activedescendant on the widget: items need no tabindex', () => {
@@ -108,7 +195,7 @@ describe('scanKeyboard', () => {
       const host = fixture(`
         <button aria-haspopup="menu" aria-controls="m">Actions</button>
         <div role="menu" id="m"><div role="menuitem" tabindex="-1">Edit</div><div role="menuitem" tabindex="-1">Delete</div></div>`);
-      withNg(new Map(), new Map(), () => expect(unreachable(host)).toEqual([]));
+      withNg(new Map([[host.querySelector('#m')!, ['keydown']]]), new Map(), () => expect(unreachable(host)).toEqual([]));
     });
 
     it('still flags a widget Tab can never enter (every item tabindex="-1")', () => {
@@ -132,7 +219,11 @@ describe('scanKeyboard', () => {
             </div>
             <div role="treeitem" tabindex="${siblingTabindex}">Readme</div>
           </div>`);
-      const clickOn = (host: HTMLElement) => new Map([[host.querySelector('#twisty')!, ['click']]]);
+      const clickOn = (host: HTMLElement) =>
+        new Map([
+          [host.querySelector('#twisty')!, ['click']],
+          [host.querySelector('[role="tree"]')!, ['keydown']],
+        ]);
 
       it.each([
         ['the item is tabbable', '0', '-1'],
@@ -181,6 +272,21 @@ describe('scanKeyboard', () => {
         const host = chart();
         const listeners = new Map<Element, string[]>([[host.querySelector('#bar-1')!, ['click']]]);
         withNg(listeners, new Map(), () => expect(unreachable(host)).toEqual(['span#bar-1']));
+      });
+
+      it('still checks a click-only mark Tab reaches (click-without-key), not only unreachable ones', () => {
+        const host = fixture(`
+          <div id="plot" role="application" tabindex="0" aria-label="Sales">
+            <span id="bar-1" tabindex="0">Q1</span>
+          </div>`);
+        const listeners = new Map<Element, string[]>([
+          [host.querySelector('#plot')!, ['keydown']],
+          [host.querySelector('#bar-1')!, ['click']],
+        ]);
+        withNg(listeners, new Map(), () => {
+          const ids = scanKeyboard(host).map((f) => `${f.id} ${f.target}`);
+          expect(ids).toEqual(['ngbr/click-without-key span#bar-1']);
+        });
       });
 
       it('does not count a page-wide key listener (body is never tabbable)', () => {
@@ -274,6 +380,15 @@ describe('scanKeyboard', () => {
     const host = fixture(`<div id="btn" tabindex="0" role="button">Go</div>`);
     const el = host.querySelector('#btn')!;
     withNg(new Map([[el, ['click', 'keydown']]]), new Map(), () => {
+      expect(scanKeyboard(host)).toEqual([]);
+    });
+  });
+
+  it('counts key handling bound with modifiers: (keydown.enter) and (keydown.space)', () => {
+    // Angular reports these by their template names, not as plain "keydown".
+    const host = fixture(`<div id="btn" tabindex="0" role="button">Go</div>`);
+    const el = host.querySelector('#btn')!;
+    withNg(new Map([[el, ['click', 'keydown.enter', 'keydown.space']]]), new Map(), () => {
       expect(scanKeyboard(host)).toEqual([]);
     });
   });

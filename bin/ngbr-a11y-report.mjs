@@ -111,7 +111,6 @@ function parseArgs(argv) {
 }
 
 const opts = parseArgs(process.argv.slice(2));
-if (opts.serve && !opts.base) opts.base = 'http://localhost:4200';
 
 // Options that only mean something when scanning — refused with --from, rather
 // than silently ignored.
@@ -130,6 +129,9 @@ if (opts.from && !opts.help) {
     process.exit(2);
   }
 }
+
+// After the --from check, so --serve alone isn't reported as --base too.
+if (opts.serve && !opts.base) opts.base = 'http://localhost:4200';
 
 if (opts.help || (!opts.from && (!opts.base || opts.routes.length === 0))) {
   process.stderr.write(USAGE);
