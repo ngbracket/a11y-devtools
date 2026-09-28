@@ -43,6 +43,17 @@ export class FancyDirective {}
     <input class="fancy" appFancy />
     <div class="fake-button" role="button" (click)="noop()">Unreachable</div>
     <span class="focusable-no-key" tabindex="0" (click)="noop()">No key handler</span>
+    <!-- Key handling through event modifiers: (keydown.enter) is still keydown. -->
+    <span class="key-modifiers" tabindex="0" (click)="noop()" (keydown.enter)="noop()" (keydown.space)="noop()">Keys</span>
+    <div role="tablist" aria-label="Roving" (keydown.arrowRight)="noop()" (keydown.arrowLeft)="noop()">
+      <div role="tab" tabindex="0">One</div>
+      <div class="roving-tab" role="tab" tabindex="-1">Two</div>
+    </div>
+    <!-- Half-built: out of the tab order, but nothing handles the arrow keys. -->
+    <div role="tablist" aria-label="Half built">
+      <div role="tab" tabindex="0">One</div>
+      <div class="half-built-tab" role="tab" tabindex="-1">Two</div>
+    </div>
   `,
 })
 export class HomePageComponent {

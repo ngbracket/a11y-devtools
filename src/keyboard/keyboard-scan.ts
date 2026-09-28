@@ -64,6 +64,15 @@ const INTERACTIVE_ROLES = new Set([
 const KEY_EVENTS = ['keydown', 'keyup', 'keypress'];
 
 /**
+ * True when `events` includes a key event. Angular reports a listener by the name
+ * in the template, key modifiers and all (`(keydown.enter)` → `keydown.enter`),
+ * so match on the event before the first dot.
+ */
+function hasKeyEvent(events: readonly string[]): boolean {
+  return events.some((e) => KEY_EVENTS.includes(e.split('.')[0]));
+}
+
+/**
  * Composite widgets: Tab reaches the widget once, and arrow keys move between
  * its items (WAI-ARIA APG "Keyboard navigation inside components").
  */
@@ -78,8 +87,8 @@ const COMPOSITE_SELECTOR = ['tablist', 'toolbar', 'menu', 'menubar', 'radiogroup
  *   controls it, and points at the item), or **roving tabindex** (the item has a
  *   tabindex, usually -1, so script can focus it; Tab can get into the widget —
  *   one of its items is tabbable, the widget itself is, or another element
- *   controls it, like a menu button — and something handles keys: the widget,
- *   an item, a controller, or an ancestor below `<body>`).
+ *   controls it, like a menu button — and something handles keys: see
+ *   {@link handlesKeys}).
  * - `'no-keys'`: set up for roving tabindex, but no key handling was found, so
  *   arrow keys may not move to it — the classic half-built tab list.
  * - `false`: not a composite item, or one Tab can't get into / script can't focus.
@@ -90,6 +99,7 @@ const COMPOSITE_SELECTOR = ['tablist', 'toolbar', 'menu', 'menubar', 'radiogroup
 function reachedWithinWidget(
   element: Element,
   isVisible?: (el: Element) => boolean,
+  keyCache: Map<Element, boolean> = new Map(),
 ): 'reached' | 'no-keys' | false {
   const widget = element.parentElement?.closest(COMPOSITE_SELECTOR);
   if (!widget) return false;
@@ -107,7 +117,11 @@ function reachedWithinWidget(
   const enterable =
     isTabbable(widget, isVisible) || controllers.length > 0 || hasTabbableDescendant(widget, isVisible);
   if (!enterable) return false;
-  return listenersVisible() && !handlesKeys(widget, controllers) ? 'no-keys' : 'reached';
+  if (!listenersVisible()) return 'reached';
+  // Same widget, same answer: work it out once per scan, not once per item.
+  let keys = keyCache.get(widget);
+  if (keys === undefined) keyCache.set(widget, (keys = handlesKeys(widget, controllers)));
+  return keys ? 'reached' : 'no-keys';
 }
 
 /** True when Angular's debug API can tell us which listeners an element has. */
@@ -117,17 +131,31 @@ function listenersVisible(): boolean {
 
 /**
  * True when something that could move focus between `widget`'s items listens
- * for keys: the widget, anything inside it, an element that controls it, or an
- * ancestor below `<body>` (Angular Material, for one, puts a tab list's keydown
- * on a wrapper around the `role="tablist"`).
+ * for keys: the widget, an element that controls it, an ancestor up to and
+ * including the nearest component host (Angular Material, for one, puts a tab
+ * list's keydown on a wrapper around the `role="tablist"`), or anything inside
+ * the widget. The walk stops at that host so an app shell's shortcut listener
+ * doesn't vouch for every widget below it.
  */
 function handlesKeys(widget: Element, controllers: readonly Element[]): boolean {
+  const ng = ngDebug();
   const body = widget.ownerDocument?.body;
   const ancestors: Element[] = [];
-  for (let el = widget.parentElement; el && el !== body; el = el.parentElement) ancestors.push(el);
-  return [widget, ...widget.querySelectorAll('*'), ...controllers, ...ancestors].some((el) =>
-    resolveListenerEvents(el).some((e) => KEY_EVENTS.includes(e)),
-  );
+  for (let el = widget.parentElement; el && el !== body; el = el.parentElement) {
+    ancestors.push(el);
+    if (isComponentHost(el, ng)) break;
+  }
+  const keyed = (el: Element) => hasKeyEvent(resolveListenerEvents(el));
+  // Cheapest first; the widget's contents (every cell of a grid) last.
+  return [widget, ...controllers, ...ancestors].some(keyed) || [...widget.querySelectorAll('*')].some(keyed);
+}
+
+function isComponentHost(el: Element, ng: ReturnType<typeof ngDebug>): boolean {
+  try {
+    return ng?.getComponent(el) != null;
+  } catch {
+    return false;
+  }
 }
 
 const ITEM_SELECTOR = [...INTERACTIVE_ROLES].map((role) => `[role="${role}"]`).join(',');
@@ -142,15 +170,19 @@ const ITEM_SELECTOR = [...INTERACTIVE_ROLES].map((role) => `[role="${role}"]`).j
  *   keys. `<body>` is never tabbable, so a page-wide shortcut listener doesn't
  *   count.
  */
-function partOfKeyboardOperatedWidget(element: Element, isVisible?: (el: Element) => boolean): boolean {
+function partOfKeyboardOperatedWidget(
+  element: Element,
+  isVisible?: (el: Element) => boolean,
+  keyCache?: Map<Element, boolean>,
+): boolean {
   const item = element.parentElement?.closest(ITEM_SELECTOR);
   if (item?.parentElement?.closest(COMPOSITE_SELECTOR)) {
     // 'no-keys' too: the item itself is reported, so its parts needn't be.
-    if (isTabbable(item, isVisible) || reachedWithinWidget(item, isVisible)) return true;
+    if (isTabbable(item, isVisible) || reachedWithinWidget(item, isVisible, keyCache)) return true;
   }
   for (let el = element.parentElement; el; el = el.parentElement) {
     if (!isTabbable(el, isVisible)) continue;
-    return resolveListenerEvents(el).some((e) => KEY_EVENTS.includes(e));
+    return hasKeyEvent(resolveListenerEvents(el));
   }
   return false;
 }
@@ -192,6 +224,7 @@ export function scanKeyboard(
   const prefixes = options.frameworkPrefixes ?? DEFAULT_FRAMEWORK_PREFIXES;
   const isVisible = options.isVisible;
   const findings: A11yFinding[] = [];
+  const keyCache = new Map<Element, boolean>();
 
   const make = (
     element: Element,
@@ -243,8 +276,8 @@ export function scanKeyboard(
     if (!focusable) {
       // A click-only part of something the keyboard operates is a mouse shortcut.
       // Only for unreachable elements: one Tab reaches is still checked below.
-      if (!interactiveByRole && partOfKeyboardOperatedWidget(element, isVisible)) continue;
-      const within = interactiveByRole ? reachedWithinWidget(element, isVisible) : false;
+      if (!interactiveByRole && partOfKeyboardOperatedWidget(element, isVisible, keyCache)) continue;
+      const within = interactiveByRole ? reachedWithinWidget(element, isVisible, keyCache) : false;
       if (within === 'reached') continue;
       if (within === 'no-keys') {
         findings.push(
@@ -278,7 +311,7 @@ export function scanKeyboard(
 
     // Focusable, but a bare (click) never fires on Enter/Space the way a native
     // button does — so a keyboard user can reach it and still not activate it.
-    const hasKey = events.some((e) => KEY_EVENTS.includes(e));
+    const hasKey = hasKeyEvent(events);
     if (hasClick && !hasKey) {
       findings.push(
         make(
