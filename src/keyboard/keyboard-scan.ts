@@ -17,6 +17,7 @@ import {
   resolveComponentPath,
   resolveDirectiveNames,
   resolveListenerEvents,
+  ngDebug,
 } from '../attribution.js';
 import type { A11yFinding } from '../scan.js';
 import {
@@ -71,17 +72,25 @@ const COMPOSITE_SELECTOR = ['tablist', 'toolbar', 'menu', 'menubar', 'radiogroup
   .join(',');
 
 /**
- * True when `element` is an item that its composite widget reaches with arrow
- * keys, so Tab skipping it is correct:
- * - **aria-activedescendant**: focus stays on the widget (or on a combobox that
- *   controls it) and points at the item; or
- * - **roving tabindex**: the item has a tabindex (usually -1), so script can
- *   focus it, and Tab can get into the widget: one of its items is tabbable,
- *   the widget itself is, or another element controls it (a menu or listbox
- *   popup, which gets focus when it opens).
- * An item with neither, or a widget Tab can't enter at all, is still reported.
+ * How a composite widget's item is reached, when Tab skipping it may be correct:
+ * - `'reached'`: the keyboard reaches it within the widget —
+ *   **aria-activedescendant** (focus stays on the widget, or on a combobox that
+ *   controls it, and points at the item), or **roving tabindex** (the item has a
+ *   tabindex, usually -1, so script can focus it; Tab can get into the widget —
+ *   one of its items is tabbable, the widget itself is, or another element
+ *   controls it, like a menu button — and something handles keys: the widget,
+ *   an item, a controller, or an ancestor below `<body>`).
+ * - `'no-keys'`: set up for roving tabindex, but no key handling was found, so
+ *   arrow keys may not move to it — the classic half-built tab list.
+ * - `false`: not a composite item, or one Tab can't get into / script can't focus.
+ *
+ * Key listeners are read through Angular's dev-mode debug API. Without it (a
+ * production build) nothing can be seen, so roving tabindex counts as reached.
  */
-function reachedWithinWidget(element: Element, isVisible?: (el: Element) => boolean): boolean {
+function reachedWithinWidget(
+  element: Element,
+  isVisible?: (el: Element) => boolean,
+): 'reached' | 'no-keys' | false {
   const widget = element.parentElement?.closest(COMPOSITE_SELECTOR);
   if (!widget) return false;
   const controllers = widget.id
@@ -91,11 +100,34 @@ function reachedWithinWidget(element: Element, isVisible?: (el: Element) => bool
           .includes(widget.id),
       )
     : [];
-  if ([widget, ...controllers].some((el) => el.hasAttribute('aria-activedescendant'))) return true;
+  if ([widget, ...controllers].some((el) => el.hasAttribute('aria-activedescendant'))) return 'reached';
 
   const tabindex = element.getAttribute('tabindex');
   if (tabindex === null || Number.isNaN(Number.parseInt(tabindex, 10))) return false;
-  return isTabbable(widget, isVisible) || controllers.length > 0 || hasTabbableDescendant(widget, isVisible);
+  const enterable =
+    isTabbable(widget, isVisible) || controllers.length > 0 || hasTabbableDescendant(widget, isVisible);
+  if (!enterable) return false;
+  return listenersVisible() && !handlesKeys(widget, controllers) ? 'no-keys' : 'reached';
+}
+
+/** True when Angular's debug API can tell us which listeners an element has. */
+function listenersVisible(): boolean {
+  return typeof ngDebug()?.getListeners === 'function';
+}
+
+/**
+ * True when something that could move focus between `widget`'s items listens
+ * for keys: the widget, anything inside it, an element that controls it, or an
+ * ancestor below `<body>` (Angular Material, for one, puts a tab list's keydown
+ * on a wrapper around the `role="tablist"`).
+ */
+function handlesKeys(widget: Element, controllers: readonly Element[]): boolean {
+  const body = widget.ownerDocument?.body;
+  const ancestors: Element[] = [];
+  for (let el = widget.parentElement; el && el !== body; el = el.parentElement) ancestors.push(el);
+  return [widget, ...widget.querySelectorAll('*'), ...controllers, ...ancestors].some((el) =>
+    resolveListenerEvents(el).some((e) => KEY_EVENTS.includes(e)),
+  );
 }
 
 const ITEM_SELECTOR = [...INTERACTIVE_ROLES].map((role) => `[role="${role}"]`).join(',');
@@ -113,6 +145,7 @@ const ITEM_SELECTOR = [...INTERACTIVE_ROLES].map((role) => `[role="${role}"]`).j
 function partOfKeyboardOperatedWidget(element: Element, isVisible?: (el: Element) => boolean): boolean {
   const item = element.parentElement?.closest(ITEM_SELECTOR);
   if (item?.parentElement?.closest(COMPOSITE_SELECTOR)) {
+    // 'no-keys' too: the item itself is reported, so its parts needn't be.
     if (isTabbable(item, isVisible) || reachedWithinWidget(item, isVisible)) return true;
   }
   for (let el = element.parentElement; el; el = el.parentElement) {
@@ -204,12 +237,30 @@ export function scanKeyboard(
     // Hidden (a closed <details>, [hidden], display:none): not reachable because
     // it isn't shown. Check it when it is.
     if (isHidden(element, isVisible)) continue;
-    if (!interactiveByRole && partOfKeyboardOperatedWidget(element, isVisible)) continue;
 
     const focusable = isTabbable(element, isVisible);
 
     if (!focusable) {
-      if (interactiveByRole && reachedWithinWidget(element, isVisible)) continue;
+      // A click-only part of something the keyboard operates is a mouse shortcut.
+      // Only for unreachable elements: one Tab reaches is still checked below.
+      if (!interactiveByRole && partOfKeyboardOperatedWidget(element, isVisible)) continue;
+      const within = interactiveByRole ? reachedWithinWidget(element, isVisible) : false;
+      if (within === 'reached') continue;
+      if (within === 'no-keys') {
+        findings.push(
+          make(
+            element,
+            'ngbr/unreachable-control',
+            'moderate',
+            `Keyboard users may not be able to reach this item: it has role="${role}" and is ` +
+              `out of the tab order, like a roving-tabindex item, but nothing in or around its ` +
+              `widget handles keys, so arrow keys may not move to it. Handle the arrow keys, or ` +
+              `use aria-activedescendant. Heuristic — verify manually.`,
+            `${RULE_DOCS}/unreachable-control`,
+          ),
+        );
+        continue;
+      }
       const reason = interactiveByRole ? `has role="${role}"` : 'has a click handler';
       findings.push(
         make(
