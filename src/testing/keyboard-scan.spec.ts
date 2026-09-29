@@ -198,6 +198,47 @@ describe('scanKeyboard', () => {
       withNg(new Map([[host.querySelector('#m')!, ['keydown']]]), new Map(), () => expect(unreachable(host)).toEqual([]));
     });
 
+    describe('one roving tab stop shared by several widgets (a board: a listbox per column)', () => {
+      const board = (outside = '') =>
+        fixture(`
+          <div id="board">
+            <section role="group"><div role="listbox" aria-label="To do">
+              <div role="option" tabindex="0">A</div><div id="b" role="option" tabindex="-1">B</div>
+            </div></section>
+            <section role="group"><div role="listbox" aria-label="Doing">
+              <div id="c" role="option" tabindex="-1">C</div>
+            </div></section>
+          </div>${outside}`);
+      const keysOn = (host: HTMLElement) =>
+        new Map([...host.querySelectorAll('[role="option"]')].map((el) => [el, ['keydown']] as [Element, string[]]));
+
+      it('skips items in a column without the tab stop when the board component shares one', () => {
+        const host = board();
+        withNg(keysOn(host), new Map(), () => expect(unreachable(host)).toEqual([]), new Set([host.querySelector('#board')!]));
+      });
+
+      it('still flags them without a component host to bound the search', () => {
+        const host = board();
+        withNg(keysOn(host), new Map(), () => expect(unreachable(host)).toEqual(['div#c']));
+      });
+
+      it('is not vouched for by a tabbable item of another role', () => {
+        const host = fixture(`
+          <div id="board">
+            <div role="tablist"><div role="tab" tabindex="0">T</div></div>
+            <div role="listbox" aria-label="Doing"><div id="c" role="option" tabindex="-1">C</div></div>
+          </div>`);
+        withNg(keysOn(host), new Map(), () => expect(unreachable(host)).toEqual(['div#c']), new Set([host.querySelector('#board')!]));
+      });
+
+      it('is not vouched for by a listbox outside the component', () => {
+        const host = fixture(`
+          <div id="board"><div role="listbox" aria-label="Doing"><div id="c" role="option" tabindex="-1">C</div></div></div>
+          <div role="listbox" aria-label="Elsewhere"><div role="option" tabindex="0">X</div></div>`);
+        withNg(keysOn(host), new Map(), () => expect(unreachable(host)).toEqual(['div#c']), new Set([host.querySelector('#board')!]));
+      });
+    });
+
     it('still flags a widget Tab can never enter (every item tabindex="-1")', () => {
       const host = fixture(`
         <div role="tablist"><div id="t1" role="tab" tabindex="-1">A</div><div id="t2" role="tab" tabindex="-1">B</div></div>`);

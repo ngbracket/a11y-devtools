@@ -3,6 +3,20 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.15.5
+
+### Fixed
+
+- **`ngbr/unreachable-control` accepts one roving tab stop shared by several
+  widgets.** A kanban board with a `role="listbox"` per column and a single tab
+  stop for the whole board had every card in the other columns reported as
+  serious, although Tab reaches the board and the arrow keys cross columns. An
+  item is now also reachable when a tabbable item of the same role, in a widget
+  of the same role, sits inside the same component. The search stops at the
+  nearest component host, so an unrelated widget elsewhere on the page can't
+  vouch for a broken one, and key handling is still required. Found on our own
+  docs: 13 false positives → 0.
+
 ## 0.15.4
 
 ### Fixed

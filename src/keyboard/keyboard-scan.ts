@@ -115,7 +115,10 @@ function reachedWithinWidget(
   const tabindex = element.getAttribute('tabindex');
   if (tabindex === null || Number.isNaN(Number.parseInt(tabindex, 10))) return false;
   const enterable =
-    isTabbable(widget, isVisible) || controllers.length > 0 || hasTabbableDescendant(widget, isVisible);
+    isTabbable(widget, isVisible) ||
+    controllers.length > 0 ||
+    hasTabbableDescendant(widget, isVisible) ||
+    sharesRovingStop(widget, element, isVisible);
   if (!enterable) return false;
   if (!listenersVisible()) return 'reached';
   // Same widget, same answer: work it out once per scan, not once per item.
@@ -148,6 +151,37 @@ function handlesKeys(widget: Element, controllers: readonly Element[]): boolean 
   const keyed = (el: Element) => hasKeyEvent(resolveListenerEvents(el));
   // Cheapest first; the widget's contents (every cell of a grid) last.
   return [widget, ...controllers, ...ancestors].some(keyed) || [...widget.querySelectorAll('*')].some(keyed);
+}
+
+/**
+ * True when `widget` is one of several same-role widgets that share a single
+ * roving tab stop inside one component: a kanban board with a `role="listbox"`
+ * per column and one tab stop for the whole board, where arrow keys cross
+ * columns. A column without the current card has no tabbable item of its own,
+ * but Tab still reaches the board. Looks for a tabbable item of the same role,
+ * in a widget of the same role, within the nearest component host around the
+ * widget, so an unrelated widget elsewhere on the page can't vouch for it.
+ * Needs Angular's debug API to find that host; without it, it never applies.
+ */
+function sharesRovingStop(widget: Element, item: Element, isVisible?: (el: Element) => boolean): boolean {
+  const ng = ngDebug();
+  const widgetRole = widget.getAttribute('role');
+  const itemRole = item.getAttribute('role');
+  if (!ng || !widgetRole || !itemRole) return false;
+  let host: Element | null = null;
+  for (let el = widget.parentElement; el; el = el.parentElement) {
+    if (isComponentHost(el, ng)) {
+      host = el;
+      break;
+    }
+  }
+  if (!host) return false;
+  return [...host.querySelectorAll(`[role="${widgetRole}"] [role="${itemRole}"]`)].some(
+    (other) =>
+      other !== item &&
+      other.parentElement?.closest(COMPOSITE_SELECTOR)?.getAttribute('role') === widgetRole &&
+      isTabbable(other, isVisible),
+  );
 }
 
 function isComponentHost(el: Element, ng: ReturnType<typeof ngDebug>): boolean {
