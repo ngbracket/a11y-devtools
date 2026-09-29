@@ -202,10 +202,10 @@ describe('scanKeyboard', () => {
       const board = (outside = '') =>
         fixture(`
           <div id="board">
-            <section role="group"><div role="listbox" aria-label="To do">
+            <section class="col" role="group"><div role="listbox" aria-label="To do">
               <div role="option" tabindex="0">A</div><div id="b" role="option" tabindex="-1">B</div>
             </div></section>
-            <section role="group"><div role="listbox" aria-label="Doing">
+            <section class="col col--full" role="group"><div role="listbox" aria-label="Doing">
               <div id="c" role="option" tabindex="-1">C</div>
             </div></section>
           </div>${outside}`);
@@ -229,6 +229,17 @@ describe('scanKeyboard', () => {
             <div role="listbox" aria-label="Doing"><div id="c" role="option" tabindex="-1">C</div></div>
           </div>`);
         withNg(keysOn(host), new Map(), () => expect(unreachable(host)).toEqual(['div#c']), new Set([host.querySelector('#board')!]));
+      });
+
+      it('is not vouched for by an unrelated working listbox elsewhere in the same component', () => {
+        // Not repeated siblings: the working one is in a <div class="picker">, the
+        // broken one in an <aside class="recent">.
+        const host = fixture(`
+          <div id="page">
+            <div class="picker"><div role="listbox" aria-label="Pick"><div role="option" tabindex="0">A</div></div></div>
+            <aside class="recent"><div role="listbox" aria-label="Recent"><div id="r" role="option" tabindex="-1">R</div></div></aside>
+          </div>`);
+        withNg(keysOn(host), new Map(), () => expect(unreachable(host)).toEqual(['div#r']), new Set([host.querySelector('#page')!]));
       });
 
       it('is not vouched for by a listbox outside the component', () => {

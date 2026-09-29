@@ -100,6 +100,7 @@ function reachedWithinWidget(
   element: Element,
   isVisible?: (el: Element) => boolean,
   keyCache: Map<Element, boolean> = new Map(),
+  sharedCache: Map<Element, boolean> = new Map(),
 ): 'reached' | 'no-keys' | false {
   const widget = element.parentElement?.closest(COMPOSITE_SELECTOR);
   if (!widget) return false;
@@ -118,7 +119,7 @@ function reachedWithinWidget(
     isTabbable(widget, isVisible) ||
     controllers.length > 0 ||
     hasTabbableDescendant(widget, isVisible) ||
-    sharesRovingStop(widget, element, isVisible);
+    sharesRovingStop(widget, element, isVisible, sharedCache);
   if (!enterable) return false;
   if (!listenersVisible()) return 'reached';
   // Same widget, same answer: work it out once per scan, not once per item.
@@ -155,15 +156,37 @@ function handlesKeys(widget: Element, controllers: readonly Element[]): boolean 
 
 /**
  * True when `widget` is one of several same-role widgets that share a single
- * roving tab stop inside one component: a kanban board with a `role="listbox"`
- * per column and one tab stop for the whole board, where arrow keys cross
- * columns. A column without the current card has no tabbable item of its own,
- * but Tab still reaches the board. Looks for a tabbable item of the same role,
- * in a widget of the same role, within the nearest component host around the
- * widget, so an unrelated widget elsewhere on the page can't vouch for it.
- * Needs Angular's debug API to find that host; without it, it never applies.
+ * roving tab stop: a kanban board with a `role="listbox"` per column and one tab
+ * stop for the whole board, where arrow keys cross columns. A column without the
+ * current card has no tabbable item of its own, but Tab still reaches the board.
+ *
+ * Accepted when another widget of the same role holds a tabbable item of the
+ * same role, both inside the nearest component host, AND the two are repeated
+ * siblings: where their branches meet, each branch is the same kind of element
+ * sharing a class (what a `@for` over columns renders; state modifiers such as
+ * a full column's extra class may differ). So a working
+ * listbox can't vouch for an unrelated broken one in another part of the same
+ * template. Needs Angular's debug API to find the host; without it (a
+ * production build) it never applies.
  */
-function sharesRovingStop(widget: Element, item: Element, isVisible?: (el: Element) => boolean): boolean {
+function sharesRovingStop(
+  widget: Element,
+  item: Element,
+  isVisible: ((el: Element) => boolean) | undefined,
+  cache: Map<Element, boolean>,
+): boolean {
+  const cached = cache.get(widget);
+  if (cached !== undefined) return cached;
+  const result = findsRepeatedSiblingStop(widget, item, isVisible);
+  cache.set(widget, result);
+  return result;
+}
+
+function findsRepeatedSiblingStop(
+  widget: Element,
+  item: Element,
+  isVisible?: (el: Element) => boolean,
+): boolean {
   const ng = ngDebug();
   const widgetRole = widget.getAttribute('role');
   const itemRole = item.getAttribute('role');
@@ -176,12 +199,31 @@ function sharesRovingStop(widget: Element, item: Element, isVisible?: (el: Eleme
     }
   }
   if (!host) return false;
-  return [...host.querySelectorAll(`[role="${widgetRole}"] [role="${itemRole}"]`)].some(
-    (other) =>
-      other !== item &&
-      other.parentElement?.closest(COMPOSITE_SELECTOR)?.getAttribute('role') === widgetRole &&
-      isTabbable(other, isVisible),
-  );
+  for (const other of host.querySelectorAll(`[role="${widgetRole}"] [role="${itemRole}"]`)) {
+    const otherWidget = other.parentElement?.closest(COMPOSITE_SELECTOR);
+    if (!otherWidget || otherWidget === widget || otherWidget.getAttribute('role') !== widgetRole) continue;
+    if (!isTabbable(other, isVisible)) continue;
+    if (repeatedSiblings(widget, otherWidget, host)) return true;
+  }
+  return false;
+}
+
+/**
+ * True when `a` and `b` sit in sibling branches of the same kind: below their
+ * lowest common ancestor (inside `bound`), the branch holding each is the same
+ * tag and they share at least one class.
+ */
+function repeatedSiblings(a: Element, b: Element, bound: Element): boolean {
+  for (let branchA: Element | null = a; branchA && branchA !== bound; branchA = branchA.parentElement) {
+    const parent = branchA.parentElement;
+    if (!parent || !parent.contains(b)) continue;
+    let branchB: Element | null = b;
+    while (branchB && branchB.parentElement !== parent) branchB = branchB.parentElement;
+    if (!branchB || branchB === branchA || branchB.tagName !== branchA.tagName) return false;
+    const classesB = branchB.classList;
+    return [...branchA.classList].some((c) => classesB.contains(c));
+  }
+  return false;
 }
 
 function isComponentHost(el: Element, ng: ReturnType<typeof ngDebug>): boolean {
@@ -208,11 +250,12 @@ function partOfKeyboardOperatedWidget(
   element: Element,
   isVisible?: (el: Element) => boolean,
   keyCache?: Map<Element, boolean>,
+  sharedCache?: Map<Element, boolean>,
 ): boolean {
   const item = element.parentElement?.closest(ITEM_SELECTOR);
   if (item?.parentElement?.closest(COMPOSITE_SELECTOR)) {
     // 'no-keys' too: the item itself is reported, so its parts needn't be.
-    if (isTabbable(item, isVisible) || reachedWithinWidget(item, isVisible, keyCache)) return true;
+    if (isTabbable(item, isVisible) || reachedWithinWidget(item, isVisible, keyCache, sharedCache)) return true;
   }
   for (let el = element.parentElement; el; el = el.parentElement) {
     if (!isTabbable(el, isVisible)) continue;
@@ -259,6 +302,7 @@ export function scanKeyboard(
   const isVisible = options.isVisible;
   const findings: A11yFinding[] = [];
   const keyCache = new Map<Element, boolean>();
+  const sharedCache = new Map<Element, boolean>();
 
   const make = (
     element: Element,
@@ -310,8 +354,8 @@ export function scanKeyboard(
     if (!focusable) {
       // A click-only part of something the keyboard operates is a mouse shortcut.
       // Only for unreachable elements: one Tab reaches is still checked below.
-      if (!interactiveByRole && partOfKeyboardOperatedWidget(element, isVisible, keyCache)) continue;
-      const within = interactiveByRole ? reachedWithinWidget(element, isVisible, keyCache) : false;
+      if (!interactiveByRole && partOfKeyboardOperatedWidget(element, isVisible, keyCache, sharedCache)) continue;
+      const within = interactiveByRole ? reachedWithinWidget(element, isVisible, keyCache, sharedCache) : false;
       if (within === 'reached') continue;
       if (within === 'no-keys') {
         findings.push(

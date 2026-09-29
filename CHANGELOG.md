@@ -11,11 +11,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   widgets.** A kanban board with a `role="listbox"` per column and a single tab
   stop for the whole board had every card in the other columns reported as
   serious, although Tab reaches the board and the arrow keys cross columns. An
-  item is now also reachable when a tabbable item of the same role, in a widget
-  of the same role, sits inside the same component. The search stops at the
-  nearest component host, so an unrelated widget elsewhere on the page can't
-  vouch for a broken one, and key handling is still required. Found on our own
-  docs: 13 false positives → 0.
+  item is now also reachable when another widget of the same role, inside the
+  same component and repeated alongside it (same element, a shared class: what
+  a `@for` over columns renders), has a tabbable item of the same role. So a
+  working listbox can't vouch for an unrelated broken one elsewhere in the
+  template, and key handling is still required. Development builds only: it
+  needs Angular's debug API to find the component, so a production-build scan
+  still reports these items. Found on our own docs: 13 false positives → 0.
 
 ## 0.15.4
 
