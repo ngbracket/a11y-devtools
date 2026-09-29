@@ -100,6 +100,7 @@ function reachedWithinWidget(
   element: Element,
   isVisible?: (el: Element) => boolean,
   keyCache: Map<Element, boolean> = new Map(),
+  sharedCache: SharedStopCache = new Map(),
 ): 'reached' | 'no-keys' | false {
   const widget = element.parentElement?.closest(COMPOSITE_SELECTOR);
   if (!widget) return false;
@@ -115,7 +116,10 @@ function reachedWithinWidget(
   const tabindex = element.getAttribute('tabindex');
   if (tabindex === null || Number.isNaN(Number.parseInt(tabindex, 10))) return false;
   const enterable =
-    isTabbable(widget, isVisible) || controllers.length > 0 || hasTabbableDescendant(widget, isVisible);
+    isTabbable(widget, isVisible) ||
+    controllers.length > 0 ||
+    hasTabbableDescendant(widget, isVisible) ||
+    sharesRovingStop(widget, element, isVisible, sharedCache);
   if (!enterable) return false;
   if (!listenersVisible()) return 'reached';
   // Same widget, same answer: work it out once per scan, not once per item.
@@ -150,6 +154,92 @@ function handlesKeys(widget: Element, controllers: readonly Element[]): boolean 
   return [widget, ...controllers, ...ancestors].some(keyed) || [...widget.querySelectorAll('*')].some(keyed);
 }
 
+/**
+ * True when `widget` is one of several same-role widgets that share a single
+ * roving tab stop: a kanban board with a `role="listbox"` per column and one tab
+ * stop for the whole board, where arrow keys cross columns. A column without the
+ * current card has no tabbable item of its own, but Tab still reaches the board.
+ *
+ * Accepted when another widget of the same role holds a tabbable item of the
+ * same role, both inside the nearest component host, AND the two are repeated
+ * siblings: where their branches meet, each branch is the same element with the
+ * same classes (what a `@for` over columns renders), ignoring Angular's own
+ * `ng-*` classes and BEM modifiers (`--full`), which vary by state. So a working
+ * listbox can't vouch for an unrelated broken one in another part of the same
+ * template. Needs Angular's debug API to find the host; without it (a
+ * production build) it never applies.
+ */
+function sharesRovingStop(
+  widget: Element,
+  item: Element,
+  isVisible: ((el: Element) => boolean) | undefined,
+  cache: SharedStopCache,
+): boolean {
+  // Per widget AND item role: a menu can mix menuitem and menuitemradio.
+  const role = item.getAttribute('role') ?? '';
+  let byRole = cache.get(widget);
+  if (!byRole) cache.set(widget, (byRole = new Map()));
+  let result = byRole.get(role);
+  if (result === undefined) byRole.set(role, (result = findsRepeatedSiblingStop(widget, item, isVisible)));
+  return result;
+}
+
+/** Per-scan answers of {@link sharesRovingStop}: widget → item role → shares a stop. */
+type SharedStopCache = Map<Element, Map<string, boolean>>;
+
+function findsRepeatedSiblingStop(
+  widget: Element,
+  item: Element,
+  isVisible?: (el: Element) => boolean,
+): boolean {
+  const ng = ngDebug();
+  const widgetRole = widget.getAttribute('role');
+  const itemRole = item.getAttribute('role');
+  if (!ng || !widgetRole || !itemRole) return false;
+  let host: Element | null = null;
+  for (let el = widget.parentElement; el; el = el.parentElement) {
+    if (isComponentHost(el, ng)) {
+      host = el;
+      break;
+    }
+  }
+  if (!host) return false;
+  for (const other of host.querySelectorAll(`[role="${widgetRole}"] [role="${itemRole}"]`)) {
+    const otherWidget = other.parentElement?.closest(COMPOSITE_SELECTOR);
+    if (!otherWidget || otherWidget === widget || otherWidget.getAttribute('role') !== widgetRole) continue;
+    if (!isTabbable(other, isVisible)) continue;
+    if (repeatedSiblings(widget, otherWidget, host)) return true;
+  }
+  return false;
+}
+
+/**
+ * True when `a` and `b` sit in sibling branches of the same kind: below their
+ * lowest common ancestor (inside `bound`), the branch holding each is the same
+ * tag with the same (non-empty) set of classes, once Angular's `ng-*` classes
+ * (e.g. `ng-star-inserted` from the animations module) and BEM modifiers are
+ * set aside. Unclassed wrappers never match: the safe direction.
+ */
+function repeatedSiblings(a: Element, b: Element, bound: Element): boolean {
+  if (a.contains(b) || b.contains(a)) return false;
+  for (let branchA: Element | null = a; branchA && branchA !== bound; branchA = branchA.parentElement) {
+    const parent = branchA.parentElement;
+    if (!parent || !parent.contains(b)) continue;
+    let branchB: Element | null = b;
+    while (branchB && branchB.parentElement !== parent) branchB = branchB.parentElement;
+    if (!branchB || branchB === branchA || branchB.tagName !== branchA.tagName) return false;
+    const setA = structuralClasses(branchA);
+    const setB = structuralClasses(branchB);
+    return setA.length > 0 && setA.length === setB.length && setA.every((c) => setB.includes(c));
+  }
+  return false;
+}
+
+/** Classes that say what an element is, not its state: no `ng-*`, no BEM `--modifier`. */
+function structuralClasses(el: Element): string[] {
+  return [...el.classList].filter((c) => !c.startsWith('ng-') && !c.includes('--')).sort();
+}
+
 function isComponentHost(el: Element, ng: ReturnType<typeof ngDebug>): boolean {
   try {
     return ng?.getComponent(el) != null;
@@ -174,11 +264,12 @@ function partOfKeyboardOperatedWidget(
   element: Element,
   isVisible?: (el: Element) => boolean,
   keyCache?: Map<Element, boolean>,
+  sharedCache?: SharedStopCache,
 ): boolean {
   const item = element.parentElement?.closest(ITEM_SELECTOR);
   if (item?.parentElement?.closest(COMPOSITE_SELECTOR)) {
     // 'no-keys' too: the item itself is reported, so its parts needn't be.
-    if (isTabbable(item, isVisible) || reachedWithinWidget(item, isVisible, keyCache)) return true;
+    if (isTabbable(item, isVisible) || reachedWithinWidget(item, isVisible, keyCache, sharedCache)) return true;
   }
   for (let el = element.parentElement; el; el = el.parentElement) {
     if (!isTabbable(el, isVisible)) continue;
@@ -225,6 +316,7 @@ export function scanKeyboard(
   const isVisible = options.isVisible;
   const findings: A11yFinding[] = [];
   const keyCache = new Map<Element, boolean>();
+  const sharedCache: SharedStopCache = new Map();
 
   const make = (
     element: Element,
@@ -276,8 +368,8 @@ export function scanKeyboard(
     if (!focusable) {
       // A click-only part of something the keyboard operates is a mouse shortcut.
       // Only for unreachable elements: one Tab reaches is still checked below.
-      if (!interactiveByRole && partOfKeyboardOperatedWidget(element, isVisible, keyCache)) continue;
-      const within = interactiveByRole ? reachedWithinWidget(element, isVisible, keyCache) : false;
+      if (!interactiveByRole && partOfKeyboardOperatedWidget(element, isVisible, keyCache, sharedCache)) continue;
+      const within = interactiveByRole ? reachedWithinWidget(element, isVisible, keyCache, sharedCache) : false;
       if (within === 'reached') continue;
       if (within === 'no-keys') {
         findings.push(

@@ -198,6 +198,69 @@ describe('scanKeyboard', () => {
       withNg(new Map([[host.querySelector('#m')!, ['keydown']]]), new Map(), () => expect(unreachable(host)).toEqual([]));
     });
 
+    describe('one roving tab stop shared by several widgets (a board: a listbox per column)', () => {
+      const board = (outside = '') =>
+        fixture(`
+          <div id="board">
+            <section class="col ng-tns-c7-0 ng-star-inserted" role="group"><div role="listbox" aria-label="To do">
+              <div role="option" tabindex="0">A</div><div id="b" role="option" tabindex="-1">B</div>
+            </div></section>
+            <section class="col col--full ng-tns-c7-1" role="group"><div role="listbox" aria-label="Doing">
+              <div id="c" role="option" tabindex="-1">C</div>
+            </div></section>
+          </div>${outside}`);
+      const keysOn = (host: HTMLElement) =>
+        new Map([...host.querySelectorAll('[role="option"]')].map((el) => [el, ['keydown']] as [Element, string[]]));
+
+      it('skips items in a column without the tab stop when the board component shares one', () => {
+        const host = board();
+        withNg(keysOn(host), new Map(), () => expect(unreachable(host)).toEqual([]), new Set([host.querySelector('#board')!]));
+      });
+
+      it('still flags them without a component host to bound the search', () => {
+        const host = board();
+        withNg(keysOn(host), new Map(), () => expect(unreachable(host)).toEqual(['div#c']));
+      });
+
+      it('is not vouched for by a tabbable item of another role', () => {
+        const host = fixture(`
+          <div id="board">
+            <div role="tablist"><div role="tab" tabindex="0">T</div></div>
+            <div role="listbox" aria-label="Doing"><div id="c" role="option" tabindex="-1">C</div></div>
+          </div>`);
+        withNg(keysOn(host), new Map(), () => expect(unreachable(host)).toEqual(['div#c']), new Set([host.querySelector('#board')!]));
+      });
+
+      it('is not vouched for by an unrelated working listbox elsewhere in the same component', () => {
+        // Not repeated siblings: the working one is in a <div class="picker">, the
+        // broken one in an <aside class="recent">.
+        const host = fixture(`
+          <div id="page">
+            <div class="picker"><div role="listbox" aria-label="Pick"><div role="option" tabindex="0">A</div></div></div>
+            <aside class="recent"><div role="listbox" aria-label="Recent"><div id="r" role="option" tabindex="-1">R</div></div></aside>
+          </div>`);
+        withNg(keysOn(host), new Map(), () => expect(unreachable(host)).toEqual(['div#r']), new Set([host.querySelector('#page')!]));
+      });
+
+      it("ignores Angular's ng-* classes and utility-style partial overlaps when matching wrappers", () => {
+        // Both wrappers carry ng-star-inserted (legacy animations add it to every
+        // @if/@for element) and share `card`, but they're different things.
+        const host = fixture(`
+          <div id="page">
+            <div class="card picker ng-star-inserted"><div role="listbox" aria-label="Pick"><div role="option" tabindex="0">A</div></div></div>
+            <div class="card recent ng-star-inserted"><div role="listbox" aria-label="Recent"><div id="r" role="option" tabindex="-1">R</div></div></div>
+          </div>`);
+        withNg(keysOn(host), new Map(), () => expect(unreachable(host)).toEqual(['div#r']), new Set([host.querySelector('#page')!]));
+      });
+
+      it('is not vouched for by a listbox outside the component', () => {
+        const host = fixture(`
+          <div id="board"><div role="listbox" aria-label="Doing"><div id="c" role="option" tabindex="-1">C</div></div></div>
+          <div role="listbox" aria-label="Elsewhere"><div role="option" tabindex="0">X</div></div>`);
+        withNg(keysOn(host), new Map(), () => expect(unreachable(host)).toEqual(['div#c']), new Set([host.querySelector('#board')!]));
+      });
+    });
+
     it('still flags a widget Tab can never enter (every item tabindex="-1")', () => {
       const host = fixture(`
         <div role="tablist"><div id="t1" role="tab" tabindex="-1">A</div><div id="t2" role="tab" tabindex="-1">B</div></div>`);
