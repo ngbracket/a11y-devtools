@@ -100,7 +100,7 @@ function reachedWithinWidget(
   element: Element,
   isVisible?: (el: Element) => boolean,
   keyCache: Map<Element, boolean> = new Map(),
-  sharedCache: Map<Element, boolean> = new Map(),
+  sharedCache: SharedStopCache = new Map(),
 ): 'reached' | 'no-keys' | false {
   const widget = element.parentElement?.closest(COMPOSITE_SELECTOR);
   if (!widget) return false;
@@ -162,9 +162,9 @@ function handlesKeys(widget: Element, controllers: readonly Element[]): boolean 
  *
  * Accepted when another widget of the same role holds a tabbable item of the
  * same role, both inside the nearest component host, AND the two are repeated
- * siblings: where their branches meet, each branch is the same kind of element
- * sharing a class (what a `@for` over columns renders; state modifiers such as
- * a full column's extra class may differ). So a working
+ * siblings: where their branches meet, each branch is the same element with the
+ * same classes (what a `@for` over columns renders), ignoring Angular's own
+ * `ng-*` classes and BEM modifiers (`--full`), which vary by state. So a working
  * listbox can't vouch for an unrelated broken one in another part of the same
  * template. Needs Angular's debug API to find the host; without it (a
  * production build) it never applies.
@@ -173,14 +173,19 @@ function sharesRovingStop(
   widget: Element,
   item: Element,
   isVisible: ((el: Element) => boolean) | undefined,
-  cache: Map<Element, boolean>,
+  cache: SharedStopCache,
 ): boolean {
-  const cached = cache.get(widget);
-  if (cached !== undefined) return cached;
-  const result = findsRepeatedSiblingStop(widget, item, isVisible);
-  cache.set(widget, result);
+  // Per widget AND item role: a menu can mix menuitem and menuitemradio.
+  const role = item.getAttribute('role') ?? '';
+  let byRole = cache.get(widget);
+  if (!byRole) cache.set(widget, (byRole = new Map()));
+  let result = byRole.get(role);
+  if (result === undefined) byRole.set(role, (result = findsRepeatedSiblingStop(widget, item, isVisible)));
   return result;
 }
+
+/** Per-scan answers of {@link sharesRovingStop}: widget → item role → shares a stop. */
+type SharedStopCache = Map<Element, Map<string, boolean>>;
 
 function findsRepeatedSiblingStop(
   widget: Element,
@@ -211,19 +216,28 @@ function findsRepeatedSiblingStop(
 /**
  * True when `a` and `b` sit in sibling branches of the same kind: below their
  * lowest common ancestor (inside `bound`), the branch holding each is the same
- * tag and they share at least one class.
+ * tag with the same (non-empty) set of classes, once Angular's `ng-*` classes
+ * (e.g. `ng-star-inserted` from the animations module) and BEM modifiers are
+ * set aside. Unclassed wrappers never match: the safe direction.
  */
 function repeatedSiblings(a: Element, b: Element, bound: Element): boolean {
+  if (a.contains(b) || b.contains(a)) return false;
   for (let branchA: Element | null = a; branchA && branchA !== bound; branchA = branchA.parentElement) {
     const parent = branchA.parentElement;
     if (!parent || !parent.contains(b)) continue;
     let branchB: Element | null = b;
     while (branchB && branchB.parentElement !== parent) branchB = branchB.parentElement;
     if (!branchB || branchB === branchA || branchB.tagName !== branchA.tagName) return false;
-    const classesB = branchB.classList;
-    return [...branchA.classList].some((c) => classesB.contains(c));
+    const setA = structuralClasses(branchA);
+    const setB = structuralClasses(branchB);
+    return setA.length > 0 && setA.length === setB.length && setA.every((c) => setB.includes(c));
   }
   return false;
+}
+
+/** Classes that say what an element is, not its state: no `ng-*`, no BEM `--modifier`. */
+function structuralClasses(el: Element): string[] {
+  return [...el.classList].filter((c) => !c.startsWith('ng-') && !c.includes('--')).sort();
 }
 
 function isComponentHost(el: Element, ng: ReturnType<typeof ngDebug>): boolean {
@@ -250,7 +264,7 @@ function partOfKeyboardOperatedWidget(
   element: Element,
   isVisible?: (el: Element) => boolean,
   keyCache?: Map<Element, boolean>,
-  sharedCache?: Map<Element, boolean>,
+  sharedCache?: SharedStopCache,
 ): boolean {
   const item = element.parentElement?.closest(ITEM_SELECTOR);
   if (item?.parentElement?.closest(COMPOSITE_SELECTOR)) {
@@ -302,7 +316,7 @@ export function scanKeyboard(
   const isVisible = options.isVisible;
   const findings: A11yFinding[] = [];
   const keyCache = new Map<Element, boolean>();
-  const sharedCache = new Map<Element, boolean>();
+  const sharedCache: SharedStopCache = new Map();
 
   const make = (
     element: Element,

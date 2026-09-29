@@ -12,8 +12,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   stop for the whole board had every card in the other columns reported as
   serious, although Tab reaches the board and the arrow keys cross columns. An
   item is now also reachable when another widget of the same role, inside the
-  same component and repeated alongside it (same element, a shared class: what
-  a `@for` over columns renders), has a tabbable item of the same role. So a
+  same component and repeated alongside it (the same element with the same
+  classes, as a `@for` over columns renders; Angular's `ng-*` classes and BEM
+  `--modifiers` are ignored), has a tabbable item of the same role. So a
   working listbox can't vouch for an unrelated broken one elsewhere in the
   template, and key handling is still required. Development builds only: it
   needs Angular's debug API to find the component, so a production-build scan

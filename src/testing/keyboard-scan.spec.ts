@@ -202,10 +202,10 @@ describe('scanKeyboard', () => {
       const board = (outside = '') =>
         fixture(`
           <div id="board">
-            <section class="col" role="group"><div role="listbox" aria-label="To do">
+            <section class="col ng-tns-c7-0 ng-star-inserted" role="group"><div role="listbox" aria-label="To do">
               <div role="option" tabindex="0">A</div><div id="b" role="option" tabindex="-1">B</div>
             </div></section>
-            <section class="col col--full" role="group"><div role="listbox" aria-label="Doing">
+            <section class="col col--full ng-tns-c7-1" role="group"><div role="listbox" aria-label="Doing">
               <div id="c" role="option" tabindex="-1">C</div>
             </div></section>
           </div>${outside}`);
@@ -238,6 +238,17 @@ describe('scanKeyboard', () => {
           <div id="page">
             <div class="picker"><div role="listbox" aria-label="Pick"><div role="option" tabindex="0">A</div></div></div>
             <aside class="recent"><div role="listbox" aria-label="Recent"><div id="r" role="option" tabindex="-1">R</div></div></aside>
+          </div>`);
+        withNg(keysOn(host), new Map(), () => expect(unreachable(host)).toEqual(['div#r']), new Set([host.querySelector('#page')!]));
+      });
+
+      it("ignores Angular's ng-* classes and utility-style partial overlaps when matching wrappers", () => {
+        // Both wrappers carry ng-star-inserted (legacy animations add it to every
+        // @if/@for element) and share `card`, but they're different things.
+        const host = fixture(`
+          <div id="page">
+            <div class="card picker ng-star-inserted"><div role="listbox" aria-label="Pick"><div role="option" tabindex="0">A</div></div></div>
+            <div class="card recent ng-star-inserted"><div role="listbox" aria-label="Recent"><div id="r" role="option" tabindex="-1">R</div></div></div>
           </div>`);
         withNg(keysOn(host), new Map(), () => expect(unreachable(host)).toEqual(['div#r']), new Set([host.querySelector('#page')!]));
       });
