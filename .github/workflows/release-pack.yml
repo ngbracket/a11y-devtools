@@ -31,6 +31,9 @@ concurrency:
 jobs:
   release:
     name: Publish @ngbracket/a11y-devtools
+    # Protected environment: every run (dry runs too) waits for a required
+    # reviewer to approve it in the Actions UI, and only runs from main.
+    environment: npm-publish
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
