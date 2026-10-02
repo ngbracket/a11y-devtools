@@ -66,7 +66,7 @@ export interface A11yOverlay {
    */
   renderTabOrder(stops: TabStop[]): void;
   /**
-   * Show the accessibility-tree preview panel for the focused element, or hide it
+   * Show the Focus preview panel (an accessibility-tree approximation) for the focused element, or hide it
    * when passed `null`. Deliberately framed as a *computed approximation* — see
    * the panel header — never as verbatim screen-reader output.
    */
@@ -135,7 +135,7 @@ export function createOverlay(options: OverlayOptions = {}): A11yOverlay {
   svg.appendChild(connector);
   container.appendChild(svg); // under the badges, which are appended later
 
-  // The accessibility-tree preview panel: a fixed card that follows focus. Hidden
+  // The Focus preview panel: a fixed card that follows focus. Hidden
   // until renderAxPanel is called with data. Marked with OVERLAY_ATTR so scans
   // never flag the tool's own UI.
   const axPanel = doc.createElement('div');
@@ -292,12 +292,12 @@ export function createOverlay(options: OverlayOptions = {}): A11yOverlay {
   return { render, renderTabOrder, renderAxPanel, clear, clearTabOrder, destroy };
 }
 
-/** The rows of the accessibility-tree preview panel, honesty header first. */
+/** The rows of the Focus preview panel, honesty header first. */
 function buildAxPanelContent(doc: Document, data: AxPanelData): HTMLElement[] {
   const nodes: HTMLElement[] = [];
 
   const header = doc.createElement('div');
-  header.textContent = 'Accessibility-tree preview — computed approximation';
+  header.textContent = 'Focus preview — computed approximation';
   Object.assign(header.style, {
     fontWeight: '700',
     fontSize: '10px',

@@ -193,19 +193,36 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
         if (!settings.focusPreview) overlayView.renderAxPanel(null);
       }
 
+      /**
+       * On turning the preview (or the tool) on, describe what's already focused —
+       * or, when focus is in our own pill menu (the toggle was just clicked), the
+       * page control that had focus before it.
+       */
+      function previewCurrentFocus(): void {
+        const active = document.activeElement;
+        const ours = active instanceof Element && active.closest(`[${OVERLAY_ATTR}]`);
+        previewFocus(ours ? (lastPageFocus?.isConnected ? lastPageFocus : null) : active);
+      }
+
       const setEnabled = (next: boolean): void => {
         if (next === enabled) return;
         enabled = next;
         writeStoredEnabled(storage, enabled);
         pillView?.setEnabled(enabled);
-        if (enabled) scanNow(); // don't wait for the app's next stable moment
-        else draw();
+        if (enabled) {
+          scanNow(); // don't wait for the app's next stable moment
+          previewCurrentFocus();
+        } else {
+          draw();
+        }
       };
 
       const setSettings = (next: DevtoolsSettings): void => {
+        const previewTurnedOn = next.focusPreview && !settings.focusPreview;
         settings = next;
         writeStoredSettings(storage, settings, defaultSettings);
         draw();
+        if (previewTurnedOn) previewCurrentFocus();
       };
 
       const downloadReport = (): void => {
@@ -251,35 +268,51 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
       // the ~2/3 axe can't test — attributed to its component. Needs the visual
       // overlay; shown while the Focus preview setting is on.
       let onFocusIn: ((event: FocusEvent) => void) | undefined;
+      // The last page control (not our own UI) that had focus, for previewCurrentFocus.
+      let lastPageFocus: Element | undefined;
       if (overlayView) {
         onFocusIn = (event: FocusEvent) => {
-          if (!enabled || !settings.focusPreview) return;
           const el = event.target;
-          if (!(el instanceof Element) || el.closest(`[${OVERLAY_ATTR}]`)) return; // skip our own UI
-          describeElement(el)
-            .then((desc) => {
-              if (!enabled || !settings.focusPreview) return; // switched off while describing
-              overlayView.renderAxPanel({
-                ...desc,
-                component: resolveOwningComponentName(el, frameworkPrefixes),
-                tag: el.tagName.toLowerCase(),
-              });
-            })
-            .catch(() => undefined);
+          if (el instanceof Element && !el.closest(`[${OVERLAY_ATTR}]`)) lastPageFocus = el;
+          previewFocus(el);
         };
         document.addEventListener('focusin', onFocusIn, true);
       }
 
-      let scanning = false;
+      /** Show the Focus preview card for `el`, unless it's our own UI or the page body. */
+      function previewFocus(el: EventTarget | null): void {
+        if (!overlayView || !enabled || !settings.focusPreview) return;
+        if (!(el instanceof Element) || el === document.body || el === document.documentElement) return;
+        if (el.closest(`[${OVERLAY_ATTR}]`)) return; // skip our own UI
+        // axe can't build an accname tree while a scan has it set up, so wait
+        // until no scan is running rather than show an empty name.
+        scansIdle()
+          .then(() => describeElement(el))
+          .then((desc) => {
+            if (!enabled || !settings.focusPreview) return; // switched off while describing
+            overlayView.renderAxPanel({
+              ...desc,
+              component: resolveOwningComponentName(el, frameworkPrefixes),
+              tag: el.tagName.toLowerCase(),
+            });
+          })
+          .catch(() => undefined);
+      }
+
+      let currentScan: Promise<unknown> | undefined;
       let rescanQueued = false;
+
+      /** Resolves once no scan is running (a queued rescan starts as one ends). */
+      async function scansIdle(): Promise<void> {
+        while (currentScan) await currentScan;
+      }
       function scanNow(): void {
         if (!enabled) return;
-        if (scanning) {
+        if (currentScan) {
           rescanQueued = true; // don't stack scans; run one more when this finishes
           return;
         }
-        scanning = true;
-        runA11yScan(root?.(), { log, logger, axe, frameworkPrefixes, keyboard })
+        currentScan = runA11yScan(root?.(), { log, logger, axe, frameworkPrefixes, keyboard })
           .then((findings) => {
             if (!enabled) return; // switched off mid-scan: draw nothing
             lastFindings = findings;
@@ -290,7 +323,7 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
           })
           .catch(() => undefined)
           .finally(() => {
-            scanning = false;
+            currentScan = undefined;
             if (rescanQueued) {
               rescanQueued = false;
               scanNow();

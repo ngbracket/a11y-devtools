@@ -178,6 +178,42 @@ describe('provideA11yDevtools', () => {
     expect(JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)!)).toEqual({ highlights: true });
   });
 
+  it('turning Focus preview on describes the control that was focused before the menu', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideA11yDevtools({ root: () => host, logger: makeLogger(), debounceMs: 0, overlay: true }),
+      ],
+    });
+    const fixture = TestBed.createComponent(AppComponent);
+    host.appendChild(fixture.nativeElement);
+    await fixture.whenStable();
+
+    const save = document.createElement('button');
+    save.textContent = 'Save';
+    host.appendChild(save);
+    save.focus(); // preview is off (keyboard defaults to false), so no card yet
+
+    const card = (): HTMLElement | undefined =>
+      [...document.querySelectorAll<HTMLElement>('div')].find((d) =>
+        d.firstElementChild?.textContent?.startsWith('Focus preview — computed approximation'),
+      );
+    expect(card()?.style.display ?? 'none').toBe('none');
+
+    const menu = document.getElementById(
+      document.querySelector('button[aria-label="a11y devtools settings"]')!.getAttribute('aria-controls')!,
+    )!;
+    await waitFor(() => /1 issue on this page/.test(menu.textContent ?? '')); // first scan done
+    const toggle = [...menu.querySelectorAll('label')]
+      .find((l) => l.textContent?.startsWith('Focus preview'))!
+      .querySelector('input')!;
+    toggle.focus(); // focus moves into our own menu, as a real click would
+    toggle.click();
+
+    await waitFor(() => card()?.style.display === 'block');
+    expect(card()!.textContent).toContain('"Save"');
+  });
+
   it('filters highlights by the minimum severity chosen in the menu', async () => {
     // A role="button" that can't be focused is a serious keyboard finding,
     // next to the fixture's critical image-alt.
