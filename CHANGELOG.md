@@ -3,6 +3,26 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.15.6
+
+### Fixed
+
+- **The Focus preview card is now headed "Focus preview".** It used to say
+  "Accessibility-tree preview", which didn't match the "Focus preview" setting
+  in the pill menu, so the card and its switch were hard to connect. It is
+  still labelled a computed approximation.
+- **Turning Focus preview on shows the card without waiting for focus to
+  move.** Before, nothing appeared until focus next moved. Now, switching the
+  setting on describes the control that already has focus; switching the whole
+  tool on does the same once its first scan finishes. When you toggle it
+  from the pill menu, it describes the page control you were on before.
+- **The Focus preview no longer shows an empty name while a scan is running.**
+  axe can't compute an accessible name during its own run, so a control
+  focused mid-scan showed "(no accessible name)". The preview now waits for the
+  scan to finish and describes only the latest focus. A `describeElement` call
+  made during a scan also no longer tears down the scan's axe tree, which had
+  silently dropped that scan's findings.
+
 ## 0.15.5
 
 ### Fixed

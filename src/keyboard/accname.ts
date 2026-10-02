@@ -57,18 +57,24 @@ export async function describeElement(element: Element): Promise<AxDescription> 
   const doc = element.ownerDocument ?? document;
   let role: string | null = null;
   let name = '';
+  let didSetup = false;
   try {
     axe.setup(doc);
+    didSetup = true;
     const vnode = axe.utils.getNodeFromTree(element);
     role = axe.commons.aria.getRole(element) ?? null;
     name = vnode ? (axe.commons.text.accessibleTextVirtual(vnode) ?? '') : '';
   } catch {
     // Leave role=null / name='' — axe couldn't build a tree (e.g. run in flight).
   } finally {
-    try {
-      axe.teardown();
-    } catch {
-      /* nothing set up */
+    // Only tear down our own setup: a failed setup means a scan owns axe's tree,
+    // and tearing that down would silently drop the scan's findings.
+    if (didSetup) {
+      try {
+        axe.teardown();
+      } catch {
+        /* nothing set up */
+      }
     }
   }
   return { role, name, description: accessibleDescription(element), states: ariaStates(element) };

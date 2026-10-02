@@ -26,7 +26,7 @@ Part of the `@ngbracket` Angular tooling family.
 - **Dark mode**: scan your dark theme too, whether it follows the OS setting, a
   class, an attribute, or custom logic.
 - **Keyboard & Focus Mode**: tab-order visualisation, keyboard findings,
-  accessibility-tree preview, and keyboard-trap detection with real Tab presses.
+  Focus preview (computed role, name and state), and keyboard-trap detection with real Tab presses.
 - **Zero production weight**: a no-op in production; axe-core is never loaded.
 
 ## Install
