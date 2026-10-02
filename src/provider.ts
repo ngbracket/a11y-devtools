@@ -279,17 +279,22 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
         document.addEventListener('focusin', onFocusIn, true);
       }
 
+      // Bumped on every preview request, so only the latest focus is described.
+      let previewGen = 0;
+
       /** Show the Focus preview card for `el`, unless it's our own UI or the page body. */
       function previewFocus(el: EventTarget | null): void {
         if (!overlayView || !enabled || !settings.focusPreview) return;
         if (!(el instanceof Element) || el === document.body || el === document.documentElement) return;
         if (el.closest(`[${OVERLAY_ATTR}]`)) return; // skip our own UI
+        const gen = ++previewGen;
+        const stale = () => gen !== previewGen || !enabled || !settings.focusPreview;
         // axe can't build an accname tree while a scan has it set up, so wait
         // until no scan is running rather than show an empty name.
         scansIdle()
-          .then(() => describeElement(el))
+          .then(() => (stale() || !el.isConnected ? null : describeElement(el)))
           .then((desc) => {
-            if (!enabled || !settings.focusPreview) return; // switched off while describing
+            if (!desc || stale()) return; // focus moved on, or switched off while waiting
             overlayView.renderAxPanel({
               ...desc,
               component: resolveOwningComponentName(el, frameworkPrefixes),
@@ -302,9 +307,13 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
       let currentScan: Promise<unknown> | undefined;
       let rescanQueued = false;
 
-      /** Resolves once no scan is running (a queued rescan starts as one ends). */
+      /**
+       * Resolves once no scan is running (a queued rescan starts as one ends).
+       * Gives up after a few back-to-back scans, so an app that keeps re-settling
+       * can't hold the preview back for ever.
+       */
       async function scansIdle(): Promise<void> {
-        while (currentScan) await currentScan;
+        for (let waits = 0; currentScan && waits < 3; waits++) await currentScan;
       }
       function scanNow(): void {
         if (!enabled) return;
