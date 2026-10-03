@@ -44,13 +44,14 @@ production builds.
 ### All four severity colours
 
 The admin app also has an `/a11y-demo` route, registered only under `isDevMode()`,
-that fails one axe rule at each impact level, so you can see all four overlay
+that fails at least one axe rule at each impact level, so you can see all four overlay
 colours: critical (red), serious (orange), moderate (yellow) and minor (blue).
 
-![all four overlay severity colours](all-severities.png)
+![The demo's One issue per severity section with the overlay on: labelled boxes for A11yDemo · image-alt (red), color-contrast (orange), empty-heading (blue) and region (yellow), with the teal dashed tab-order path crossing them](all-severities-2026-10.png)
 
-The console report written alongside it has one summary line, then the findings
-grouped by the component that rendered each one:
+The console report has one summary line, then the findings grouped by the
+component that rendered each one. This capture is from September 2026, before the
+demo page was put in landmarks, so its findings differ from the report below:
 
 ![grouped, component-attributed console report](grouped-console-2026-09.png)
 
@@ -72,7 +73,7 @@ npx ngbr-a11y-report --base https://a11y-demo.ngbracket.com \
 The self-contained HTML report opens with a summary per page, then groups each
 page's findings by the component that rendered them:
 
-![HTML report titled Automated accessibility scan: a summary table (/a11y-demo 5 rules, 21 node-instances, 1 component; /login 0), then the A11yDemo findings with critical image-alt, serious color-contrast and tabindex, and moderate region](html-report-2026-09.png)
+![HTML report titled Automated accessibility scan: a summary table (/a11y-demo 5 rules, 5 node-instances, 1 component; /login 0), then the A11yDemo findings with critical image-alt, serious color-contrast and tabindex, moderate region and minor empty-heading](html-report-2026-10.png)
 
 Every report (Markdown, JSON and HTML) states its scope up front: automated
 checks cover only part of WCAG, so it is not a conformance report or a VPAT/ACR,
