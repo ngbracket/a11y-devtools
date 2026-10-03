@@ -1,33 +1,40 @@
 # @ngbracket/a11y-devtools
 
-Accessibility auditing for Angular that maps each axe violation back to **the
-component that rendered it**, so you get `♿ UserCardComponent — 2 issue(s)`, not a
-wall of CSS selectors. Run it as a dev overlay while you build, or headless in CI.
+Finds accessibility problems in Angular apps and names the component behind each one.
+Use it as an overlay while you develop, or headless in CI. It runs axe-core, plus its
+own keyboard checks if you turn them on, and groups the results by component:
 
-**📖 Documentation: [ngbracket.com/tools/a11y-devtools/docs](https://ngbracket.com/tools/a11y-devtools/docs/introduction)**
-(guides, every option and CLI flag, and the rule catalogue).
+```text
+♿ UserCardComponent — 2 issue(s)
+    critical · image-alt: Images must have alternative text
+    serious · color-contrast: Elements must meet minimum color contrast ratio thresholds
+```
+
+Documentation: [ngbracket.com/tools/a11y-devtools/docs](https://ngbracket.com/tools/a11y-devtools/docs/introduction)
+has the guides, every option and CLI flag, and the rule catalogue. You can also try the
+[live demo](https://a11y-demo.ngbracket.com/a11y-demo) without installing anything.
 
 Part of the `@ngbracket` Angular tooling family.
 
 ## Features
 
-- **Component attribution**: every finding names the Angular component to fix,
-  walking past UI-library components (Material, CDK, Nebular, …) to yours. Uses
+- Component attribution: every finding names the Angular component to fix. It skips
+  past UI-library components (Material, CDK, Nebular and others) to yours, using
   Angular's documented dev debug API (`window.ng`).
-- **In-app provider**: rescans as the app settles; grouped console output and an
-  optional on-page overlay. Switch it on and off with the on-page pill or
-  Alt+Shift+A; the pill's menu picks what's drawn (highlights, tab order, focus
-  preview, minimum severity) and downloads an HTML report of the routes you've
-  visited. Choices are remembered.
-- **Report mode**: scan many routes headless from the CLI; Markdown, JSON and a
-  self-contained HTML report.
-- **CI gating with a baseline**: fail only on *new* issues, so an app with known
-  issues can adopt the gate today.
-- **Dark mode**: scan your dark theme too, whether it follows the OS setting, a
-  class, an attribute, or custom logic.
-- **Keyboard & Focus Mode**: tab-order visualisation, keyboard findings,
-  Focus preview (computed role, name and state), and keyboard-trap detection with real Tab presses.
-- **Zero production weight**: a no-op in production; axe-core is never loaded.
+- In-app provider: rescans each time the app settles, logs findings grouped by
+  component, and can draw an overlay on the page. Turn it on and off with the
+  on-page pill or Alt+Shift+A. The pill's menu picks what's drawn and downloads an
+  HTML report of the routes you've visited.
+- Report mode: scans many routes headless from the CLI and writes Markdown, JSON
+  and a self-contained HTML report.
+- CI gating with a baseline: fails only on new issues, so an app with known issues
+  can add the gate straight away.
+- Dark mode: scans your dark theme too, however your app switches to it.
+- Keyboard & Focus Mode: numbers the tab order, adds keyboard findings, shows the
+  Focus preview card (computed role, name and state), and finds keyboard traps by
+  pressing Tab for real.
+- Production weight: does nothing in production builds, and axe-core isn't loaded
+  there.
 
 ## Install
 
@@ -38,7 +45,7 @@ npm i -D @ngbracket/a11y-devtools
 npm i -D playwright && npx playwright install chromium
 ```
 
-Needs Angular 18+.
+It needs Angular 18 or later.
 
 ## Quick start
 
@@ -56,8 +63,8 @@ export const appConfig: ApplicationConfig = {
 ![Keyboard & Focus Mode over the demo page: numbered tab-order badges (badge 1 in
 orange flags a positive tabindex) joined by a connector path, severity-coloured
 finding highlights labelled with their owning component (including the ngbr/*
-keyboard findings), and the focus-follow accessibility-tree panel showing the
-focused button's computed role, name and states.](./demo/keyboard-layer-2026-09.png)
+keyboard findings), and the Focus preview card showing the focused button's
+computed role, name and states.](./demo/keyboard-layer-2026-09.png)
 
 In CI (`--serve` starts `ng serve`, waits for it, and stops it after the scan):
 
@@ -78,13 +85,13 @@ Next steps, in the docs:
 [CLI reference](https://ngbracket.com/tools/a11y-devtools/docs/cli) ·
 [Findings & rules](https://ngbracket.com/tools/a11y-devtools/docs/findings)
 
-## What it can't do
+## What it leaves to you
 
-Automated checks cover part of WCAG, so a clean run is necessary, not sufficient:
-keyboard, screen-reader and human testing cover the rest. The keyboard findings are
-heuristics, labelled "verify manually". It helps you build toward supporting WCAG
-2.2 AA; it doesn't certify conformance. See
-[What it checks (and what it can't)](https://ngbracket.com/tools/a11y-devtools/docs/coverage).
+Automated checks cover part of WCAG. The rest needs manual testing: keyboard, screen
+reader, zoom and review by people. The keyboard findings are heuristics,
+each labelled "verify manually". The tool helps you build toward supporting WCAG 2.2
+AA; it doesn't certify conformance. See
+[What it checks](https://ngbracket.com/tools/a11y-devtools/docs/coverage).
 
 ## Develop
 
@@ -111,13 +118,13 @@ ever becomes reachable through a static import.
 
 ### Planned
 
-- Headless "linear walkthrough" — the tab sequence as an SR-ish reading list per
-  route in report-mode (M2's preview is currently overlay-only).
+- A headless "linear walkthrough": the tab sequence as a reading list per route in
+  report mode. The Focus preview is overlay-only for now.
 - Per-component filtering and a violation-count badge.
 
 ### Done
 
-- Component attribution — the nearest app-owned component, walking past UI primitives.
+- Component attribution: the nearest app-owned component, skipping UI primitives.
 - Directive and `hostDirectives` attribution.
 - Configurable framework prefixes.
 - axe scan.
@@ -128,10 +135,10 @@ ever becomes reachable through a static import.
 - HTML report output.
 - Baseline/diff mode: CI fails only on new issues.
 - Dark-mode scanning: `--color-scheme`, `--dark-class` / `--dark-attribute`, and theme-aware hooks.
-- **Keyboard & Focus Mode M1** — tab-order visualisation + keyboard-reachability findings.
-- **Keyboard & Focus Mode M2** — focus-follow accessibility-tree preview.
-- **Keyboard & Focus Mode M3** — missing focus-trap detection (uncontained
-  `aria-modal`) and the keyboard-trap walk with real Tab presses.
+- Keyboard & Focus Mode M1: tab-order visualisation and keyboard-reachability findings.
+- Keyboard & Focus Mode M2: the focus-follow accessibility-tree preview (now called Focus preview).
+- Keyboard & Focus Mode M3: missing focus-trap detection (an `aria-modal` that doesn't
+  contain focus) and the keyboard-trap walk with real Tab presses.
 - CI production-weight guard.
 - Real-browser E2E tests, including component attribution in a real Angular app.
 - Report mode can start the dev server (`--serve`).
