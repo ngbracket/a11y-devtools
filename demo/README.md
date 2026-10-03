@@ -44,9 +44,8 @@ production builds.
 ### All four severity colours
 
 The admin app also has an `/a11y-demo` route, registered only under `isDevMode()`,
-that fails one axe rule at each impact level. It shows all four overlay colours,
-critical (red), serious (orange), moderate (yellow) and minor (blue), and the
-matching console report:
+that fails one axe rule at each impact level, so you can see all four overlay
+colours: critical (red), serious (orange), moderate (yellow) and minor (blue).
 
 ![all four overlay severity colours](all-severities.png)
 

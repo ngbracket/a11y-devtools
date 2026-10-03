@@ -1,8 +1,8 @@
 # @ngbracket/a11y-devtools
 
-Accessibility checks for Angular apps that name the component behind each problem.
-It runs axe-core on your app, as an overlay while you develop or headless in CI,
-and groups what it finds by the component that rendered it:
+Finds accessibility problems in Angular apps and names the component behind each one.
+Use it as an overlay while you develop, or headless in CI. It runs axe-core, plus its
+own keyboard checks if you turn them on, and groups the results by component:
 
 ```text
 ♿ UserCardComponent — 2 issue(s)
@@ -18,15 +18,23 @@ Part of the `@ngbracket` Angular tooling family.
 
 ## Features
 
-| Feature | What it does |
-|---|---|
-| Component attribution | Names the Angular component to fix for every finding, skipping past UI-library components (Material, CDK, Nebular and others) to yours. Uses Angular's documented dev debug API (`window.ng`). |
-| In-app provider | Rescans each time the app settles, logs findings grouped by component, and can draw an overlay on the page. Turn it on and off with the on-page pill or Alt+Shift+A. The pill's menu picks what's drawn (highlights, tab order, Focus preview, minimum severity) and downloads an HTML report of the routes you've visited. Your choices are remembered. |
-| Report mode | Scans many routes headless from the CLI and writes Markdown, JSON and a self-contained HTML report. |
-| CI gating with a baseline | Fails only on new issues, so an app with known issues can add the gate straight away. |
-| Dark mode | Scans your dark theme too, whether it follows the OS setting, a class, an attribute or your own logic. |
-| Keyboard & Focus Mode | Numbers the tab order, adds keyboard findings, shows the Focus preview card (computed role, name and state), and finds keyboard traps by pressing Tab for real. |
-| Production weight | Does nothing in production builds, and axe-core isn't loaded there. |
+- Component attribution: every finding names the Angular component to fix. It skips
+  past UI-library components (Material, CDK, Nebular and others) to yours, using
+  Angular's documented dev debug API (`window.ng`).
+- In-app provider: rescans each time the app settles, logs findings grouped by
+  component, and can draw an overlay on the page. Turn it on and off with the
+  on-page pill or Alt+Shift+A. The pill's menu picks what's drawn and downloads an
+  HTML report of the routes you've visited.
+- Report mode: scans many routes headless from the CLI and writes Markdown, JSON
+  and a self-contained HTML report.
+- CI gating with a baseline: fails only on new issues, so an app with known issues
+  can add the gate straight away.
+- Dark mode: scans your dark theme too, however your app switches to it.
+- Keyboard & Focus Mode: numbers the tab order, adds keyboard findings, shows the
+  Focus preview card (computed role, name and state), and finds keyboard traps by
+  pressing Tab for real.
+- Production weight: does nothing in production builds, and axe-core isn't loaded
+  there.
 
 ## Install
 
@@ -79,8 +87,8 @@ Next steps, in the docs:
 
 ## What it leaves to you
 
-Automated checks cover part of WCAG. Keyboard, screen-reader and human testing cover
-the rest, so a clean run still needs those. The keyboard findings are heuristics,
+Automated checks cover part of WCAG. The rest needs manual testing: keyboard, screen
+reader, zoom and review by people. The keyboard findings are heuristics,
 each labelled "verify manually". The tool helps you build toward supporting WCAG 2.2
 AA; it doesn't certify conformance. See
 [What it checks](https://ngbracket.com/tools/a11y-devtools/docs/coverage).

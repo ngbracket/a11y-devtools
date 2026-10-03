@@ -1,7 +1,7 @@
 {
   "name": "@ngbracket/a11y-devtools",
   "version": "0.15.6",
-  "description": "Dev-only in-app accessibility auditing for Angular that maps each axe violation back to the component that rendered it — the attribution React overlay tools can't do.",
+  "description": "Finds accessibility problems in Angular apps and names the component behind each one. A dev overlay, or headless reports for CI.",
   "license": "MIT",
   "author": "Duncan Faulkner",
   "contributors": [
