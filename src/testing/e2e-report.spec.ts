@@ -141,6 +141,26 @@ const PAGES: Record<string, string> = {
     </style>
     <main><h1>Attribute</h1><p class="note">Theme-dependent text</p></main>`,
 
+  // An app running the in-app overlay with its tab-order path drawn. The path's
+  // SVG is fixed over the viewport and overflows it, which made axe's
+  // color-contrast give up ("needs review") on text below the fold, so it was
+  // never reported. Report mode hides the overlay before it scans. The layer is
+  // a shown popover with a pill button, as keepInTopLayer and the toggle make it.
+  '/overlay-below-fold': `
+    <main>
+      <h1>Overlay</h1>
+      <div style="height: 1500px"></div>
+      <p class="below-fold" style="color: #b0b0b0; background: #ffffff">Low contrast, below the fold</p>
+    </main>
+    <div id="overlay" data-ngb-a11y-overlay popover="manual"
+      style="position: fixed; inset: 0; width: auto; height: auto; margin: 0; padding: 0; border: 0; background: transparent; pointer-events: none">
+      <svg data-ngb-a11y-overlay style="position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible">
+        <polyline points="10,10 300,1700" fill="none" stroke="teal" stroke-width="2" />
+      </svg>
+    </div>
+    <button data-ngb-a11y-overlay role="switch" aria-checked="true" style="position: fixed; left: 8px; bottom: 8px">a11y</button>
+    <script>document.getElementById('overlay').showPopover();</script>`,
+
   // Plain axe + layout: a missing alt, and a positive tabindex that jumps up the page.
   '/axe': `
     <main>
@@ -211,6 +231,11 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
 
   it('scans every route without errors', () => {
     expect(report.pages.map((p) => p.label)).toEqual(Object.keys(PAGES));
+  });
+
+  it('checks contrast below the fold even when the app runs the in-app overlay', () => {
+    const below = page('/overlay-below-fold').findings.filter((f) => f.html.includes('below-fold'));
+    expect(below.map((f) => f.id)).toEqual(['color-contrast']);
   });
 
   it('reports axe violations and layout-dependent keyboard findings', () => {

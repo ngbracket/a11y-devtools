@@ -3,6 +3,20 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.15.8
+
+### Fixed
+
+- Report mode now checks colour contrast below the fold when the app runs the
+  in-app overlay. The overlay's tab-order path is drawn on a fixed SVG that
+  runs past the bottom of the viewport. axe counted it as covering the text
+  there, so its contrast check returned "needs review" instead of a result,
+  and report mode doesn't list those. Contrast problems on parts of a page
+  below the report's 900px-tall viewport could go unreported, in light and
+  dark passes. Report mode now hides the overlay before it scans. On the
+  public demo this brings back two dark-mode contrast failures the dark pass
+  had missed.
+
 ## 0.15.7
 
 ### Fixed
