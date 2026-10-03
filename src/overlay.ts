@@ -4,9 +4,15 @@ import type { AxDescription } from './keyboard/accname.js';
 import { keepInTopLayer } from './top-layer.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-/** Tab-order path + badge colours: normal teal, warning orange for positive tabindex. */
+/** Tab-order path colour (teal); bright enough to show on dark pages. */
 const TAB_ORDER_COLOR = '#0b8f8f';
-const TAB_ORDER_WARN_COLOR = '#e8710a';
+/**
+ * Badge fills behind white 10px digits: at least 4.5:1 with white (teal 5.15,
+ * orange 5.02), so the overlay passes its own contrast check in any theme. The
+ * orange marks a positive-tabindex stop.
+ */
+const TAB_BADGE_FILL = '#0a7a7a';
+const TAB_BADGE_WARN_FILL = '#b45309';
 /** How far outside a control's left edge the tab-order badge sits, and its min viewport x. */
 const TAB_BADGE_GUTTER = 10;
 const TAB_BADGE_MIN_X = 9;
@@ -340,7 +346,7 @@ function buildAxPanelContent(doc: Document, data: AxPanelData): HTMLElement[] {
  * positive tabindex hijacks the natural order.
  */
 function buildBadge(doc: Document, stop: TabStop): HTMLElement {
-  const color = stop.positive ? TAB_ORDER_WARN_COLOR : TAB_ORDER_COLOR;
+  const color = stop.positive ? TAB_BADGE_WARN_FILL : TAB_BADGE_FILL;
   const badge = doc.createElement('div');
   badge.setAttribute('data-ngb-tab-order', String(stop.order));
   const owner = stop.component ? ` · ${stop.component}` : '';

@@ -173,8 +173,27 @@ describe('createOverlay', () => {
     const a = targetEl('a');
     overlay.renderTabOrder([stop(a, { order: 1, positive: true, tabindex: 3 })]);
     const badge = overlayRoot()!.querySelector('[data-ngb-tab-order]') as HTMLElement;
-    expect(badge.style.background).toContain('rgb(232, 113, 10)'); // #e8710a warn
+    expect(badge.style.background).toContain('rgb(180, 83, 9)'); // #b45309 warn
     expect(badge.title).toContain('hijacks order');
+  });
+
+  // White 10px digits need 4.5:1 on the fill, in light and dark pages alike
+  // (axe flagged 3.93:1 on the old #0b8f8f teal).
+  it.each([
+    ['a normal stop', {}],
+    ['a positive-tabindex stop', { positive: true, tabindex: 3 }],
+  ])('gives %s badge at least 4.5:1 contrast with its white digits', (_, extra) => {
+    const a = targetEl('a');
+    overlay.renderTabOrder([stop(a, { order: 1, ...extra })]);
+    const badge = overlayRoot()!.querySelector('[data-ngb-tab-order]') as HTMLElement;
+    const rgb = badge.style.background.match(/\d+/g)!.slice(0, 3).map(Number);
+    const lum = (c: number[]) =>
+      c
+        .map((v) => v / 255)
+        .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+        .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+    expect(badge.style.color).toBe('rgb(255, 255, 255)');
+    expect(1.05 / (lum(rgb) + 0.05)).toBeGreaterThanOrEqual(4.5);
   });
 
   it('threads a connector polyline through the badge anchor points', () => {
