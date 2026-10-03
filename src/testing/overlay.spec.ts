@@ -40,6 +40,17 @@ function overlayRoot(): HTMLElement | null {
   return document.querySelector(`[${OVERLAY_ATTR}]`);
 }
 
+/** WCAG contrast of an `rgb(r, g, b)` fill against white text. */
+function contrastWithWhite(fill: string): number {
+  const lum = fill
+    .match(/\d+/g)!
+    .slice(0, 3)
+    .map((v) => Number(v) / 255)
+    .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+    .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+  return 1.05 / (lum + 0.05);
+}
+
 describe('createOverlay', () => {
   let overlay: A11yOverlay;
 
@@ -173,8 +184,34 @@ describe('createOverlay', () => {
     const a = targetEl('a');
     overlay.renderTabOrder([stop(a, { order: 1, positive: true, tabindex: 3 })]);
     const badge = overlayRoot()!.querySelector('[data-ngb-tab-order]') as HTMLElement;
-    expect(badge.style.background).toContain('rgb(232, 113, 10)'); // #e8710a warn
+    expect(badge.style.background).toContain('rgb(180, 83, 9)'); // #b45309 warn
     expect(badge.title).toContain('hijacks order');
+  });
+
+  // White 11px label text needs 4.5:1 on its fill for every impact (axe
+  // flagged the overlay; serious, moderate, minor and none were 2.42 to 4.11).
+  it.each(['critical', 'serious', 'moderate', 'minor', null] as const)(
+    'gives a %s finding label at least 4.5:1 contrast with its white text',
+    (impact) => {
+      targetEl('target');
+      overlay.render([finding({ impact })]);
+      const label = overlayRoot()!.querySelector('[data-impact] span') as HTMLElement;
+      expect(label.style.color).toBe('rgb(255, 255, 255)');
+      expect(contrastWithWhite(label.style.background)).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+
+  // White 10px digits need 4.5:1 on the fill, in light and dark pages alike
+  // (axe flagged 3.93:1 on the old #0b8f8f teal).
+  it.each([
+    ['a normal stop', {}],
+    ['a positive-tabindex stop', { positive: true, tabindex: 3 }],
+  ])('gives %s badge at least 4.5:1 contrast with its white digits', (_, extra) => {
+    const a = targetEl('a');
+    overlay.renderTabOrder([stop(a, { order: 1, ...extra })]);
+    const badge = overlayRoot()!.querySelector('[data-ngb-tab-order]') as HTMLElement;
+    expect(badge.style.color).toBe('rgb(255, 255, 255)');
+    expect(contrastWithWhite(badge.style.background)).toBeGreaterThanOrEqual(4.5);
   });
 
   it('threads a connector polyline through the badge anchor points', () => {

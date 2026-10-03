@@ -3,6 +3,22 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.15.7
+
+### Fixed
+
+- The keyboard tab-order badges now pass a colour contrast check. Their white
+  digits sat on a teal fill at 3.93:1, below the 4.5:1 that text this size
+  needs, and axe flagged them on a dark-mode page. The fill is now `#0a7a7a`
+  (5.15:1). The orange badge for a positive `tabindex` had the same problem
+  (3.09:1) and is now `#b45309` (5.02:1). The lines joining the badges keep
+  their teal.
+- The finding labels now pass a colour contrast check too. Their white text
+  sat on the impact colour, which gave 2.42:1 to 4.11:1 for every impact except
+  critical. Labels now use a darker fill in the same hue: serious `#b45309`,
+  moderate `#8a6d00`, minor `#2563c4` and no impact `#666666`, all at least
+  4.9:1. The box outlines keep the original impact colours.
+
 ## 0.15.6
 
 ### Fixed
