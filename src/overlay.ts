@@ -4,12 +4,11 @@ import type { AxDescription } from './keyboard/accname.js';
 import { keepInTopLayer } from './top-layer.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-/** Tab-order path colour (teal); bright enough to show on dark pages. */
+/** Tab-order connector line colour (teal). */
 const TAB_ORDER_COLOR = '#0b8f8f';
 /**
  * Badge fills behind white 10px digits: at least 4.5:1 with white (teal 5.15,
- * orange 5.02), so the overlay passes its own contrast check in any theme. The
- * orange marks a positive-tabindex stop.
+ * orange 5.02). The orange marks a positive-tabindex stop.
  */
 const TAB_BADGE_FILL = '#0a7a7a';
 const TAB_BADGE_WARN_FILL = '#b45309';
@@ -35,6 +34,18 @@ const IMPACT_COLOR: Record<NonNullable<Impact> | 'none', string> = {
   moderate: '#c9a227',
   minor: '#3b7dd8',
   none: '#8a8a8a',
+};
+
+/**
+ * Label fill per impact, behind white 11px text: at least 4.5:1 with white, in
+ * the same hue as the border, so the labels pass a contrast check themselves.
+ */
+const IMPACT_LABEL_FILL: Record<NonNullable<Impact> | 'none', string> = {
+  critical: '#d32029',
+  serious: '#b45309',
+  moderate: '#8a6d00',
+  minor: '#2563c4',
+  none: '#666666',
 };
 
 function colorFor(impact: Impact): string {
@@ -408,7 +419,7 @@ function buildBox(doc: Document, finding: A11yFinding): HTMLElement {
     padding: '1px 4px',
     font: '11px/1.4 ui-monospace, monospace',
     color: '#fff',
-    background: color,
+    background: IMPACT_LABEL_FILL[finding.impact ?? 'none'],
     whiteSpace: 'nowrap',
   });
   box.appendChild(label);
