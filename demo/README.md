@@ -46,8 +46,10 @@ production builds.
 The admin app also has an `/a11y-demo` route, registered only under `isDevMode()`,
 that fails at least one axe rule at each impact level, so you can see all four overlay
 colours: critical (red), serious (orange), moderate (yellow) and minor (blue).
+The moderate example is the last paragraph on the page, because it has to sit
+outside every landmark.
 
-![The demo's One issue per severity section with the overlay on: labelled boxes for A11yDemo · image-alt (red), color-contrast (orange), empty-heading (blue) and region (yellow), with the teal dashed tab-order path crossing them](all-severities-2026-10.png)
+![The demo's One issue per severity section with the overlay on: labelled boxes for A11yDemo · image-alt (red), color-contrast (orange) and empty-heading (blue), with the teal dashed tab-order path crossing them. Below a break, the last paragraph of the page in a yellow A11yDemo · region box](all-severities-2026-10.png)
 
 The console report has one summary line, then the findings grouped by the
 component that rendered each one. This capture is from September 2026, before the
