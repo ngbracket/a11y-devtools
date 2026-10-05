@@ -333,7 +333,8 @@ export function uniqueLocator(element: Element): string | undefined {
       return 0;
     }
   };
-  if (count(shortSelector(element)) === 1) return undefined;
+  const short = shortSelector(element);
+  if (count(short) === 1 && doc.querySelector(short) === element) return undefined;
   const step = (el: Element) => {
     if (el.id && count(`#${escape(el.id)}`) === 1) return { text: `#${escape(el.id)}`, anchored: true };
     const classes = [...el.classList].slice(0, 2).map((c) => `.${escape(c)}`).join('');
@@ -384,11 +385,17 @@ export function scanKeyboard(
   const hoverFinding = (element: Element, signal: HoverSignal): A11yFinding => {
     const url = `${RULE_DOCS}/hover-only-content`;
     // The disabled control itself, or a wrapper around one (Angular Material's
-    // documented way to give a disabled button a tooltip).
+    // documented way to give a disabled button a tooltip): a tooltip on any
+    // wrapper, or other hover content on a wrapper whose only child is the control.
+    const only = element.children.length === 1 ? element.children[0] : null;
     const disabled =
       isNativelyFocusable(element) && isDisabled(element)
         ? element
-        : [...element.querySelectorAll('button, input, select, textarea')].find(isDisabled);
+        : signal === 'tooltip'
+          ? [...element.querySelectorAll('button, input, select, textarea')].find(isDisabled)
+          : only && isNativelyFocusable(only) && isDisabled(only)
+            ? only
+            : undefined;
     if (disabled) {
       return make(
         element,

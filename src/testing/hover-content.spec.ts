@@ -124,8 +124,43 @@ describe('ngbr/hover-only-content', () => {
     });
   });
 
-  it('ignores a generic [tooltip] or [tp] attribute on a custom element', () => {
-    expect(hover(fixture('<my-chart tooltip></my-chart><x-avatar tp="x"></x-avatar>'))).toEqual([]);
+  it('ignores a generic [tooltip] or [tp] attribute on a registered web component', () => {
+    customElements.define('hc-chart', class extends HTMLElement {});
+    customElements.define('hc-avatar', class extends HTMLElement {});
+    expect(hover(fixture('<hc-chart tooltip="on"></hc-chart><hc-avatar tp="x"></hc-avatar>'))).toEqual([]);
+  });
+
+  it('still counts the [tooltip] marker on an Angular component host', () => {
+    expect(hover(fixture('<app-badge tooltip="Overdue"></app-badge>'))).toHaveLength(1);
+  });
+
+  it('skips an empty or switched-off tooltip in a dev build for every library with a text input', () => {
+    const host = fixture('<span tuihint="">?</span><span tp="">?</span><span>?</span><span>?</span>');
+    const [taiga, tippyEmpty, tippyOff, zorro] = [...host.children];
+    const dirs = new Map<Element, object[]>([
+      [taiga, [directive('TuiHint')]],
+      [tippyEmpty, [directive('TippyDirective')]],
+      [tippyOff, [directive('TippyDirective', { tpIsEnabled: false })]],
+      [zorro, [directive('NzTooltipDirective', { nzTooltipTitle: '' })]],
+    ]);
+    withNg(() => expect(hover(host)).toEqual([]), new Map(), dirs);
+  });
+
+  it('gives a hover-listener row with a disabled button inside the generic message, not the disabled one', () => {
+    const host = fixture('<table><tbody><tr><td>Row</td><td><button disabled>Edit</button></td></tr></tbody></table>');
+    const row = host.querySelector('tr')!;
+    withNg(() => {
+      const found = hover(host);
+      expect(found).toHaveLength(1);
+      expect(found[0].help).not.toContain('aria-disabled');
+    }, new Map([[row, ['mouseenter']]]));
+  });
+
+  it('gives the disabled message to a hover-listener wrapper whose only child is a disabled button', () => {
+    const host = fixture('<span><button disabled>Submit</button></span>');
+    withNg(() => {
+      expect(hover(host)[0].help).toContain('aria-disabled');
+    }, new Map([[host.firstElementChild!, ['mouseenter']]]));
   });
 
   describe('title', () => {
@@ -147,9 +182,13 @@ describe('ngbr/hover-only-content', () => {
     });
 
     it('treats icon-font ligatures as icons', () => {
-      const host = fixture('<span class="material-symbols-outlined">info</span><span>Info</span>');
+      const host = fixture(
+        '<span class="material-symbols-outlined">info</span><span>Info</span><span class="material-icons-outlined">schedule</span><i class="fa fa-clock">x</i>',
+      );
       expect(isIconLike(host.children[0])).toBe(true);
       expect(isIconLike(host.children[1])).toBe(false);
+      expect(isIconLike(host.children[2])).toBe(true);
+      expect(isIconLike(host.children[3])).toBe(true);
     });
   });
 
@@ -258,6 +297,12 @@ describe('uniqueLocator', () => {
     expect(selector).toBe('li:nth-child(2) > i.ic:nth-child(1)');
     expect(document.querySelectorAll(selector)).toHaveLength(1);
     expect(document.querySelector(selector)).toBe(second);
+  });
+
+  it('gives a locator when the unescaped short selector matches a different element', () => {
+    const host = fixture('<div id="a" class="b">decoy</div><div id="a.b">real</div>');
+    const real = host.children[1];
+    expect(document.querySelector(uniqueLocator(real)!)).toBe(real);
   });
 
   it('escapes ids and classes that aren’t valid as written', () => {

@@ -67,11 +67,21 @@ const TOOLTIP_LIBRARIES: readonly TooltipLibrary[] = [
     isOff: (d) => d['isDisabled'] === true || empty(d['tooltip']),
   },
   // ng-zorro
-  { directives: ['NzTooltipDirective'], selector: '[nz-tooltip]' },
+  {
+    directives: ['NzTooltipDirective'],
+    selector: '[nz-tooltip]',
+    isOff: (d) => 'nzTooltipTitle' in d && empty(d['nzTooltipTitle']),
+  },
   // Taiga UI
   { directives: ['TuiHint', 'TuiHintDirective', 'TuiHintHover'], selector: '[tuihint]', textAttribute: 'tuihint' },
   // @ngneat/helipopper (Tippy.js)
-  { directives: ['TippyDirective'], selector: '[tp]', textAttribute: 'tp', genericMarker: true },
+  {
+    directives: ['TippyDirective'],
+    selector: '[tp]',
+    textAttribute: 'tp',
+    genericMarker: true,
+    isOff: (d) => d['tpIsEnabled'] === false,
+  },
   // HTML interest invokers
   { directives: [], selector: '[interestfor]' },
 ];
@@ -85,7 +95,7 @@ const HOVER_EVENTS = ['mouseenter', 'mouseover', 'pointerenter', 'pointerover'];
  * Icon-font classes whose text is a ligature or glyph name, not visible text:
  * Material Icons and Symbols, Font Awesome, Bootstrap Icons, PrimeIcons, Glyphicons.
  */
-const ICON_CLASS = /^(mat-icon|material-icons|material-symbols-\w+|fa-[\w-]+|fa[srlbdt]|fa-solid|fa-regular|bi-[\w-]+|pi-[\w-]+|glyphicon-[\w-]+)$/;
+const ICON_CLASS = /^(mat-icon|material-icons(-[\w-]+)?|material-symbols-\w+|fa-[\w-]+|fa[srlbdt]|fa-solid|fa-regular|bi-[\w-]+|pi-[\w-]+|glyphicon-[\w-]+)$/;
 
 /** How an element shows content on hover. */
 export type HoverSignal = 'tooltip' | 'hover-listener' | 'title';
@@ -113,19 +123,24 @@ function hasTooltip(element: Element): boolean {
           (safeMatches(element, lib.selector) || (lib.instanceKeys ?? []).some((key) => key in d.instance))),
     );
     if (found) {
-      if (!lib.isOff?.(found.instance as Record<string, unknown>)) return true;
-      continue;
+      if (lib.isOff?.(found.instance as Record<string, unknown>) || emptyTextAttribute(element, lib)) continue;
+      return true;
     }
     if (!marked || !safeMatches(element, lib.selector)) continue;
     // A marker with no directive: production, or something else using the attribute.
     if (directives.length > 0 && lib.directives.length + (lib.genericDirectives?.length ?? 0) > 0) continue;
-    if (lib.genericMarker && element.tagName.includes('-')) continue;
-    if (lib.textAttribute && element.hasAttribute(lib.textAttribute) && empty(element.getAttribute(lib.textAttribute))) {
-      continue;
-    }
+    // A registered web component may use the attribute for something else.
+    // Angular component hosts aren't registered custom elements, so they still count.
+    if (lib.genericMarker && globalThis.customElements?.get(element.localName) !== undefined) continue;
+    if (emptyTextAttribute(element, lib)) continue;
     return true;
   }
   return false;
+}
+
+/** The library's text attribute is on `element` but empty: no tooltip text. */
+function emptyTextAttribute(element: Element, lib: TooltipLibrary): boolean {
+  return !!lib.textAttribute && element.hasAttribute(lib.textAttribute) && empty(element.getAttribute(lib.textAttribute));
 }
 
 function safeMatches(element: Element, selector: string): boolean {

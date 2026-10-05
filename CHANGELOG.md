@@ -13,8 +13,11 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   rule looks for:
   - a tooltip from Angular Material, PrimeNG, ng-bootstrap, ngx-bootstrap,
     ng-zorro, Taiga UI or helipopper, by its directive class in a dev build or
-    by its attribute or host class in any build. Moderate. A tooltip that is
-    switched off, or has no text, is skipped.
+    by its attribute or host class in any build. Moderate. An empty tooltip
+    attribute is skipped in every build. In a dev build, a tooltip switched off
+    through its directive is skipped too (Material, PrimeNG, ng-bootstrap,
+    ngx-bootstrap, ng-zorro and helipopper), and so is Material's
+    `matTooltipDisabled` in any build.
   - an HTML `interestfor` attribute. Moderate.
   - an Angular `(mouseenter)`, `(mouseover)`, `(pointerenter)` or
     `(pointerover)` listener (dev builds). Minor, since such a listener can also
