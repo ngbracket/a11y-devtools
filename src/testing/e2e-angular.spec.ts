@@ -155,6 +155,13 @@ describe.skipIf(!ready)('attribution in a real Angular app (E2E)', () => {
       expect(tab.component).toBe('HomePageComponent');
     });
 
+    it('flags hover-only content: a hover listener (moderate) and an icon title (minor)', () => {
+      const hint = find(page('/').findings, 'ngbr/hover-only-content', 'hover-hint');
+      expect(hint.impact).toBe('moderate');
+      expect(hint.component).toBe('HomePageComponent');
+      expect(find(page('/').findings, 'ngbr/hover-only-content', 'title-icon').impact).toBe('minor');
+    });
+
     it('attributes findings on a second route to that route’s page component', () => {
       expect(find(page('/settings').findings, 'color-contrast', 'faint').component).toBe('SettingsPageComponent');
     });

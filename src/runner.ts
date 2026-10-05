@@ -23,8 +23,8 @@ export interface RunOptions {
   frameworkPrefixes?: readonly string[];
   /**
    * Also run the keyboard layer — heuristic `ngbr/*` findings for
-   * keyboard-unreachable controls, click-without-keyboard handlers, and
-   * tab-order mismatches. Default false.
+   * keyboard-unreachable controls, click-without-keyboard handlers, hover-only
+   * content, and tab-order mismatches. Default false.
    */
   keyboard?: boolean;
 }

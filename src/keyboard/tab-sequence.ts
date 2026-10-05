@@ -170,7 +170,7 @@ export function resolvedTabIndex(element: Element): number {
 }
 
 /** True when `element` (or an ancestor) is disabled via a control or `<fieldset disabled>`. */
-function isDisabled(element: Element): boolean {
+export function isDisabled(element: Element): boolean {
   if ('disabled' in element && (element as { disabled?: boolean }).disabled) return true;
   // A disabled fieldset disables its controls (except those inside its first legend).
   return element.closest('fieldset[disabled]') !== null && element.closest('legend') === null;

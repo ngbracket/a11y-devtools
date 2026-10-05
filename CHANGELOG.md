@@ -3,6 +3,38 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.16.0
+
+### Added
+
+- New keyboard rule `ngbr/hover-only-content`. It reports an element that shows
+  content on hover when Tab can't reach it, so keyboard users never see that
+  content. An info icon with a tooltip in a table row is the common case. The
+  rule looks for:
+  - a tooltip directive from Angular Material, PrimeNG, ng-bootstrap,
+    ngx-bootstrap, ng-zorro, Taiga UI or helipopper, by its directive class in a
+    dev build or by its attribute or host class in any build
+  - an HTML `interestfor` attribute
+  - an Angular `(mouseenter)`, `(mouseover)`, `(pointerenter)` or
+    `(pointerover)` listener (dev builds)
+  - a `title` on an icon with no visible text, reported as minor
+
+  A disabled control with a tooltip gets its own message: a disabled control
+  can't take focus, so use `aria-disabled="true"` instead. The rule skips an
+  element inside something Tab reaches (an icon in a link) and a wrapper around
+  one. It runs with the keyboard layer and maps to WCAG 2.1.1 in the ACR
+  worksheet. Like the other keyboard rules, it is a heuristic to check by hand.
+
+### Fixed
+
+- The overlay now draws each keyboard finding on its own element. Keyboard
+  findings used a short selector such as `mat-icon.info`. When that matched an
+  element repeated in every table row, the overlay drew all the findings on the
+  first match. The selector is now an `:nth-child` path from the nearest unique
+  `id` when the short form matches more than one element. Findings on a unique
+  element keep their selector. A baseline that lists a keyboard finding on a
+  repeated element will show it once as fixed and once as new.
+
 ## 0.15.8
 
 ### Fixed

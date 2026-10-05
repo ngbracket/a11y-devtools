@@ -160,6 +160,15 @@ export function resolveOwningComponentName(
  * can't see. Empty when the debug global is absent or the node has none.
  */
 export function resolveDirectiveNames(node: Element): string[] {
+  return resolveDirectives(node).map((d) => d.name);
+}
+
+/**
+ * The directive instances on `node` with their names, for checks that need to
+ * look at an instance (e.g. to tell PrimeNG's `Tooltip` from another library's
+ * class of the same name). Empty when the debug global is absent.
+ */
+export function resolveDirectives(node: Element): { name: string; instance: object }[] {
   const ng = ngDebug();
   if (!ng?.getDirectives) return [];
   let directives: unknown[];
@@ -168,10 +177,10 @@ export function resolveDirectiveNames(node: Element): string[] {
   } catch {
     return []; // node isn't part of a live view
   }
-  const names: string[] = [];
+  const found: { name: string; instance: object }[] = [];
   for (const directive of directives) {
     const name = nameOf(directive);
-    if (name) names.push(name);
+    if (name) found.push({ name, instance: directive as object });
   }
-  return names;
+  return found;
 }

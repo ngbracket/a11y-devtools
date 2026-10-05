@@ -7,9 +7,9 @@
  * output, overlay, and report as the axe violations — attributed to the owning
  * component like everything else.
  *
- * Honesty guardrail: these are *heuristics*, not axe rules. `click-without-key`
- * and `tab-order-mismatch` are flagged as candidates to verify by hand, never as
- * confirmed failures.
+ * Honesty guardrail: these are *heuristics*, not axe rules. `click-without-key`,
+ * `hover-only-content` and `tab-order-mismatch` are flagged as candidates to
+ * verify by hand, never as confirmed failures.
  */
 import {
   appComponentFromPath,
@@ -24,13 +24,16 @@ import {
   hasFocusableDescendant,
   hasTabbableDescendant,
   isHidden,
+  isDisabled,
   isNativelyFocusable,
   isTabbable,
   tabSequence,
   visualOrderJumps,
 } from './tab-sequence.js';
 import { findUncontainedModals } from './focus-trap.js';
+import { hoverSignal, type HoverSignal } from './hover-content.js';
 import { blockingModalDialog } from '../top-layer.js';
+import { OVERLAY_EXCLUDE_SELECTOR } from '../overlay.js';
 
 export interface KeyboardScanOptions {
   /** UI-primitive prefixes to walk past during attribution; see the scan options. */
@@ -248,6 +251,21 @@ function isComponentHost(el: Element, ng: ReturnType<typeof ngDebug>): boolean {
   }
 }
 
+/**
+ * True when an ancestor of `element` is tabbable (focus lands there, as with an
+ * icon inside a link) or is in `flagged` (already reported).
+ */
+function hasTabbableOrFlaggedAncestor(
+  element: Element,
+  flagged: ReadonlySet<Element>,
+  isVisible?: (el: Element) => boolean,
+): boolean {
+  for (let el = element.parentElement; el; el = el.parentElement) {
+    if (flagged.has(el) || isTabbable(el, isVisible)) return true;
+  }
+  return false;
+}
+
 const ITEM_SELECTOR = [...INTERACTIVE_ROLES].map((role) => `[role="${role}"]`).join(',');
 
 /**
@@ -284,16 +302,55 @@ function partOfKeyboardOperatedWidget(
  */
 export const RULE_DOCS = 'https://ngbracket.com/tools/a11y-devtools/docs';
 
-/** A short, human CSS-ish selector for our own findings (not an axe target). */
+/**
+ * A short, human CSS-ish selector for our own findings (not an axe target). When
+ * the short form matches more than one element (an icon repeated in every table
+ * row), it becomes an `:nth-child` path from the nearest unique `id` or `<body>`,
+ * so the overlay draws each finding on its own element instead of the first match.
+ */
 export function shortSelector(element: Element): string {
+  const short = shortForm(element);
+  const doc = element.ownerDocument;
+  if (!doc || matchCount(doc, short) <= 1) return short;
+  const steps: string[] = [];
+  for (let el: Element | null = element; el && el !== doc.body && el !== doc.documentElement; el = el.parentElement) {
+    if (el !== element && el.id && matchCount(doc, `#${cssEscape(el.id)}`) === 1) {
+      steps.unshift(`${el.tagName.toLowerCase()}#${cssEscape(el.id)}`);
+      return steps.join(' > ');
+    }
+    const parent = el.parentElement;
+    const index = parent ? [...parent.children].indexOf(el) + 1 : 1;
+    steps.unshift(el === element ? `${short}:nth-child(${index})` : `${el.tagName.toLowerCase()}:nth-child(${index})`);
+  }
+  steps.unshift('body');
+  return steps.join(' > ');
+}
+
+function shortForm(element: Element): string {
   const tag = element.tagName.toLowerCase();
-  if (element.id) return `${tag}#${element.id}`;
+  if (element.id) return `${tag}#${cssEscape(element.id)}`;
   const classes = (element.getAttribute('class') ?? '')
     .trim()
     .split(/\s+/)
     .filter(Boolean)
-    .slice(0, 2);
+    .slice(0, 2)
+    .map(cssEscape);
   return classes.length ? `${tag}.${classes.join('.')}` : tag;
+}
+
+function matchCount(doc: Document, selector: string): number {
+  try {
+    return doc.querySelectorAll(selector).length;
+  } catch {
+    return 0; // not a valid selector here: keep the short form
+  }
+}
+
+/** `CSS.escape` where available (not in every test DOM); else escape the usual suspects. */
+function cssEscape(value: string): string {
+  const css = (globalThis as { CSS?: { escape?: (v: string) => string } }).CSS;
+  if (typeof css?.escape === 'function') return css.escape(value);
+  return value.replace(/^(\d)/, '\\3$1 ').replace(/([^\w-])/g, '\\$1');
 }
 
 /** Truncated outerHTML for a finding's `html`. */
@@ -317,6 +374,44 @@ export function scanKeyboard(
   const findings: A11yFinding[] = [];
   const keyCache = new Map<Element, boolean>();
   const sharedCache: SharedStopCache = new Map();
+  /** Elements reported as unreachable controls, so the hover check doesn't repeat them. */
+  const unreachable = new Set<Element>();
+
+  const hoverFinding = (element: Element, signal: HoverSignal): A11yFinding => {
+    const url = `${RULE_DOCS}/hover-only-content`;
+    if (isNativelyFocusable(element) && isDisabled(element)) {
+      return make(
+        element,
+        'ngbr/hover-only-content',
+        'moderate',
+        `Keyboard users can't see this disabled control's hover content: a disabled control ` +
+          `can't take focus, so its tooltip only opens for the mouse. Use aria-disabled="true" ` +
+          `instead of disabled, or show the reason as text. Heuristic — verify manually.`,
+        url,
+      );
+    }
+    if (signal === 'title') {
+      return make(
+        element,
+        'ngbr/hover-only-content',
+        'minor',
+        `Only mouse users see this icon's title: Tab doesn't reach the icon, so its title ` +
+          `never shows for keyboard users. Show the text on the page, or put the icon in a ` +
+          `focusable control with a visible label or tooltip. Heuristic — verify manually.`,
+        url,
+      );
+    }
+    const what = signal === 'tooltip' ? 'it has a tooltip' : 'it listens for the mouse moving over it';
+    return make(
+      element,
+      'ngbr/hover-only-content',
+      'moderate',
+      `Keyboard users may not see what this shows on hover: ${what}, but Tab doesn't reach ` +
+        `it. Make it focusable (a <button>, or tabindex="0") so the content also opens on ` +
+        `focus, or show the text on the page. Heuristic — verify manually.`,
+      url,
+    );
+  };
 
   const make = (
     element: Element,
@@ -384,9 +479,11 @@ export function scanKeyboard(
             `${RULE_DOCS}/unreachable-control`,
           ),
         );
+        unreachable.add(element);
         continue;
       }
       const reason = interactiveByRole ? `has role="${role}"` : 'has a click handler';
+      unreachable.add(element);
       findings.push(
         make(
           element,
@@ -417,6 +514,26 @@ export function scanKeyboard(
         ),
       );
     }
+  }
+
+  // Hover-only content: a tooltip, hover listener or icon `title` on something
+  // Tab can't reach, so keyboard users never see what it shows.
+  const hoverFlagged = new Set<Element>();
+  for (const element of root.querySelectorAll('*')) {
+    if (modal && !modal.contains(element)) continue;
+    if (unreachable.has(element) || element.closest(OVERLAY_EXCLUDE_SELECTOR)) continue;
+    const signal = hoverSignal(element);
+    if (!signal) continue;
+    if (isTabbable(element, isVisible) || isHidden(element, isVisible)) continue;
+    // A wrapper around something Tab reaches: focus lands inside it. Skipped to
+    // keep false positives down, though the tooltip may still not open on focus.
+    if (hasTabbableDescendant(element, isVisible)) continue;
+    // Inside something Tab reaches (an icon in a link), or inside an element
+    // already reported: one finding is enough.
+    if (hasTabbableOrFlaggedAncestor(element, hoverFlagged, isVisible)) continue;
+    if (reachedWithinWidget(element, isVisible, keyCache, sharedCache) === 'reached') continue;
+    hoverFlagged.add(element);
+    findings.push(hoverFinding(element, signal));
   }
 
   // Missing focus trap (M3): an open aria-modal whose focus isn't contained.

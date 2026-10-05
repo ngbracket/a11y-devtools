@@ -74,8 +74,8 @@ export interface ScanPagesOptions {
   frameworkPrefixes?: readonly string[];
   /**
    * Also run the keyboard layer in-page — heuristic `ngbr/*` findings for
-   * keyboard-unreachable controls, click-without-keyboard handlers, and
-   * tab-order mismatches (the last needs real layout, which headless has).
+   * keyboard-unreachable controls, click-without-keyboard handlers, hover-only
+   * content, and tab-order mismatches (the last needs real layout, which headless has).
    * Default false.
    */
   keyboard?: boolean;
