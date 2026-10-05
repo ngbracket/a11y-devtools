@@ -43,6 +43,12 @@ export interface A11yFinding {
   directives: string[];
   /** CSS selector axe reported for the node. */
   target: string;
+  /**
+   * A selector that matches only this node, when `target` can match others.
+   * Set by the keyboard layer; the overlay uses it to find the node. Not part of
+   * a finding's identity in a baseline.
+   */
+  locator?: string;
   html: string;
 }
 

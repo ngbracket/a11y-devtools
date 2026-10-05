@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { RULE_DOCS, scanKeyboard, shortSelector } from '../keyboard/keyboard-scan';
+import { RULE_DOCS, scanKeyboard, shortSelector, uniqueLocator } from '../keyboard/keyboard-scan';
 import { hoverSignal, isIconLike } from '../keyboard/hover-content';
 
 /** A directive instance whose class is called `name`, with extra own properties. */
@@ -70,8 +70,14 @@ describe('ngbr/hover-only-content', () => {
   describe('tooltip libraries, by directive (bound input, no marker)', () => {
     it('flags MatTooltip, NgbTooltip, NzTooltipDirective, TuiHint and TippyDirective', () => {
       const host = fixture(['a', 'b', 'c', 'd', 'e'].map((id) => `<span id="${id}">?</span>`).join(''));
-      const names = ['MatTooltip', 'NgbTooltip', 'NzTooltipDirective', 'TuiHint', 'TippyDirective'];
-      const dirs = new Map(names.map((name, i) => [host.children[i], [directive(name)]]));
+      const instances = [
+        directive('MatTooltip', { message: 'Info' }),
+        directive('NgbTooltip', { ngbTooltip: 'Info' }),
+        directive('NzTooltipDirective'),
+        directive('TuiHint'),
+        directive('TippyDirective'),
+      ];
+      const dirs = new Map(instances.map((d, i) => [host.children[i], [d]]));
       withNg(() => expect(hover(host).map((f) => f.target)).toEqual(['span#a', 'span#b', 'span#c', 'span#d', 'span#e']), new Map(), dirs);
     });
 
@@ -87,9 +93,39 @@ describe('ngbr/hover-only-content', () => {
     });
   });
 
-  it('flags an element with an Angular hover listener', () => {
+  it('flags an element with an Angular hover listener, as minor', () => {
     const host = fixture('<span id="hint">?</span>');
-    withNg(() => expect(hover(host)).toHaveLength(1), new Map([[host.firstElementChild!, ['mouseenter', 'mouseleave']]]));
+    withNg(
+      () => expect(hover(host).map((f) => f.impact)).toEqual(['minor']),
+      new Map([[host.firstElementChild!, ['mouseenter', 'mouseleave']]]),
+    );
+  });
+
+  describe('a tooltip that is switched off', () => {
+    it('is skipped by Material’s disabled class, in any build', () => {
+      expect(hover(fixture('<span class="mat-mdc-tooltip-trigger mat-mdc-tooltip-disabled">Long name</span>'))).toEqual([]);
+    });
+
+    it('is skipped when the marker attribute is empty', () => {
+      expect(hover(fixture('<span mattooltip="">?</span><span ptooltip=" ">?</span>'))).toEqual([]);
+    });
+
+    it('is skipped when the directive instance is off or has no text', () => {
+      const host = fixture('<span>a</span><span>b</span><span>c</span><span>d</span><span>e</span>');
+      const [a, b, c, d, e] = [...host.children];
+      const dirs = new Map<Element, object[]>([
+        [a, [directive('MatTooltip', { disabled: true, message: 'x' })]],
+        [b, [directive('MatTooltip', { disabled: false, message: '' })]],
+        [c, [directive('Tooltip', { tooltipPosition: 'right', tooltipDisabled: true })]],
+        [d, [directive('NgbTooltip', { disableTooltip: true, ngbTooltip: 'x' })]],
+        [e, [directive('TooltipDirective', { tooltip: 'x', isDisabled: true })]],
+      ]);
+      withNg(() => expect(hover(host)).toEqual([]), new Map(), dirs);
+    });
+  });
+
+  it('ignores a generic [tooltip] or [tp] attribute on a custom element', () => {
+    expect(hover(fixture('<my-chart tooltip></my-chart><x-avatar tp="x"></x-avatar>'))).toEqual([]);
   });
 
   describe('title', () => {
@@ -100,6 +136,14 @@ describe('ngbr/hover-only-content', () => {
 
     it('ignores a title on text', () => {
       expect(hover(fixture('<abbr title="Web Content Accessibility Guidelines">WCAG</abbr>'))).toEqual([]);
+    });
+
+    it('ignores a title that repeats the alt text', () => {
+      expect(hover(fixture('<img alt="Jane Doe" title="Jane Doe" src="data:,">'))).toEqual([]);
+    });
+
+    it('does not treat a class that only starts like an icon class as an icon', () => {
+      expect(hover(fixture('<div class="faq" title="Questions">FAQ</div><div class="bi" title="x">Text</div>'))).toEqual([]);
     });
 
     it('treats icon-font ligatures as icons', () => {
@@ -140,6 +184,13 @@ describe('ngbr/hover-only-content', () => {
       expect(found.map((f) => f.html)).toEqual(['<span mattooltip="Inside">?</span>']);
     });
 
+    it('when it sits inside an element already reported as an unreachable control', () => {
+      const host = fixture('<div class="row"><mat-icon mattooltip="Details">info</mat-icon> Row</div>');
+      withNg(() => {
+        expect(scanKeyboard(host).map((f) => f.id)).toEqual(['ngbr/unreachable-control']);
+      }, new Map([[host.firstElementChild!, ['click']]]));
+    });
+
     it('when the element is already an unreachable control', () => {
       const host = fixture('<span role="button" mattooltip="Delete">x</span>');
       const ids = scanKeyboard(host).map((f) => f.id);
@@ -154,6 +205,14 @@ describe('ngbr/hover-only-content', () => {
   it('flags a disabled button with a tooltip, suggesting aria-disabled', () => {
     const found = hover(fixture('<button disabled mattooltip="Finish the form first">Submit</button>'));
     expect(found).toHaveLength(1);
+    expect(found[0].impact).toBe('moderate');
+    expect(found[0].help).toContain('aria-disabled="true"');
+  });
+
+  it('gives the disabled advice for a tooltip on a wrapper around a disabled button', () => {
+    const found = hover(fixture('<span mattooltip="Finish the form first"><button disabled>Submit</button></span>'));
+    expect(found).toHaveLength(1);
+    expect(found[0].target).toBe('span');
     expect(found[0].help).toContain('aria-disabled="true"');
   });
 
@@ -164,42 +223,46 @@ describe('ngbr/hover-only-content', () => {
     const found = hover(host);
     expect(found).toHaveLength(2);
     const icons = [...host.querySelectorAll('mat-icon')];
-    expect(found.map((f) => document.querySelector(f.target))).toEqual([icons[1], icons[2]]);
+    expect(found.map((f) => document.querySelector(f.locator ?? f.target))).toEqual([icons[1], icons[2]]);
+    // The target stays the short form, so a baseline keyed on it doesn't change.
+    expect(found.map((f) => f.target)).toEqual(['mat-icon.info', 'mat-icon.info']);
   });
 });
 
 describe('hoverSignal', () => {
   it('prefers a tooltip over a title', () => {
     const el = fixture('<mat-icon mattooltip="A" title="B">info</mat-icon>').firstElementChild!;
-    expect(hoverSignal(el)).toBe('tooltip');
+    expect(hoverSignal(el, [])).toBe('tooltip');
   });
 
   it('returns null with no signal', () => {
-    expect(hoverSignal(fixture('<span>Text</span>').firstElementChild!)).toBeNull();
+    expect(hoverSignal(fixture('<span>Text</span>').firstElementChild!, [])).toBeNull();
   });
 });
 
-describe('shortSelector', () => {
+describe('uniqueLocator', () => {
   afterEach(() => {
     document.body.innerHTML = '';
   });
 
-  it('keeps the short form when it is unique', () => {
+  it('is undefined when the short selector is already unique', () => {
     const el = fixture('<div id="only" class="a b">x</div>').firstElementChild!;
     expect(shortSelector(el)).toBe('div#only');
+    expect(uniqueLocator(el)).toBeUndefined();
   });
 
-  it('builds an nth-child path for a repeated element, from the nearest unique id', () => {
-    const host = fixture('<ul id="list"><li><i class="ic">a</i></li><li><i class="ic">b</i></li></ul>');
-    const second = host.querySelectorAll('i')[1];
-    const selector = shortSelector(second);
-    expect(selector).toBe('ul#list > li:nth-child(2) > i.ic:nth-child(1)');
+  it('stops as soon as the path is unique', () => {
+    const host = fixture('<ul id="list"><li><i class="ic">a</i></li><li><i class="ic">b</i></li></ul><i class="ic">c</i>');
+    const second = host.querySelectorAll('li i')[1];
+    const selector = uniqueLocator(second)!;
+    expect(selector).toBe('li:nth-child(2) > i.ic:nth-child(1)');
+    expect(document.querySelectorAll(selector)).toHaveLength(1);
     expect(document.querySelector(selector)).toBe(second);
   });
 
-  it('falls back to a path from body when no ancestor has an id', () => {
-    const host = fixture('<p><b>x</b></p><p><b>y</b></p>');
+  it('escapes ids and classes that aren’t valid as written', () => {
+    const host = fixture('<p><b class="md:flex">x</b></p><p><b class="md:flex">y</b></p>');
     const second = host.querySelectorAll('b')[1];
-    expect(document.querySelector(shortSelector(second))).toBe(second);
+    expect(document.querySelector(uniqueLocator(second)!)).toBe(second);
   });
 });

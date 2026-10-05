@@ -91,6 +91,17 @@ describe('createOverlay', () => {
     expect(box.style.height).toBe('30px');
   });
 
+  it('finds the node by locator when there is one, not by the shared target', () => {
+    targetEl('first', { top: 10 });
+    const second = targetEl('second', { top: 200 });
+    second.className = 'info';
+    document.getElementById('first')!.className = 'info';
+    overlay.render([finding({ target: 'div.info', locator: '#second' })]);
+
+    const box = overlayRoot()!.querySelector('[data-impact]') as HTMLElement;
+    expect(box.style.top).toBe('200px');
+  });
+
   it('colours the box by impact and labels it with the component', () => {
     targetEl('target');
     overlay.render([finding({ impact: 'serious', component: 'NavBarComponent' })]);

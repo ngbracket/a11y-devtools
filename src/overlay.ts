@@ -257,7 +257,7 @@ export function createOverlay(options: OverlayOptions = {}): A11yOverlay {
   function render(findings: A11yFinding[]): void {
     clear();
     for (const finding of findings) {
-      const target = resolveTarget(doc, finding.target);
+      const target = resolveTarget(doc, finding.locator ?? finding.target);
       if (!target) continue; // node gone since the scan (e.g. re-rendered)
       const box = buildBox(doc, finding);
       box.addEventListener('click', () => flashAndScroll(target, box));
