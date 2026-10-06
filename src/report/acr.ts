@@ -72,6 +72,7 @@ export interface AxeRuleMeta {
 const NGBR_RULES: Record<string, { criteria: string[]; ranWhen: keyof Pick<ScanChecks, 'keyboard' | 'focusTraps'> }> = {
   'ngbr/unreachable-control': { criteria: ['2.1.1'], ranWhen: 'keyboard' },
   'ngbr/click-without-key': { criteria: ['2.1.1'], ranWhen: 'keyboard' },
+  'ngbr/hover-only-content': { criteria: ['2.1.1'], ranWhen: 'keyboard' },
   'ngbr/tab-order-mismatch': { criteria: ['2.4.3'], ranWhen: 'keyboard' },
   'ngbr/modal-focus-not-contained': { criteria: ['2.4.3'], ranWhen: 'keyboard' },
   'ngbr/focus-trap': { criteria: ['2.1.2'], ranWhen: 'focusTraps' },

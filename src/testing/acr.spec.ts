@@ -136,6 +136,7 @@ describe('buildAcrWorksheet', () => {
     const on = buildAcrWorksheet(report(page, { checks: { ...checks, keyboard: true, focusTraps: true } }), RULES);
     expect(row(on.rows, '2.1.2')).toMatchObject({ result: 'no-failures-detected', checkedBy: ['ngbr/focus-trap'] });
     expect(row(on.rows, '2.4.3').checkedBy).toEqual(['ngbr/tab-order-mismatch', 'ngbr/modal-focus-not-contained']);
+    expect(row(on.rows, '2.1.1').checkedBy).toContain('ngbr/hover-only-content');
   });
 
   it('marks heuristic-only findings as possible failures, and axe findings win', () => {

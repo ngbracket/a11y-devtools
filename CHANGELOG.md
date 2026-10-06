@@ -3,6 +3,48 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.16.0
+
+### Added
+
+- New keyboard rule `ngbr/hover-only-content`. It reports an element that shows
+  content on hover when Tab can't reach it, so keyboard users may never see that
+  content. An info icon with a tooltip in a table row is the common case. The
+  rule looks for:
+  - a tooltip from Angular Material, PrimeNG, ng-bootstrap, ngx-bootstrap,
+    ng-zorro, Taiga UI or helipopper, by its directive class in a dev build or
+    by its attribute or host class in any build. Moderate. An empty tooltip
+    attribute is skipped in every build. In a dev build, a tooltip switched off
+    through its directive is skipped too (Material, PrimeNG, ng-bootstrap,
+    ngx-bootstrap, ng-zorro and helipopper), and so is Material's
+    `matTooltipDisabled` in any build.
+  - an HTML `interestfor` attribute. Moderate.
+  - an Angular `(mouseenter)`, `(mouseover)`, `(pointerenter)` or
+    `(pointerover)` listener (dev builds). Minor, since such a listener can also
+    do something else, such as highlight a row.
+  - a `title` on an icon with no visible text, unless it repeats the icon's
+    `alt` or `aria-label`. Minor.
+
+  A disabled control with a tooltip, or a wrapper around one, gets its own
+  message: a disabled control can't take focus, so use `aria-disabled="true"`
+  instead. The rule skips an element inside something Tab reaches (an icon in a
+  link), a wrapper around something Tab reaches, and anything inside an
+  element already reported. It runs with the keyboard layer and maps to WCAG
+  2.1.1 in the ACR worksheet. Like the other keyboard rules, it is a heuristic
+  to check by hand.
+
+  If you gate CI on a baseline, findings from this rule show as new after you
+  upgrade. Update the baseline once you've checked them.
+
+### Fixed
+
+- The overlay now draws each keyboard finding on its own element. Keyboard
+  findings use a short selector such as `mat-icon.info`, and when that matched
+  an element repeated in every table row, the overlay drew all the findings on
+  the first match. Findings now carry a `locator` as well: a selector that
+  matches only that element, which the overlay uses. `target` is unchanged, so
+  baselines are unaffected.
+
 ## 0.15.8
 
 ### Fixed

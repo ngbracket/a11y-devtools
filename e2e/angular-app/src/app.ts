@@ -54,6 +54,9 @@ export class FancyDirective {}
       <div role="tab" tabindex="0">One</div>
       <div class="half-built-tab" role="tab" tabindex="-1">Two</div>
     </div>
+    <!-- Hover-only content: a hand-built tooltip and an icon title Tab can't reach. -->
+    <span class="hover-hint" (mouseenter)="noop()" (mouseleave)="noop()">ⓘ</span>
+    <span class="title-icon" title="Mandatory"></span>
   `,
 })
 export class HomePageComponent {

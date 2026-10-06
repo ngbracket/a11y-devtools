@@ -1,6 +1,6 @@
 {
   "name": "@ngbracket/a11y-devtools",
-  "version": "0.15.8",
+  "version": "0.16.0",
   "description": "Finds accessibility problems in Angular apps and names the component behind each one. A dev overlay, or headless reports for CI.",
   "license": "MIT",
   "author": "Duncan Faulkner",
