@@ -5,6 +5,20 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## 0.16.1
 
+### Added
+
+- New keyboard rule `ngbr/drag-without-keyboard`. It reports a list whose items
+  move by drag and drop when the tool finds no keyboard way to move them.
+  Angular CDK drag and drop has no keyboard support of its own, so a list of
+  rows with `cdkDragHandle` icons is mouse-only unless the app adds one. The
+  rule finds drag items by the `cdk-drag` class inside a `cdk-drop-list` and by
+  `draggable="true"`, in any build, and reports each list once. It skips a list
+  with a tab stop in or next to it whose name says it moves an item ("Move up",
+  an arrow, a Material `arrow_upward` icon). Serious when Tab can't reach a drag
+  handle. Moderate in a dev build when Tab reaches the handle but no Angular key
+  listener sits on the handle, its item or the list. Maps to WCAG 2.1.1 and
+  2.5.7 in the ACR worksheet.
+
 ### Fixed
 
 - The tab-order layer now hides the page's tab stops while an Angular Material
@@ -16,6 +30,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   `mat-dialog-container`, `.cdk-dialog-container` or dialog role. Report mode
   also no longer counts Tab cycling inside a default `mat-dialog` as a
   `ngbr/focus-trap` finding.
+- The scanner now recognises the focus traps in PrimeNG, ngx-bootstrap and
+  ng-bootstrap dialogs. PrimeNG and ngx-bootstrap put their sentinels inside
+  the dialog, as its first and last tab stops. ng-bootstrap's modal and
+  offcanvas trap Tab with a script and no sentinels, so they're recognised by
+  element name. Before, the tab-order layer showed the page's stops under these
+  dialogs, and `ngbr/modal-focus-not-contained` reported a leak that wasn't
+  there.
 
 ## 0.16.0
 

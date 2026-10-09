@@ -162,6 +162,13 @@ describe.skipIf(!ready)('attribution in a real Angular app (E2E)', () => {
       expect(find(page('/').findings, 'ngbr/hover-only-content', 'title-icon').impact).toBe('minor');
     });
 
+    it('flags a drag list whose handles Tab can\'t reach, not one whose handle handles keys', () => {
+      const list = find(page('/').findings, 'ngbr/drag-without-keyboard', 'drag-mouse-only');
+      expect(list.impact).toBe('serious');
+      expect(list.component).toBe('HomePageComponent');
+      expect(page('/').findings.filter((f) => f.html.includes('drag-keys'))).toEqual([]);
+    });
+
     it('attributes findings on a second route to that route’s page component', () => {
       expect(find(page('/settings').findings, 'color-contrast', 'faint').component).toBe('SettingsPageComponent');
     });

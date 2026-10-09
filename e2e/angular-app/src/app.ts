@@ -57,6 +57,17 @@ export class FancyDirective {}
     <!-- Hover-only content: a hand-built tooltip and an icon title Tab can't reach. -->
     <span class="hover-hint" (mouseenter)="noop()" (mouseleave)="noop()">ⓘ</span>
     <span class="title-icon" title="Mandatory"></span>
+    <!-- Drag and drop (CDK's classes, written by hand): handles Tab can't reach, and a
+         handle that moves its item with the arrow keys. -->
+    <ul class="cdk-drop-list drag-mouse-only">
+      <li class="cdk-drag"><span class="cdk-drag-handle">⠿</span>One</li>
+      <li class="cdk-drag"><span class="cdk-drag-handle">⠿</span>Two</li>
+    </ul>
+    <ul class="cdk-drop-list drag-keys">
+      <li class="cdk-drag">
+        <button class="cdk-drag-handle" aria-label="Move One" (keydown.arrowUp)="noop()">⠿</button>One
+      </li>
+    </ul>
   `,
 })
 export class HomePageComponent {

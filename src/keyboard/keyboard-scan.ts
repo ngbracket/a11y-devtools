@@ -8,8 +8,8 @@
  * component like everything else.
  *
  * Honesty guardrail: these are *heuristics*, not axe rules. `click-without-key`,
- * `hover-only-content` and `tab-order-mismatch` are flagged as candidates to
- * verify by hand, never as confirmed failures.
+ * `hover-only-content`, `drag-without-keyboard` and `tab-order-mismatch` are
+ * flagged as candidates to verify by hand, never as confirmed failures.
  */
 import {
   appComponentFromPath,
@@ -32,6 +32,7 @@ import {
 } from './tab-sequence.js';
 import { findUncontainedModals } from './focus-trap.js';
 import { hoverSignal, type HoverSignal } from './hover-content.js';
+import { dragGroups, dragHandles, hasMoveControl } from './drag-drop.js';
 import { blockingModalDialog } from '../top-layer.js';
 import { OVERLAY_EXCLUDE_SELECTOR } from '../overlay.js';
 
@@ -564,6 +565,57 @@ export function scanKeyboard(
     if (reachedWithinWidget(element, isVisible, keyCache, sharedCache) === 'reached') continue;
     hoverFlagged.add(element);
     findings.push(hoverFinding(element, signal));
+  }
+
+  // Drag and drop with no keyboard way to move the items: no Move up / Move down
+  // style control near the list, and no drag handle Tab reaches that handles keys.
+  // One finding per list, on the list.
+  for (const { container, items } of dragGroups(root, (el) => isHidden(el, isVisible))) {
+    if (modal && !modal.contains(container)) continue;
+    if (container.closest(OVERLAY_EXCLUDE_SELECTOR)) continue;
+    if (hasMoveControl(container, (el) => isTabbable(el, isVisible))) continue;
+    const starts = [...new Set([container, ...items.flatMap(dragHandles)])];
+    const reachable = starts.filter((el) => isTabbable(el, isVisible));
+    const url = `${RULE_DOCS}/drag-without-keyboard`;
+    const fix =
+      `Add buttons that move an item (Move up, Move down), or make each drag handle a ` +
+      `button that moves its item with the arrow keys and announces the new position. ` +
+      `Buttons also help people who can't drag with a mouse.`;
+    if (reachable.length === 0) {
+      findings.push(
+        make(
+          container,
+          'ngbr/drag-without-keyboard',
+          'serious',
+          `Keyboard users can't move these items: ${items.length} item(s) here move by drag ` +
+            `and drop, but Tab doesn't reach a drag handle and there's no other control to ` +
+            `move them. ${fix} Heuristic — verify manually.`,
+          url,
+        ),
+      );
+      continue;
+    }
+    // Tab reaches a handle or item. In a production build the key listeners can't
+    // be seen, so assume it handles keys.
+    if (!listenersVisible()) continue;
+    const handlesKeys = reachable.some((start) => {
+      for (let el: Element | null = start; el && el !== container.parentElement; el = el.parentElement) {
+        if (hasKeyEvent(eventsOf(el))) return true;
+      }
+      return false;
+    });
+    if (handlesKeys) continue;
+    findings.push(
+      make(
+        container,
+        'ngbr/drag-without-keyboard',
+        'moderate',
+        `Keyboard users may not be able to move these items: ${items.length} item(s) here ` +
+          `move by drag and drop, and Tab reaches the drag handles, but nothing on them ` +
+          `handles keys. ${fix} Heuristic — verify manually.`,
+        url,
+      ),
+    );
   }
 
   // Missing focus trap (M3): an open aria-modal whose focus isn't contained.

@@ -24,7 +24,8 @@ export interface RunOptions {
   /**
    * Also run the keyboard layer — heuristic `ngbr/*` findings for
    * keyboard-unreachable controls, click-without-keyboard handlers, hover-only
-   * content, and tab-order mismatches. Default false.
+   * content, drag and drop with no keyboard way, and tab-order mismatches.
+   * Default false.
    */
   keyboard?: boolean;
 }
