@@ -195,6 +195,21 @@ describe.skipIf(!ready)('attribution in a real Angular app (E2E)', () => {
     expect(stderr).toContain('no component attribution (window.ng absent)');
   }, 60_000);
 
+  it('the tab-order layer shows only the stops of an open CDK dialog (aria-modal="false")', async () => {
+    const { chromium } = await import('playwright');
+    const browser = await chromium.launch();
+    try {
+      const tab = await browser.newPage();
+      await tab.goto(`${dev}/dialog?overlay`);
+      await tab.locator('.dialog-save').waitFor();
+      expect(await tab.locator('[role="dialog"]').getAttribute('aria-modal')).toBe('false');
+      const badges = tab.locator('[data-ngb-tab-order]');
+      await expect.poll(() => badges.count(), { timeout: 15_000 }).toBe(2);
+    } finally {
+      await browser.close();
+    }
+  }, 60_000);
+
   it('the in-app overlay labels findings with their components', async () => {
     const { chromium } = await import('playwright');
     const browser = await chromium.launch();

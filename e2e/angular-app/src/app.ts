@@ -3,7 +3,8 @@
  * E2E spec can check that findings are attributed to the right component
  * through the real `window.ng` debug API.
  */
-import { Component, Directive } from '@angular/core';
+import { Dialog } from '@angular/cdk/dialog';
+import { afterNextRender, Component, Directive, inject } from '@angular/core';
 
 const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 
@@ -82,14 +83,39 @@ export class HomePageComponent {
 })
 export class SettingsPageComponent {}
 
+/** The content of the real CDK dialog that DialogPageComponent opens. */
+@Component({
+  selector: 'app-dialog-content',
+  template: `<h2>Edit level</h2><input class="dialog-name" aria-label="Name" /><button class="dialog-save">Save</button>`,
+})
+export class DialogContentComponent {}
+
+/**
+ * Opens a real Angular CDK dialog on load. CDK and Material dialogs default to
+ * aria-modal="false" and put their focus-trap anchors beside the container, so
+ * this checks the tab-order layer shows only the dialog's stops.
+ */
+@Component({
+  selector: 'app-dialog-page',
+  template: `<h1>Dialog</h1><button class="behind-dialog">Behind the dialog</button>`,
+})
+export class DialogPageComponent {
+  private readonly dialog = inject(Dialog);
+  constructor() {
+    afterNextRender(() => this.dialog.open(DialogContentComponent));
+  }
+}
+
 @Component({
   selector: 'app-root',
-  imports: [HeaderComponent, HomePageComponent, SettingsPageComponent],
+  imports: [HeaderComponent, HomePageComponent, SettingsPageComponent, DialogPageComponent],
   template: `
     <app-header />
     <main>
       @if (page === 'settings') {
         <app-settings-page />
+      } @else if (page === 'dialog') {
+        <app-dialog-page />
       } @else {
         <app-home-page />
       }
@@ -98,5 +124,9 @@ export class SettingsPageComponent {}
 })
 export class AppComponent {
   // No router needed: the route picks the page.
-  page = location.pathname.startsWith('/settings') ? 'settings' : 'home';
+  page = location.pathname.startsWith('/settings')
+    ? 'settings'
+    : location.pathname.startsWith('/dialog')
+      ? 'dialog'
+      : 'home';
 }
