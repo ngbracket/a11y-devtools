@@ -161,8 +161,21 @@ describe('ngbr/drag-without-keyboard', () => {
   });
 
   it('reports tabindex="-1" items with no key handling as moderate (dev build)', () => {
-    const host = fixture(`<ul class="cdk-drop-list"><li class="cdk-drag" tabindex="-1">One</li></ul>`);
+    const host = fixture(`<ul class="cdk-drop-list"><li class="cdk-drag" tabindex="0">One</li><li class="cdk-drag" tabindex="-1">Two</li></ul>`);
     withNg(() => expect(drag(host).map((f) => f.impact)).toEqual(['moderate']));
+  });
+
+  it('still reports serious when every item is tabindex="-1" and nothing is a tab stop', () => {
+    const host = fixture(`<ul class="cdk-drop-list"><li class="cdk-drag" tabindex="-1">One</li><li class="cdk-drag" tabindex="-1">Two</li></ul>`);
+    withNg(() => expect(drag(host).map((f) => f.impact)).toEqual(['serious']));
+    withoutNg(() => expect(drag(host).map((f) => f.impact)).toEqual(['serious']));
+  });
+
+  it('skips native draggable images inside a CDK item', () => {
+    const host = fixture(`
+      <ul class="cdk-drop-list"><li class="cdk-drag"><button>Move One down</button>
+        <img draggable="true" alt="a" src="a.png" /><img draggable="true" alt="b" src="b.png" /></li></ul>`);
+    expect(drag(host)).toEqual([]);
   });
 
   it('skips disabled lists and items, and a cdkDrag outside a drop list', () => {

@@ -16,11 +16,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   reports each list once. It skips a list with a tab stop in or next to it
   whose name says it moves an item ("Move up", "Reorder", an arrow, a Material
   `arrow_upward` icon). Serious when the keyboard can't reach a drag handle of a
-  CDK list; moderate for a native `draggable` list. A handle or item with a `tabindex` counts as reachable,
+  CDK list; moderate for a native `draggable` list. A handle or item with a
+  `tabindex` counts as reachable when a drag list on the page has a tab stop,
   as in a board where one card is the tab stop and the arrow keys move to the
   rest. Moderate in a dev build when a handle is reachable but no Angular key
-  listener sits on the handle, its item, the list, or the elements up to the
-  component that holds the list. Maps to WCAG 2.1.1 and
+  listener sits on the handle, its item, the list, or the elements up to and
+  including the component that holds the list. Maps to WCAG 2.1.1 and
   2.5.7 in the ACR worksheet.
 
 ### Fixed

@@ -576,16 +576,28 @@ export function scanKeyboard(
   // Drag and drop with no keyboard way to move the items: no Move up / Move down
   // style control near the list, and no drag handle Tab reaches that handles keys.
   // One finding per list, on the list.
-  for (const { container, items, cdk } of dragGroups(root, (el) => isHidden(el, isVisible))) {
+  const groups = dragGroups(root, (el) => isHidden(el, isVisible));
+  const startsOf = (container: Element, items: Element[]) => [
+    ...new Set([container, ...items.flatMap(dragHandles)]),
+  ];
+  // A roving-tabindex board has one tab stop among all its lists; without any tab
+  // stop on the page's drag lists, a tabindex="-1" item is out of reach.
+  const anyTabStop = groups.some(({ container, items }) =>
+    startsOf(container, items).some((el) => isTabbable(el, isVisible)),
+  );
+  for (const { container, items, cdk } of groups) {
     if (modal && !modal.contains(container)) continue;
     if (container.closest(OVERLAY_EXCLUDE_SELECTOR)) continue;
     if (hasMoveControl(container, (el) => isTabbable(el, isVisible))) continue;
-    const starts = [...new Set([container, ...items.flatMap(dragHandles)])];
-    // Reachable: a tab stop, or an element script can focus (any tabindex), as in
-    // a roving-tabindex board where one card is the tab stop and arrow keys move
-    // to the rest. The key-listener check below then decides.
+    const starts = startsOf(container, items);
+    // Reachable: a tab stop, or an element script can focus (any tabindex) when a
+    // drag list on the page has a tab stop, as in a roving-tabindex board where
+    // one card is the tab stop and arrow keys move to the rest. The key-listener
+    // check below then decides.
     const reachable = starts.filter(
-      (el) => isTabbable(el, isVisible) || (hasTabindex(el) && !isDisabled(el) && !isHidden(el, isVisible)),
+      (el) =>
+        isTabbable(el, isVisible) ||
+        (anyTabStop && hasTabindex(el) && !isDisabled(el) && !isHidden(el, isVisible)),
     );
     const url = `${RULE_DOCS}/drag-without-keyboard`;
     const count = items.length === 1 ? '1 item here moves' : `${items.length} items here move`;
@@ -611,13 +623,14 @@ export function scanKeyboard(
     // The keyboard can reach a handle or item. In a production build the key
     // listeners can't be seen, so assume it handles keys.
     if (!listenersVisible()) continue;
-    // From each reachable handle up through the list to the nearest component
-    // host above it: a sortable tab list, say, handles keys on a wrapper.
+    // From each reachable handle up through the list, to and including the
+    // nearest component host above it: a sortable tab list, say, handles keys on
+    // a wrapper.
     const ng = ngDebug();
     const keyed = (start: Element): boolean => {
       for (let el: Element | null = start; el && el !== el.ownerDocument?.body; el = el.parentElement) {
         if (hasKeyEvent(eventsOf(el))) return true;
-        if (el !== start && !container.contains(el) && el !== container && isComponentHost(el, ng)) break;
+        if (!container.contains(el) && isComponentHost(el, ng)) break;
       }
       return false;
     };

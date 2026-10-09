@@ -49,6 +49,8 @@ export function dragGroups(root: ParentNode, isHidden: (el: Element) => boolean)
   const groups = new Map<Element, Element[]>();
   for (const item of root.querySelectorAll(DRAG_ITEM_SELECTOR)) {
     if (item.matches('.cdk-drag-disabled, .cdk-drag-preview, .cdk-drag-placeholder')) continue;
+    // A native draggable inside a CDK item (an image or link in a card) moves with the item.
+    if (!item.classList.contains('cdk-drag') && item.parentElement?.closest('.cdk-drag')) continue;
     // From the parent: an element can be both an item and a drop list (nested lists).
     const container = item.classList.contains('cdk-drag')
       ? item.parentElement?.closest('.cdk-drop-list')
