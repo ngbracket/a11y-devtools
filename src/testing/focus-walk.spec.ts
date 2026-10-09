@@ -105,4 +105,31 @@ describe('createFocusWalkProbe', () => {
 
     expect(walk.trapFinding([ok, cancel], false)).toBeNull();
   });
+  it('does not report focus cycling inside a default mat-dialog (aria-modal="false")', () => {
+    document.body.innerHTML = `
+      <mat-dialog-container role="dialog" aria-modal="false" tabindex="-1">
+        <button id="ok">OK</button><button id="cancel">Cancel</button>
+      </mat-dialog-container>
+    `;
+    const walk = createFocusWalkProbe(document);
+    focus('ok');
+    const ok = walk.probe().id!;
+    focus('cancel');
+    const cancel = walk.probe().id!;
+
+    expect(walk.trapFinding([ok, cancel], false)).toBeNull();
+  });
+
+  it('still reports focus cycling inside a plain non-modal dialog', () => {
+    document.body.innerHTML = `
+      <div role="dialog"><button id="ok">OK</button><button id="cancel">Cancel</button></div>
+    `;
+    const walk = createFocusWalkProbe(document);
+    focus('ok');
+    const ok = walk.probe().id!;
+    focus('cancel');
+    const cancel = walk.probe().id!;
+
+    expect(walk.trapFinding([ok, cancel], false)).not.toBeNull();
+  });
 });

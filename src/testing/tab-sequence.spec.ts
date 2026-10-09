@@ -156,6 +156,37 @@ describe('tab-sequence', () => {
     expect(ids).toEqual(['name', 'save']);
   });
 
+  it('only counts stops inside a default mat-dialog (aria-modal="false", CDK anchors beside it)', () => {
+    // Material 22's real structure: anchors are siblings of the container, and
+    // ariaModal defaults to false (the page is hidden with aria-hidden instead).
+    const host = fixture(`
+      <button id="behind">behind</button>
+      <div class="cdk-overlay-container">
+        <div class="cdk-global-overlay-wrapper">
+          <div class="cdk-overlay-pane mat-mdc-dialog-panel">
+            <div tabindex="0" class="cdk-visually-hidden cdk-focus-trap-anchor" aria-hidden="true"></div>
+            <mat-dialog-container tabindex="-1" role="dialog" aria-modal="false" class="mat-mdc-dialog-container">
+              <input id="name" /><button id="save">Save</button>
+            </mat-dialog-container>
+            <div tabindex="0" class="cdk-visually-hidden cdk-focus-trap-anchor" aria-hidden="true"></div>
+          </div>
+        </div>
+      </div>
+    `);
+    const ids = tabSequence(host, { isVisible: alwaysVisible }).map((s) => s.element.id);
+    expect(ids).toEqual(['name', 'save']);
+  });
+
+  it('keeps the page stops for a dialog with no focus-trap anchors (non-modal)', () => {
+    const host = fixture(`
+      <button id="behind">behind</button>
+      <div role="dialog" aria-modal="false"><button id="ok">OK</button></div>
+      <button id="after">after</button>
+    `);
+    const ids = tabSequence(host, { isVisible: alwaysVisible }).map((s) => s.element.id);
+    expect(ids).toEqual(['behind', 'ok', 'after']);
+  });
+
   it('isTabbable honours the visibility predicate', () => {
     const host = fixture(`<button id="b">b</button>`);
     const button = host.querySelector('#b')!;

@@ -66,14 +66,23 @@ export function isFocusSentinel(el: Element): boolean {
 }
 
 /**
- * The open `aria-modal` whose focus a JS trap keeps in, or null: its stops are
- * one unbroken run in `order` with a sentinel directly before and after. The
+ * Elements that may hold a JS focus trap: any `aria-modal`, any dialog role, and
+ * the Angular CDK / Material dialog containers. Material 22 opens `mat-dialog`
+ * with `aria-modal="false"` (it hides the page with `aria-hidden` instead), so
+ * `aria-modal="true"` alone misses every default Material dialog.
+ */
+export const TRAP_CANDIDATE_SELECTOR =
+  '[aria-modal="true"], [role="dialog"], [role="alertdialog"], mat-dialog-container, .cdk-dialog-container';
+
+/**
+ * The open dialog whose focus a JS trap keeps in, or null: its stops are one
+ * unbroken run in `order` with a sentinel directly before and after. The
  * browser can reach those sentinels, but the trap sends focus from them back
- * into the modal. Checked with real Tab presses on a CDK dialog: from the last
+ * into the dialog. Checked with real Tab presses on a CDK dialog: from the last
  * control, Tab wraps to the first. With several, the last is the topmost.
  */
 function sentinelTrappedModal(root: ParentNode, order: Element[]): Element | null {
-  const modals = [...root.querySelectorAll('[aria-modal="true"]')].reverse();
+  const modals = [...root.querySelectorAll(TRAP_CANDIDATE_SELECTOR)].reverse();
   for (const modal of modals) {
     const inside = order.map((el) => modal.contains(el));
     const first = inside.indexOf(true);

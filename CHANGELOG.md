@@ -3,6 +3,20 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.16.1
+
+### Fixed
+
+- The tab-order layer now hides the page's tab stops while an Angular Material
+  dialog is open. Material 22 opens `mat-dialog` with `aria-modal="false"` by
+  default and hides the page from screen readers with `aria-hidden`. The
+  scanner only looked for the CDK focus trap around `aria-modal="true"`
+  elements, so it missed the trap and numbered the page's stops under the
+  dialog as well as the dialog's own. It now finds the trap around any
+  `mat-dialog-container`, `.cdk-dialog-container` or dialog role. Report mode
+  also no longer counts Tab cycling inside a default `mat-dialog` as a
+  `ngbr/focus-trap` finding.
+
 ## 0.16.0
 
 ### Added

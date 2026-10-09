@@ -45,6 +45,20 @@ describe('findUncontainedModals', () => {
     expect(findUncontainedModals(host, alwaysVisible)).toEqual([]);
   });
 
+  it('does not flag a default mat-dialog (aria-modal="false") as a leak', () => {
+    const host = fixture(`
+      <button id="behind">Page button</button>
+      <div class="cdk-overlay-pane">
+        <div tabindex="0" class="cdk-focus-trap-anchor" aria-hidden="true"></div>
+        <mat-dialog-container role="dialog" aria-modal="false" tabindex="-1">
+          <input aria-label="Name" /><button>Save</button>
+        </mat-dialog-container>
+        <div tabindex="0" class="cdk-focus-trap-anchor" aria-hidden="true"></div>
+      </div>
+    `);
+    expect(findUncontainedModals(host, alwaysVisible)).toEqual([]);
+  });
+
   it('accepts data-focus-guard sentinels (the focus-lock pattern)', () => {
     const host = fixture(`
       <button>Page button</button>
