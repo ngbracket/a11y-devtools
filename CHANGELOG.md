@@ -3,7 +3,7 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-## 0.16.1
+## 0.17.0
 
 ### Added
 
