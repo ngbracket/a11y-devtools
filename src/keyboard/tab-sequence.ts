@@ -71,7 +71,7 @@ export function isFocusSentinel(el: Element): boolean {
  * with `aria-modal="false"` (it hides the page with `aria-hidden` instead), so
  * `aria-modal="true"` alone misses every default Material dialog.
  */
-export const TRAP_CANDIDATE_SELECTOR =
+const TRAP_CANDIDATE_SELECTOR =
   '[aria-modal="true"], [role="dialog"], [role="alertdialog"], mat-dialog-container, .cdk-dialog-container';
 
 /**

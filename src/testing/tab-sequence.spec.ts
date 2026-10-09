@@ -177,6 +177,22 @@ describe('tab-sequence', () => {
     expect(ids).toEqual(['name', 'save']);
   });
 
+  it('picks the mat-dialog-container, not a role="dialog" wrapper around its anchors', () => {
+    const host = fixture(`
+      <button id="behind">behind</button>
+      <div role="dialog" id="wrapper">
+        <button id="wrapper-btn">wrapper</button>
+        <div tabindex="0" class="cdk-focus-trap-anchor" aria-hidden="true"></div>
+        <mat-dialog-container role="dialog" aria-modal="false" tabindex="-1">
+          <button id="save">Save</button>
+        </mat-dialog-container>
+        <div tabindex="0" class="cdk-focus-trap-anchor" aria-hidden="true"></div>
+      </div>
+    `);
+    const ids = tabSequence(host, { isVisible: alwaysVisible }).map((s) => s.element.id);
+    expect(ids).toEqual(['save']);
+  });
+
   it('keeps the page stops for a dialog with no focus-trap anchors (non-modal)', () => {
     const host = fixture(`
       <button id="behind">behind</button>
