@@ -65,7 +65,8 @@ export interface A11yDevtoolsOptions {
   /**
    * Turn on the **keyboard layer** — the ~2/3 of accessibility axe can't test.
    * Adds heuristic `ngbr/*` findings (keyboard-unreachable controls,
-   * click-without-keyboard handlers, hover-only content, tab-order mismatches)
+   * click-without-keyboard handlers, hover-only content, drag and drop with no
+   * keyboard way, tab-order mismatches)
    * to the report, and,
    * when `overlay` is on, draws the numbered tab-order path over the page.
    * Default false.

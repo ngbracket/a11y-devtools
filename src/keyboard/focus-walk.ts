@@ -108,7 +108,10 @@ function deepActiveElement(doc: Document): Element | null {
 /** True when focus cycling among `elements` is an open modal containing focus (fine). */
 function containedByOpenModal(elements: readonly Element[]): boolean {
   const modalOf = (el: Element): Element | null => {
-    const aria = el.closest('[aria-modal="true"]');
+    // CDK / Material dialog containers trap focus by design, even with
+    // aria-modal="false" (Material's default). This trusts the container, so a
+    // hand-built .cdk-dialog-container with no trap that leaks focus isn't flagged.
+    const aria = el.closest('[aria-modal="true"], mat-dialog-container, .cdk-dialog-container');
     if (aria) return aria;
     try {
       return el.closest('dialog:modal');

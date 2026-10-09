@@ -137,6 +137,8 @@ describe('buildAcrWorksheet', () => {
     expect(row(on.rows, '2.1.2')).toMatchObject({ result: 'no-failures-detected', checkedBy: ['ngbr/focus-trap'] });
     expect(row(on.rows, '2.4.3').checkedBy).toEqual(['ngbr/tab-order-mismatch', 'ngbr/modal-focus-not-contained']);
     expect(row(on.rows, '2.1.1').checkedBy).toContain('ngbr/hover-only-content');
+    expect(row(on.rows, '2.1.1').checkedBy).toContain('ngbr/drag-without-keyboard');
+    expect(row(on.rows, '2.5.7')).toMatchObject({ result: 'no-failures-detected', checkedBy: ['ngbr/drag-without-keyboard'] });
   });
 
   it('marks heuristic-only findings as possible failures, and axe findings win', () => {

@@ -8,8 +8,8 @@
  * component like everything else.
  *
  * Honesty guardrail: these are *heuristics*, not axe rules. `click-without-key`,
- * `hover-only-content` and `tab-order-mismatch` are flagged as candidates to
- * verify by hand, never as confirmed failures.
+ * `hover-only-content`, `drag-without-keyboard` and `tab-order-mismatch` are
+ * flagged as candidates to verify by hand, never as confirmed failures.
  */
 import {
   appComponentFromPath,
@@ -32,6 +32,7 @@ import {
 } from './tab-sequence.js';
 import { findUncontainedModals } from './focus-trap.js';
 import { hoverSignal, type HoverSignal } from './hover-content.js';
+import { dragGroups, dragHandles, hasMoveControl } from './drag-drop.js';
 import { blockingModalDialog } from '../top-layer.js';
 import { OVERLAY_EXCLUDE_SELECTOR } from '../overlay.js';
 
@@ -73,6 +74,12 @@ const KEY_EVENTS = ['keydown', 'keyup', 'keypress'];
  */
 function hasKeyEvent(events: readonly string[]): boolean {
   return events.some((e) => KEY_EVENTS.includes(e.split('.')[0]));
+}
+
+/** True when `element` has a numeric `tabindex`, so script can focus it. */
+function hasTabindex(element: Element): boolean {
+  const tabindex = element.getAttribute('tabindex');
+  return tabindex !== null && !Number.isNaN(Number.parseInt(tabindex, 10));
 }
 
 /**
@@ -564,6 +571,82 @@ export function scanKeyboard(
     if (reachedWithinWidget(element, isVisible, keyCache, sharedCache) === 'reached') continue;
     hoverFlagged.add(element);
     findings.push(hoverFinding(element, signal));
+  }
+
+  // Drag and drop with no keyboard way to move the items: no Move up / Move down
+  // style control near the list, and no drag handle Tab reaches that handles keys.
+  // One finding per list, on the list.
+  const groups = dragGroups(root, (el) => isHidden(el, isVisible));
+  const startsOf = (container: Element, items: Element[]) => [
+    ...new Set([container, ...items.flatMap(dragHandles)]),
+  ];
+  // A roving-tabindex board has one tab stop among all its lists; without any tab
+  // stop on the page's drag lists, a tabindex="-1" item is out of reach.
+  const anyTabStop = groups.some(({ container, items }) =>
+    startsOf(container, items).some((el) => isTabbable(el, isVisible)),
+  );
+  for (const { container, items, cdk } of groups) {
+    if (modal && !modal.contains(container)) continue;
+    if (container.closest(OVERLAY_EXCLUDE_SELECTOR)) continue;
+    if (hasMoveControl(container, (el) => isTabbable(el, isVisible))) continue;
+    const starts = startsOf(container, items);
+    // Reachable: a tab stop, or an element script can focus (any tabindex) when a
+    // drag list on the page has a tab stop, as in a roving-tabindex board where
+    // one card is the tab stop and arrow keys move to the rest. The key-listener
+    // check below then decides.
+    const reachable = starts.filter(
+      (el) =>
+        isTabbable(el, isVisible) ||
+        (anyTabStop && hasTabindex(el) && !isDisabled(el) && !isHidden(el, isVisible)),
+    );
+    const url = `${RULE_DOCS}/drag-without-keyboard`;
+    const count = items.length === 1 ? '1 item here moves' : `${items.length} items here move`;
+    const fix =
+      `Add buttons that move an item (Move up, Move down), or make each drag handle a ` +
+      `button that moves its item with the arrow keys and announces the new position. ` +
+      `Buttons also help people who can't drag with a mouse.`;
+    if (reachable.length === 0) {
+      findings.push(
+        make(
+          container,
+          'ngbr/drag-without-keyboard',
+          // Native draggable="true" is weaker evidence of a list to reorder than CDK's.
+          cdk ? 'serious' : 'moderate',
+          `Keyboard users can't move these items: ${count} by drag and drop, but Tab ` +
+            `doesn't reach a drag handle and there's no other control to move them. ` +
+            `${fix} Heuristic — verify manually.`,
+          url,
+        ),
+      );
+      continue;
+    }
+    // The keyboard can reach a handle or item. In a production build the key
+    // listeners can't be seen, so assume it handles keys.
+    if (!listenersVisible()) continue;
+    // From each reachable handle up through the list, to and including the
+    // nearest component host above it: a sortable tab list, say, handles keys on
+    // a wrapper.
+    const ng = ngDebug();
+    const keyed = (start: Element): boolean => {
+      for (let el: Element | null = start; el && el !== el.ownerDocument?.body; el = el.parentElement) {
+        if (hasKeyEvent(eventsOf(el))) return true;
+        if (!container.contains(el) && isComponentHost(el, ng)) break;
+      }
+      return false;
+    };
+    const handlesKeys = reachable.some(keyed);
+    if (handlesKeys) continue;
+    findings.push(
+      make(
+        container,
+        'ngbr/drag-without-keyboard',
+        'moderate',
+        `Keyboard users may not be able to move these items: ${count} by drag and drop, ` +
+          `and the keyboard can reach their drag handles, but nothing on them handles keys. ` +
+          `${fix} Heuristic — verify manually.`,
+        url,
+      ),
+    );
   }
 
   // Missing focus trap (M3): an open aria-modal whose focus isn't contained.

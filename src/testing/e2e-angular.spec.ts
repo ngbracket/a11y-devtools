@@ -162,6 +162,13 @@ describe.skipIf(!ready)('attribution in a real Angular app (E2E)', () => {
       expect(find(page('/').findings, 'ngbr/hover-only-content', 'title-icon').impact).toBe('minor');
     });
 
+    it('flags a drag list whose handles Tab can\'t reach, not one whose handle handles keys', () => {
+      const list = find(page('/').findings, 'ngbr/drag-without-keyboard', 'drag-mouse-only');
+      expect(list.impact).toBe('serious');
+      expect(list.component).toBe('HomePageComponent');
+      expect(page('/').findings.filter((f) => f.html.includes('drag-keys'))).toEqual([]);
+    });
+
     it('attributes findings on a second route to that route’s page component', () => {
       expect(find(page('/settings').findings, 'color-contrast', 'faint').component).toBe('SettingsPageComponent');
     });
@@ -186,6 +193,21 @@ describe.skipIf(!ready)('attribution in a real Angular app (E2E)', () => {
     expect(stdout).toContain('(unknown component)'); // …but can't name components
     expect(stdout).not.toContain('HeaderComponent');
     expect(stderr).toContain('no component attribution (window.ng absent)');
+  }, 60_000);
+
+  it('the tab-order layer shows only the stops of an open CDK dialog (aria-modal="false")', async () => {
+    const { chromium } = await import('playwright');
+    const browser = await chromium.launch();
+    try {
+      const tab = await browser.newPage();
+      await tab.goto(`${dev}/dialog?overlay`);
+      await tab.locator('.dialog-save').waitFor();
+      expect(await tab.locator('[role="dialog"]').getAttribute('aria-modal')).toBe('false');
+      const badges = tab.locator('[data-ngb-tab-order]');
+      await expect.poll(() => badges.count(), { timeout: 15_000 }).toBe(2);
+    } finally {
+      await browser.close();
+    }
   }, 60_000);
 
   it('the in-app overlay labels findings with their components', async () => {
