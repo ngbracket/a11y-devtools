@@ -11,14 +11,16 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   move by drag and drop when the tool finds no keyboard way to move them.
   Angular CDK drag and drop has no keyboard support of its own, so a list of
   rows with `cdkDragHandle` icons is mouse-only unless the app adds one. The
-  rule finds drag items by the `cdk-drag` class inside a `cdk-drop-list` and by
-  `draggable="true"`, in any build, and reports each list once. It skips a list
-  with a tab stop in or next to it whose name says it moves an item ("Move up",
-  an arrow, a Material `arrow_upward` icon). Serious when the keyboard can't
-  reach a drag handle. A handle or item with a `tabindex` counts as reachable,
+  rule finds drag items by the `cdk-drag` class inside a `cdk-drop-list`, and
+  by `draggable="true"` when a parent holds two or more, in any build. It
+  reports each list once. It skips a list with a tab stop in or next to it
+  whose name says it moves an item ("Move up", "Reorder", an arrow, a Material
+  `arrow_upward` icon). Serious when the keyboard can't reach a drag handle of a
+  CDK list; moderate for a native `draggable` list. A handle or item with a `tabindex` counts as reachable,
   as in a board where one card is the tab stop and the arrow keys move to the
   rest. Moderate in a dev build when a handle is reachable but no Angular key
-  listener sits on the handle, its item or the list. Maps to WCAG 2.1.1 and
+  listener sits on the handle, its item, the list, or the elements up to the
+  component that holds the list. Maps to WCAG 2.1.1 and
   2.5.7 in the ACR worksheet.
 
 ### Fixed

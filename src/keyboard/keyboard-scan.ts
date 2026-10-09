@@ -576,7 +576,7 @@ export function scanKeyboard(
   // Drag and drop with no keyboard way to move the items: no Move up / Move down
   // style control near the list, and no drag handle Tab reaches that handles keys.
   // One finding per list, on the list.
-  for (const { container, items } of dragGroups(root, (el) => isHidden(el, isVisible))) {
+  for (const { container, items, cdk } of dragGroups(root, (el) => isHidden(el, isVisible))) {
     if (modal && !modal.contains(container)) continue;
     if (container.closest(OVERLAY_EXCLUDE_SELECTOR)) continue;
     if (hasMoveControl(container, (el) => isTabbable(el, isVisible))) continue;
@@ -588,6 +588,7 @@ export function scanKeyboard(
       (el) => isTabbable(el, isVisible) || (hasTabindex(el) && !isDisabled(el) && !isHidden(el, isVisible)),
     );
     const url = `${RULE_DOCS}/drag-without-keyboard`;
+    const count = items.length === 1 ? '1 item here moves' : `${items.length} items here move`;
     const fix =
       `Add buttons that move an item (Move up, Move down), or make each drag handle a ` +
       `button that moves its item with the arrow keys and announces the new position. ` +
@@ -597,10 +598,11 @@ export function scanKeyboard(
         make(
           container,
           'ngbr/drag-without-keyboard',
-          'serious',
-          `Keyboard users can't move these items: ${items.length} item(s) here move by drag ` +
-            `and drop, but Tab doesn't reach a drag handle and there's no other control to ` +
-            `move them. ${fix} Heuristic — verify manually.`,
+          // Native draggable="true" is weaker evidence of a list to reorder than CDK's.
+          cdk ? 'serious' : 'moderate',
+          `Keyboard users can't move these items: ${count} by drag and drop, but Tab ` +
+            `doesn't reach a drag handle and there's no other control to move them. ` +
+            `${fix} Heuristic — verify manually.`,
           url,
         ),
       );
@@ -609,21 +611,26 @@ export function scanKeyboard(
     // The keyboard can reach a handle or item. In a production build the key
     // listeners can't be seen, so assume it handles keys.
     if (!listenersVisible()) continue;
-    const handlesKeys = reachable.some((start) => {
-      for (let el: Element | null = start; el && el !== container.parentElement; el = el.parentElement) {
+    // From each reachable handle up through the list to the nearest component
+    // host above it: a sortable tab list, say, handles keys on a wrapper.
+    const ng = ngDebug();
+    const keyed = (start: Element): boolean => {
+      for (let el: Element | null = start; el && el !== el.ownerDocument?.body; el = el.parentElement) {
         if (hasKeyEvent(eventsOf(el))) return true;
+        if (el !== start && !container.contains(el) && el !== container && isComponentHost(el, ng)) break;
       }
       return false;
-    });
+    };
+    const handlesKeys = reachable.some(keyed);
     if (handlesKeys) continue;
     findings.push(
       make(
         container,
         'ngbr/drag-without-keyboard',
         'moderate',
-        `Keyboard users may not be able to move these items: ${items.length} item(s) here ` +
-          `move by drag and drop, and the keyboard can reach their drag handles, but nothing ` +
-          `on them handles keys. ${fix} Heuristic — verify manually.`,
+        `Keyboard users may not be able to move these items: ${count} by drag and drop, ` +
+          `and the keyboard can reach their drag handles, but nothing on them handles keys. ` +
+          `${fix} Heuristic — verify manually.`,
         url,
       ),
     );

@@ -17,22 +17,28 @@ export interface DragGroup {
   container: Element;
   /** The items that can be dragged now (not disabled, not hidden). */
   items: Element[];
+  /** True for CDK drag and drop; false for native `draggable="true"`. */
+  cdk: boolean;
 }
 
 const DRAG_ITEM_SELECTOR = '.cdk-drop-list .cdk-drag, [draggable="true"]';
 
 /**
- * Names of controls that move an item: "Move up", "Move to top", "Earlier",
- * arrow glyphs, and the Material icon ligatures for up and down arrows.
+ * Names of controls that move an item: "Move up", "Move to top", "Reorder",
+ * arrow glyphs, and the Material icon ligatures for up and down arrows. Words
+ * such as "up" or "top" count only as the whole name, so "Sign up" or "Back to
+ * top" elsewhere near the list doesn't count.
  */
 const MOVE_NAME =
-  /\b(move|up|down|top|bottom|earlier|later|raise|lower|reorder)\b|[↑↓⬆⬇▲▼]|\b(arrow_upward|arrow_downward|keyboard_arrow_up|keyboard_arrow_down|north|south)\b/i;
+  /\b(move|reorder)\b|[↑↓⬆⬇▲▼]|\b(arrow_upward|arrow_downward|keyboard_arrow_up|keyboard_arrow_down)\b|^\s*(up|down|top|bottom|earlier|later)\s*$/i;
 
 const CONTROL_SELECTOR = 'button, a[href], [role="button"], [role="menuitem"]';
 
 /**
  * The drag lists in `root`, one per container. CDK items group by their
- * `cdk-drop-list`; native ones by their parent. A disabled list or item (CDK's
+ * `cdk-drop-list`; native ones by their parent, and only when there are at least
+ * two (one draggable on its own is more often an image or file chip to drag
+ * out of the page than a list to reorder). A disabled list or item (CDK's
  * `cdk-drop-list-disabled` / `cdk-drag-disabled`) and CDK's drag preview and
  * placeholder are left out.
  */
@@ -40,14 +46,19 @@ export function dragGroups(root: ParentNode, isHidden: (el: Element) => boolean)
   const groups = new Map<Element, Element[]>();
   for (const item of root.querySelectorAll(DRAG_ITEM_SELECTOR)) {
     if (item.matches('.cdk-drag-disabled, .cdk-drag-preview, .cdk-drag-placeholder')) continue;
-    const container = item.classList.contains('cdk-drag') ? item.closest('.cdk-drop-list') : item.parentElement;
+    // From the parent: an element can be both an item and a drop list (nested lists).
+    const container = item.classList.contains('cdk-drag')
+      ? item.parentElement?.closest('.cdk-drop-list')
+      : item.parentElement;
     if (!container || container.classList.contains('cdk-drop-list-disabled')) continue;
     if (isHidden(item)) continue;
     const items = groups.get(container) ?? [];
     items.push(item);
     groups.set(container, items);
   }
-  return [...groups].map(([container, items]) => ({ container, items }));
+  return [...groups]
+    .map(([container, items]) => ({ container, items, cdk: items[0].classList.contains('cdk-drag') }))
+    .filter((group) => group.cdk || group.items.length >= 2);
 }
 
 /**

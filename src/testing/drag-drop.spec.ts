@@ -3,10 +3,14 @@ import { RULE_DOCS, scanKeyboard } from '../keyboard/keyboard-scan';
 import { dragGroups, dragHandles } from '../keyboard/drag-drop';
 
 /** Install a fake `window.ng` whose `getListeners` reports `listeners`. */
-function withNg(fn: () => void, listeners: Map<Element, string[]> = new Map()): void {
+function withNg(
+  fn: () => void,
+  listeners: Map<Element, string[]> = new Map(),
+  hosts: ReadonlySet<Element> = new Set(),
+): void {
   const original = (globalThis as { ng?: unknown }).ng;
   (globalThis as { ng?: unknown }).ng = {
-    getComponent: () => null,
+    getComponent: (el: Element) => (hosts.has(el) ? {} : null),
     getOwningComponent: () => null,
     getDirectives: () => [],
     getListeners: (el: Element) => (listeners.get(el) ?? []).map((name) => ({ name, type: 'dom' as const })),
@@ -59,7 +63,7 @@ describe('ngbr/drag-without-keyboard', () => {
     expect(found).toHaveLength(1);
     expect(found[0].impact).toBe('serious');
     expect(found[0].target).toContain('levels');
-    expect(found[0].help).toContain('3 item(s)');
+    expect(found[0].help).toContain('3 items here move');
     expect(found[0].help).toContain('Heuristic — verify manually');
     expect(found[0].helpUrl).toBe(`${RULE_DOCS}/drag-without-keyboard`);
   });
@@ -166,12 +170,56 @@ describe('ngbr/drag-without-keyboard', () => {
     expect(drag(fixture(table(hiddenRow)))).toEqual([]);
   });
 
-  it('flags native draggable="true" items, grouped by their parent', () => {
+  it('flags native draggable="true" lists as moderate, grouped by their parent', () => {
     const host = fixture(`
       <ul id="cards"><li draggable="true">One</li><li draggable="true">Two</li></ul>
-      <ul id="other"><li draggable="true">Three</li></ul>`);
+      <ul id="other"><li draggable="true">Three</li><li draggable="true">Four</li></ul>`);
     const found = drag(host);
     expect(found.map((f) => f.target)).toEqual([expect.stringContaining('cards'), expect.stringContaining('other')]);
+    expect(found.map((f) => f.impact)).toEqual(['moderate', 'moderate']);
+  });
+
+  it('skips a lone draggable="true" element, such as an image to drag out of the page', () => {
+    expect(drag(fixture('<p><img draggable="true" alt="Logo" src="x.png" /></p>'))).toEqual([]);
+  });
+
+  it('says "1 item" for a list of one', () => {
+    expect(drag(fixture(table(row('Novice'))))[0].help).toContain('1 item here moves');
+  });
+
+  it('is not silenced by "Sign up" or "Back to top" near the list', () => {
+    const host = fixture(`
+      <section>
+        <a href="#top">Back to top</a><button>Sign up</button>
+        ${table(row('Novice') + row('Beginner'))}
+      </section>`);
+    expect(drag(host)).toHaveLength(1);
+  });
+
+  it('accepts a whole-name "Up" / "Down" button', () => {
+    expect(drag(fixture(table(row('Novice', '<td><button>Up</button><button>Down</button></td>'))))).toEqual([]);
+  });
+
+  it('finds key handling on a component host above the list (a sortable tab list)', () => {
+    const host = fixture(`
+      <app-tabs><div class="wrapper">
+        <div class="cdk-drop-list" role="tablist">
+          <div class="cdk-drag" role="tab" tabindex="0">One</div><div class="cdk-drag" role="tab" tabindex="-1">Two</div>
+        </div>
+      </div></app-tabs>`);
+    const appTabs = host.querySelector('app-tabs')!;
+    const wrapper = host.querySelector('.wrapper')!;
+    withNg(() => expect(drag(host)).toEqual([]), new Map([[wrapper, ['keydown']]]), new Set([appTabs]));
+  });
+
+  it('stops looking for key handling at the component host', () => {
+    const host = fixture(`
+      <div class="page"><app-list>
+        <div class="cdk-drop-list"><div class="cdk-drag" tabindex="0">One</div></div>
+      </app-list></div>`);
+    const page = host.querySelector('.page')!;
+    const appList = host.querySelector('app-list')!;
+    withNg(() => expect(drag(host)).toHaveLength(1), new Map([[page, ['keydown']]]), new Set([appList]));
   });
 });
 
@@ -191,6 +239,18 @@ describe('dragGroups and dragHandles', () => {
     expect(groups.map((g) => [g.container.id, g.items.length])).toEqual([
       ['a', 1],
       ['b', 1],
+    ]);
+  });
+
+  it('groups an item that is also a drop list under the list around it', () => {
+    const host = fixture(`
+      <div class="cdk-drop-list" id="outer">
+        <div class="cdk-drag cdk-drop-list" id="both"><div class="cdk-drag">child</div></div>
+      </div>`);
+    const groups = dragGroups(host, () => false);
+    expect(groups.map((g) => [g.container.id, g.items.length])).toEqual([
+      ['outer', 1],
+      ['both', 1],
     ]);
   });
 
