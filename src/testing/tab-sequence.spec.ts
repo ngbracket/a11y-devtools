@@ -193,6 +193,63 @@ describe('tab-sequence', () => {
     expect(ids).toEqual(['save']);
   });
 
+  it('only counts stops inside a PrimeNG dialog (pFocusTrap spans inside the dialog)', () => {
+    const host = fixture(`
+      <button id="behind">behind</button>
+      <div class="p-dialog" role="dialog" aria-modal="true">
+        <span class="p-hidden-accessible p-hidden-focusable" tabindex="0" role="presentation"
+          aria-hidden="true" data-p-hidden-accessible="true" data-p-hidden-focusable="true"></span>
+        <input id="name" /><button id="save">Save</button>
+        <span class="p-hidden-accessible p-hidden-focusable" tabindex="0" role="presentation"
+          aria-hidden="true" data-p-hidden-accessible="true" data-p-hidden-focusable="true"></span>
+      </div>
+      <button id="after">after</button>
+    `);
+    const ids = tabSequence(host, { isVisible: alwaysVisible }).map((s) => s.element.id);
+    expect(ids).toEqual(['name', 'save']);
+  });
+
+  it('only counts stops inside an ngx-bootstrap modal (anchors around .modal-dialog)', () => {
+    const host = fixture(`
+      <button id="behind">behind</button>
+      <modal-container class="modal" role="dialog" tabindex="-1" aria-modal="true">
+        <div tabindex="0" class="cdk-visually-hidden cdk-focus-trap-anchor" aria-hidden="true"></div>
+        <div class="modal-dialog" role="document">
+          <div class="modal-content"><button id="close">Close</button></div>
+        </div>
+        <div tabindex="0" class="cdk-visually-hidden cdk-focus-trap-anchor" aria-hidden="true"></div>
+      </modal-container>
+    `);
+    const ids = tabSequence(host, { isVisible: alwaysVisible }).map((s) => s.element.id);
+    expect(ids).toEqual(['close']);
+  });
+
+  it('only counts stops inside an ng-bootstrap modal or offcanvas (script trap, no anchors)', () => {
+    for (const tag of ['ngb-modal-window', 'ngb-offcanvas-panel']) {
+      const host = fixture(`
+        <button id="behind">behind</button>
+        <${tag} class="modal d-block" role="dialog" tabindex="-1" aria-modal="true">
+          <div class="modal-content"><button id="ok">OK</button></div>
+        </${tag}>
+      `);
+      const ids = tabSequence(host, { isVisible: alwaysVisible }).map((s) => s.element.id);
+      expect(ids, tag).toEqual(['ok']);
+      document.body.innerHTML = '';
+    }
+  });
+
+  it('keeps the page stops when a dialog has a sentinel inside at one end only', () => {
+    const host = fixture(`
+      <button id="behind">behind</button>
+      <div role="dialog" aria-modal="true">
+        <span tabindex="0" aria-hidden="true"></span>
+        <button id="ok">OK</button>
+      </div>
+    `);
+    const ids = tabSequence(host, { isVisible: alwaysVisible }).map((s) => s.element.id);
+    expect(ids).toEqual(['behind', 'ok']);
+  });
+
   it('keeps the page stops for a dialog with no focus-trap anchors (non-modal)', () => {
     const host = fixture(`
       <button id="behind">behind</button>

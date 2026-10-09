@@ -57,8 +57,8 @@ export interface TabSequenceOptions {
 /**
  * A focus-trap sentinel: an empty, script-driven tab stop that sends focus back
  * into the modal when reached — Angular CDK / Material's `cdk-focus-trap-anchor`
- * (`tabindex="0"`, `aria-hidden="true"`), or a `data-focus-guard` element (the
- * focus-lock pattern). No text and no child elements, so it isn't real content.
+ * (`tabindex="0"`, `aria-hidden="true"`), PrimeNG's `p-hidden-focusable` span,
+ * or a `data-focus-guard` element (the focus-lock pattern). No text and no child elements, so it isn't real content.
  */
 export function isFocusSentinel(el: Element): boolean {
   if (el.childElementCount > 0 || (el.textContent ?? '').trim() !== '') return false;
@@ -66,18 +66,38 @@ export function isFocusSentinel(el: Element): boolean {
 }
 
 /**
- * Elements that may hold a JS focus trap: any `aria-modal`, any dialog role, and
- * the Angular CDK / Material dialog containers. Material 22 opens `mat-dialog`
- * with `aria-modal="false"` (it hides the page with `aria-hidden` instead), so
- * `aria-modal="true"` alone misses every default Material dialog.
+ * Dialogs from libraries that trap Tab with a script and add no sentinels:
+ * ng-bootstrap's modal and offcanvas (`ngbFocusTrap`). They're recognised by
+ * element name, which is there in production builds too.
  */
-const TRAP_CANDIDATE_SELECTOR =
-  '[aria-modal="true"], [role="dialog"], [role="alertdialog"], mat-dialog-container, .cdk-dialog-container';
+const SCRIPT_TRAP_SELECTOR = 'ngb-modal-window, ngb-offcanvas-panel';
 
 /**
- * The open dialog whose focus a JS trap keeps in, or null: its stops are one
- * unbroken run in `order` with a sentinel directly before and after. The
- * browser can reach those sentinels, but the trap sends focus from them back
+ * Elements that may hold a JS focus trap: any `aria-modal`, any dialog role, the
+ * Angular CDK / Material dialog containers, and {@link SCRIPT_TRAP_SELECTOR}.
+ * Material 22 opens `mat-dialog` with `aria-modal="false"` (it hides the page
+ * with `aria-hidden` instead), so `aria-modal="true"` alone misses every default
+ * Material dialog.
+ */
+const TRAP_CANDIDATE_SELECTOR = [
+  '[aria-modal="true"]',
+  '[role="dialog"]',
+  '[role="alertdialog"]',
+  'mat-dialog-container',
+  '.cdk-dialog-container',
+  SCRIPT_TRAP_SELECTOR,
+].join(', ');
+
+/**
+ * The open dialog whose focus a JS trap keeps in, or null. Its stops must be one
+ * unbroken run in `order`, and one of these holds:
+ * - a sentinel sits directly before and after the run, outside the dialog
+ *   (Angular CDK / Material: the anchors are the dialog container's siblings);
+ * - the run starts and ends with a sentinel inside the dialog (PrimeNG's
+ *   `pFocusTrap` prepends and appends hidden spans; ngx-bootstrap's
+ *   `modal-container` holds its CDK-style anchors around `.modal-dialog`);
+ * - the dialog is one of {@link SCRIPT_TRAP_SELECTOR}.
+ * The browser can reach those sentinels, but the trap sends focus from them back
  * into the dialog. Checked with real Tab presses on a CDK dialog: from the last
  * control, Tab wraps to the first. With several, the last is the topmost.
  */
@@ -91,6 +111,8 @@ function sentinelTrappedModal(root: ParentNode, order: Element[]): Element | nul
     const before = order[first - 1];
     const after = order[last + 1];
     if (before && after && isFocusSentinel(before) && isFocusSentinel(after)) return modal;
+    if (last > first && isFocusSentinel(order[first]) && isFocusSentinel(order[last])) return modal;
+    if (modal.matches(SCRIPT_TRAP_SELECTOR)) return modal;
   }
   return null;
 }

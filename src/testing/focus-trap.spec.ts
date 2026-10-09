@@ -59,6 +59,36 @@ describe('findUncontainedModals', () => {
     expect(findUncontainedModals(host, alwaysVisible)).toEqual([]);
   });
 
+  it('does not flag PrimeNG, ngx-bootstrap or ng-bootstrap modals, which trap focus', () => {
+    const primeng = fixture(`
+      <button>Page button</button>
+      <div role="dialog" aria-modal="true">
+        <span class="p-hidden-focusable" tabindex="0" aria-hidden="true" data-p-hidden-focusable="true"></span>
+        <button>OK</button>
+        <span class="p-hidden-focusable" tabindex="0" aria-hidden="true" data-p-hidden-focusable="true"></span>
+      </div>
+    `);
+    expect(findUncontainedModals(primeng, alwaysVisible)).toEqual([]);
+    document.body.innerHTML = '';
+
+    const ngx = fixture(`
+      <button>Page button</button>
+      <modal-container class="modal" role="dialog" aria-modal="true">
+        <div tabindex="0" class="cdk-focus-trap-anchor" aria-hidden="true"></div>
+        <div class="modal-dialog" role="document"><button>OK</button></div>
+        <div tabindex="0" class="cdk-focus-trap-anchor" aria-hidden="true"></div>
+      </modal-container>
+    `);
+    expect(findUncontainedModals(ngx, alwaysVisible)).toEqual([]);
+    document.body.innerHTML = '';
+
+    const ngb = fixture(`
+      <button>Page button</button>
+      <ngb-modal-window role="dialog" aria-modal="true"><button>OK</button></ngb-modal-window>
+    `);
+    expect(findUncontainedModals(ngb, alwaysVisible)).toEqual([]);
+  });
+
   it('accepts data-focus-guard sentinels (the focus-lock pattern)', () => {
     const host = fixture(`
       <button>Page button</button>
