@@ -91,6 +91,15 @@ describe('ngbr/drag-without-keyboard', () => {
     expect(drag(host)).toEqual([]);
   });
 
+  it("doesn't let one list's Move buttons vouch for a list beside it", () => {
+    const host = fixture(`
+      <section>
+        <ol class="cdk-drop-list" id="mouse-only"><li class="cdk-drag"><span class="cdk-drag-handle">⠿</span>A</li></ol>
+        <ol class="cdk-drop-list" id="with-buttons"><li class="cdk-drag"><span class="cdk-drag-handle">⠿</span>A<button>Move A down</button></li></ol>
+      </section>`);
+    expect(drag(host).map((f) => f.target)).toEqual([expect.stringContaining('mouse-only')]);
+  });
+
   it('still flags a list whose move buttons Tab can\'t reach', () => {
     const disabled = '<td><button disabled>Move up</button></td>';
     expect(drag(fixture(table(row('Novice', disabled))))).toHaveLength(1);

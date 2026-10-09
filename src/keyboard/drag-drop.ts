@@ -23,6 +23,9 @@ export interface DragGroup {
 
 const DRAG_ITEM_SELECTOR = '.cdk-drop-list .cdk-drag, [draggable="true"]';
 
+/** Something that is, or holds, a drag list. */
+const DRAG_LIST_SELECTOR = '.cdk-drop-list, [draggable="true"]';
+
 /**
  * Names of controls that move an item: "Move up", "Move to top", "Reorder",
  * arrow glyphs, and the Material icon ligatures for up and down arrows. Words
@@ -85,16 +88,23 @@ function roughName(element: Element): string {
 
 /**
  * True when there's a control near the list whose name says it moves an item
- * ("Move up", "↓", an `arrow_upward` icon): in the list or next to it, inside
- * the list's parent. A drag handle doesn't count, even one named "Reorder":
- * whether it works from the keyboard depends on its key handling, which the
- * scan checks separately. `isTabbable` decides whether the keyboard can reach it.
+ * ("Move up", "↓", an `arrow_upward` icon): in the list, or in an element next
+ * to it such as a toolbar above it. A sibling that holds another drag list is
+ * left out, so one list's Move buttons don't vouch for the list beside it. A
+ * drag handle doesn't count, even one named "Reorder": whether it works from the
+ * keyboard depends on its key handling, which the scan checks separately.
+ * `isTabbable` decides whether the keyboard can reach it.
  */
 export function hasMoveControl(container: Element, isTabbable: (el: Element) => boolean): boolean {
-  const scope = container.parentElement ?? container;
-  for (const control of scope.querySelectorAll(CONTROL_SELECTOR)) {
-    if (control.closest('.cdk-drag-handle')) continue;
-    if (MOVE_NAME.test(roughName(control)) && isTabbable(control)) return true;
+  const siblings = [...(container.parentElement?.children ?? [])].filter(
+    (el) => el !== container && !el.matches(DRAG_LIST_SELECTOR) && !el.querySelector(DRAG_LIST_SELECTOR),
+  );
+  for (const scope of [container, ...siblings]) {
+    const controls = [...(scope.matches(CONTROL_SELECTOR) ? [scope] : []), ...scope.querySelectorAll(CONTROL_SELECTOR)];
+    for (const control of controls) {
+      if (control.closest('.cdk-drag-handle')) continue;
+      if (MOVE_NAME.test(roughName(control)) && isTabbable(control)) return true;
+    }
   }
   return false;
 }
