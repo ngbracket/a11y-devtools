@@ -136,6 +136,22 @@ describe('ngbr/drag-without-keyboard', () => {
     withoutNg(() => expect(drag(host)).toHaveLength(1));
   });
 
+  it('skips a roving-tabindex board: cards with tabindex="-1" that handle keys', () => {
+    // Like @ngbracket/board: one card on the whole board is the tab stop and arrow
+    // keys move between the rest, so a column can have no tab stop of its own.
+    const host = fixture(`
+      <div class="cdk-drop-list" role="list"><div class="cdk-drag" role="listitem" tabindex="0">A</div></div>
+      <div class="cdk-drop-list" role="list"><div class="cdk-drag" role="listitem" tabindex="-1">B</div></div>`);
+    const cards = [...host.querySelectorAll('.cdk-drag')];
+    withNg(() => expect(drag(host)).toEqual([]), new Map(cards.map((c) => [c, ['keydown']])));
+    withoutNg(() => expect(drag(host)).toEqual([]));
+  });
+
+  it('reports tabindex="-1" items with no key handling as moderate (dev build)', () => {
+    const host = fixture(`<ul class="cdk-drop-list"><li class="cdk-drag" tabindex="-1">One</li></ul>`);
+    withNg(() => expect(drag(host).map((f) => f.impact)).toEqual(['moderate']));
+  });
+
   it('skips disabled lists and items, and a cdkDrag outside a drop list', () => {
     expect(drag(fixture(table(row('Novice'), 'cdk-drop-list-disabled')))).toEqual([]);
     document.body.innerHTML = '';

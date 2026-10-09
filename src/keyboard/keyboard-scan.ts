@@ -76,6 +76,12 @@ function hasKeyEvent(events: readonly string[]): boolean {
   return events.some((e) => KEY_EVENTS.includes(e.split('.')[0]));
 }
 
+/** True when `element` has a numeric `tabindex`, so script can focus it. */
+function hasTabindex(element: Element): boolean {
+  const tabindex = element.getAttribute('tabindex');
+  return tabindex !== null && !Number.isNaN(Number.parseInt(tabindex, 10));
+}
+
 /**
  * Composite widgets: Tab reaches the widget once, and arrow keys move between
  * its items (WAI-ARIA APG "Keyboard navigation inside components").
@@ -575,7 +581,12 @@ export function scanKeyboard(
     if (container.closest(OVERLAY_EXCLUDE_SELECTOR)) continue;
     if (hasMoveControl(container, (el) => isTabbable(el, isVisible))) continue;
     const starts = [...new Set([container, ...items.flatMap(dragHandles)])];
-    const reachable = starts.filter((el) => isTabbable(el, isVisible));
+    // Reachable: a tab stop, or an element script can focus (any tabindex), as in
+    // a roving-tabindex board where one card is the tab stop and arrow keys move
+    // to the rest. The key-listener check below then decides.
+    const reachable = starts.filter(
+      (el) => isTabbable(el, isVisible) || (hasTabindex(el) && !isDisabled(el) && !isHidden(el, isVisible)),
+    );
     const url = `${RULE_DOCS}/drag-without-keyboard`;
     const fix =
       `Add buttons that move an item (Move up, Move down), or make each drag handle a ` +
@@ -595,8 +606,8 @@ export function scanKeyboard(
       );
       continue;
     }
-    // Tab reaches a handle or item. In a production build the key listeners can't
-    // be seen, so assume it handles keys.
+    // The keyboard can reach a handle or item. In a production build the key
+    // listeners can't be seen, so assume it handles keys.
     if (!listenersVisible()) continue;
     const handlesKeys = reachable.some((start) => {
       for (let el: Element | null = start; el && el !== container.parentElement; el = el.parentElement) {
@@ -611,8 +622,8 @@ export function scanKeyboard(
         'ngbr/drag-without-keyboard',
         'moderate',
         `Keyboard users may not be able to move these items: ${items.length} item(s) here ` +
-          `move by drag and drop, and Tab reaches the drag handles, but nothing on them ` +
-          `handles keys. ${fix} Heuristic — verify manually.`,
+          `move by drag and drop, and the keyboard can reach their drag handles, but nothing ` +
+          `on them handles keys. ${fix} Heuristic — verify manually.`,
         url,
       ),
     );

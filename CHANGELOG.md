@@ -14,8 +14,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   rule finds drag items by the `cdk-drag` class inside a `cdk-drop-list` and by
   `draggable="true"`, in any build, and reports each list once. It skips a list
   with a tab stop in or next to it whose name says it moves an item ("Move up",
-  an arrow, a Material `arrow_upward` icon). Serious when Tab can't reach a drag
-  handle. Moderate in a dev build when Tab reaches the handle but no Angular key
+  an arrow, a Material `arrow_upward` icon). Serious when the keyboard can't
+  reach a drag handle. A handle or item with a `tabindex` counts as reachable,
+  as in a board where one card is the tab stop and the arrow keys move to the
+  rest. Moderate in a dev build when a handle is reachable but no Angular key
   listener sits on the handle, its item or the list. Maps to WCAG 2.1.1 and
   2.5.7 in the ACR worksheet.
 
