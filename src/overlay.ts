@@ -40,7 +40,7 @@ const IMPACT_COLOR: Record<NonNullable<Impact> | 'none', string> = {
  * Label fill per impact, behind white 11px text: at least 4.5:1 with white, in
  * the same hue as the border, so the labels pass a contrast check themselves.
  */
-const IMPACT_LABEL_FILL: Record<NonNullable<Impact> | 'none', string> = {
+export const IMPACT_LABEL_FILL: Record<NonNullable<Impact> | 'none', string> = {
   critical: '#d32029',
   serious: '#b45309',
   moderate: '#8a6d00',

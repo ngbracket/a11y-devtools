@@ -1,4 +1,5 @@
-import { OVERLAY_ATTR } from './overlay.js';
+import { IMPACT_LABEL_FILL, OVERLAY_ATTR } from './overlay.js';
+import type { Impact } from './scan.js';
 import { keepInTopLayer } from './top-layer.js';
 import { createPillMenu, type PillMenuOptions, type PillMenuStatus } from './pill-menu.js';
 
@@ -124,16 +125,28 @@ export interface TogglePillOptions {
   menu?: Omit<PillMenuOptions, 'opensUp' | 'alignLeft'>;
 }
 
+/** What the pill and its menu show about the current page. */
+export interface PillStatus extends PillMenuStatus {
+  /** Issues that pass the severity and component filters: the pill's count badge. */
+  matching?: number;
+  /** Most severe impact among those, which colours the badge. */
+  worst?: Impact;
+}
+
 export interface TogglePill {
   /** Reflect a state change made elsewhere (e.g. the keyboard shortcut). */
   setEnabled(enabled: boolean): void;
-  /** Update the menu's issue and page counts (no-op without a menu). */
-  setStatus(status: PillMenuStatus): void;
+  /** Update the count badge and the menu's issue and page counts. */
+  setStatus(status: PillStatus): void;
   destroy(): void;
 }
 
 const PILL_ON = '#3ecf8e';
 const PILL_OFF = '#8a8f98';
+/** Count badge fill when nothing matches: 5.3:1 with its white text. */
+const BADGE_CLEAR_FILL = '#1f7a4d';
+
+let nextBadgeId = 0;
 
 /**
  * A small on/off switch for the devtools, fixed to a corner of the page. A real
@@ -180,7 +193,45 @@ export function createTogglePill(options: TogglePillOptions): TogglePill {
   const state = doc.createElement('span');
   state.setAttribute('aria-hidden', 'true');
   state.style.fontWeight = '400';
-  button.append(dot, name, state);
+  // Issue-count badge. Visible digits only; assistive tech gets the count in
+  // words as the switch's description.
+  const badge = doc.createElement('span');
+  badge.setAttribute('aria-hidden', 'true');
+  badge.hidden = true;
+  Object.assign(badge.style, {
+    minWidth: '18px',
+    padding: '2px 5px',
+    borderRadius: '999px',
+    color: '#ffffff',
+    font: '700 11px/1 ui-sans-serif, system-ui, sans-serif',
+    textAlign: 'center',
+  });
+  const badgeWords = doc.createElement('span');
+  badgeWords.id = `ngbr-a11y-count-${nextBadgeId++}`;
+  badgeWords.hidden = true; // still read as a description via aria-describedby
+  button.append(dot, name, state, badge, badgeWords);
+  let status: PillStatus | undefined;
+
+  function renderBadge(): void {
+    const matching = status?.matching;
+    if (!enabled || matching === undefined || !status) {
+      badge.hidden = true;
+      button.removeAttribute('aria-describedby');
+      return;
+    }
+    const { found } = status;
+    badge.hidden = false;
+    badge.textContent = String(matching);
+    badge.style.background = matching === 0 ? BADGE_CLEAR_FILL : IMPACT_LABEL_FILL[status.worst ?? 'none'];
+    const issues = (n: number) => `${n} ${n === 1 ? 'issue' : 'issues'}`;
+    badgeWords.textContent =
+      matching === found
+        ? found === 0
+          ? 'No issues on this page'
+          : `${issues(found)} on this page`
+        : `${issues(matching)} of ${found} on this page match the filters`;
+    button.setAttribute('aria-describedby', badgeWords.id);
+  }
 
   // Inline styles can't do :focus-visible, so draw the ring from focus events,
   // only when the browser would show one.
@@ -202,6 +253,7 @@ export function createTogglePill(options: TogglePillOptions): TogglePill {
     state.textContent = enabled ? 'on' : 'off';
     button.style.opacity = enabled ? '1' : '0.75';
     button.title = `a11y devtools ${enabled ? 'on' : 'off'}${keys ? ` (${keys})` : ''}`;
+    renderBadge();
   }
   setEnabled(enabled);
 
@@ -241,7 +293,11 @@ export function createTogglePill(options: TogglePillOptions): TogglePill {
 
   return {
     setEnabled,
-    setStatus: (status) => menu?.setStatus(status),
+    setStatus: (next) => {
+      status = next;
+      renderBadge();
+      menu?.setStatus(next);
+    },
     destroy: () => {
       menu?.destroy();
       releaseTopLayer();

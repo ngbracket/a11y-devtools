@@ -25,9 +25,11 @@ import {
   type PillPosition,
 } from './toggle.js';
 import {
+  componentCounts,
   readStoredSettings,
   resolveSettings,
   visibleFindings,
+  worstImpact,
   writeStoredSettings,
   type DevtoolsSettings,
   type MinImpact,
@@ -174,10 +176,25 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
       let lastFindings: A11yFinding[] = [];
       const visited = new Map<string, PageReport>();
 
+      // Show one component's issues only (null: all). Not remembered, and reset
+      // on a route change: the components change from page to page.
+      let componentFilter: string | null = null;
+      let lastPath: string | undefined;
+
       /** Draw (or clear) each overlay layer from the last scan and the settings. */
       function draw(): void {
-        const shown = settings.highlights ? visibleFindings(lastFindings, settings.minImpact) : [];
-        pillView?.setStatus({ found: lastFindings.length, shown: shown.length, pages: visited.size });
+        const matching = visibleFindings(lastFindings, settings.minImpact, componentFilter);
+        const shown = settings.highlights ? matching : [];
+        pillView?.setStatus({
+          found: lastFindings.length,
+          shown: shown.length,
+          pages: visited.size,
+          matching: matching.length,
+          worst: worstImpact(matching),
+          // Counted at the chosen severity, so an option's count matches the badge.
+          components: componentCounts(visibleFindings(lastFindings, settings.minImpact)),
+          component: componentFilter,
+        });
         if (!overlayView) return;
         if (!enabled) {
           overlayView.clear();
@@ -251,7 +268,17 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
             onToggle: setEnabled,
             shortcut,
             position: pill,
-            menu: overlayView ? { settings, onChange: setSettings, onDownload: downloadReport } : undefined,
+            menu: overlayView
+              ? {
+                  settings,
+                  onChange: setSettings,
+                  onDownload: downloadReport,
+                  onComponentChange: (component) => {
+                    componentFilter = component;
+                    draw();
+                  },
+                }
+              : undefined,
           })
         : undefined;
 
@@ -328,6 +355,9 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
             if (!enabled) return; // switched off mid-scan: draw nothing
             lastFindings = findings;
             const route = location.pathname + location.search;
+            // A new path is a new page; a query-string change (?page=2) keeps the filter.
+            if (lastPath !== undefined && location.pathname !== lastPath) componentFilter = null;
+            lastPath = location.pathname;
             // Label by route: a single-page app usually keeps one title on every route.
             visited.set(route, { label: route, url: location.href, findings });
             draw();

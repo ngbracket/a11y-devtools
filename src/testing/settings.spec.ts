@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  componentCounts,
   meetsMinImpact,
   readStoredSettings,
   resolveSettings,
   SETTINGS_STORAGE_KEY,
+  UNKNOWN_COMPONENT,
   visibleFindings,
+  worstImpact,
   writeStoredSettings,
   type DevtoolsSettings,
 } from '../settings';
@@ -87,5 +90,31 @@ describe('stored settings', () => {
     } as unknown as Storage;
     expect(readStoredSettings(blocked)).toBeNull();
     expect(() => writeStoredSettings(blocked, defaults, defaults)).not.toThrow();
+  });
+});
+
+describe('component filter', () => {
+  const at = (impact: A11yFinding['impact'], component: string | null): A11yFinding => ({ ...finding(impact), component });
+  const findings = [at('minor', 'A'), at('critical', 'B'), at('serious', 'A'), at('moderate', null)];
+
+  it('keeps one component, with the severity filter on top', () => {
+    expect(visibleFindings(findings, 'minor', 'A').map((f) => f.impact)).toEqual(['minor', 'serious']);
+    expect(visibleFindings(findings, 'serious', 'A').map((f) => f.impact)).toEqual(['serious']);
+    expect(visibleFindings(findings, 'minor', UNKNOWN_COMPONENT).map((f) => f.impact)).toEqual(['moderate']);
+    expect(visibleFindings(findings, 'minor', null)).toHaveLength(4);
+  });
+
+  it('counts issues per component, most first', () => {
+    expect(componentCounts(findings)).toEqual([
+      { name: 'A', count: 2 },
+      { name: UNKNOWN_COMPONENT, count: 1 },
+      { name: 'B', count: 1 },
+    ]);
+  });
+
+  it('finds the worst impact', () => {
+    expect(worstImpact(findings)).toBe('critical');
+    expect(worstImpact([at('minor', 'A'), at(null, 'A')])).toBe('minor');
+    expect(worstImpact([])).toBeNull();
   });
 });

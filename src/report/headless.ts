@@ -8,6 +8,7 @@ import { detectTabTrap, type FocusObservation } from '../keyboard/focus-walk.js'
 import { OVERLAY_EXCLUDE_SELECTOR } from '../overlay.js';
 import type { A11yFinding } from '../scan.js';
 import { findingsNotIn } from './baseline.js';
+import type { Walkthrough } from '../keyboard/walkthrough.js';
 import type { PageReport, ScanChecks, ScanReport } from './format.js';
 
 /** A colour scheme a pass is scanned in. */
@@ -88,6 +89,14 @@ export interface ScanPagesOptions {
    * modal is containment, not a trap, and isn't reported. Default false.
    */
   focusTraps?: boolean;
+  /**
+   * Also list each route's tab order with every stop's computed role, name,
+   * states and owning component: a reading list for checking the keyboard and
+   * screen-reader path without opening the app. A computed approximation, not
+   * what any one screen reader says. With `colorScheme: 'both'` it runs on the
+   * light pass only. Default false.
+   */
+  walkthrough?: boolean;
 }
 
 type PlaywrightModule = typeof import('playwright');
@@ -178,6 +187,7 @@ interface PassConfig {
   frameworkPrefixes: readonly string[] | undefined;
   keyboard: boolean | undefined;
   focusTraps: boolean;
+  walkthrough: boolean;
   setup: ScanPagesOptions['setup'];
   beforeScan: ScanPagesOptions['beforeScan'];
   darkClass: string | undefined;
@@ -244,6 +254,24 @@ async function scanPass(
           };
           return w.__ngbA11yScan(args.axe, args.scan);
         }, { axe: axeOptions, scan: { frameworkPrefixes, keyboard: config.keyboard } })) as A11yFinding[];
+        // Before the trap walk: pressing Tab can change the page.
+        let walkthrough: Walkthrough | undefined;
+        if (config.walkthrough) {
+          try {
+            walkthrough = await page.evaluate(
+              (prefixes) =>
+                (
+                  window as unknown as {
+                    __ngbA11yWalkthrough: (p?: readonly string[]) => Promise<Walkthrough>;
+                  }
+                ).__ngbA11yWalkthrough(prefixes),
+              frameworkPrefixes,
+            );
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.warn(`ngbr-a11y-report: walkthrough failed on ${label}: ${message}`);
+          }
+        }
         if (config.focusTraps) {
           // A failed walk shouldn't throw away the scan's findings — warn and move on.
           try {
@@ -254,7 +282,7 @@ async function scanPass(
             console.warn(`ngbr-a11y-report: focus-trap walk failed on ${label}: ${message}`);
           }
         }
-        pages.push({ label, url: page.url(), findings, colorScheme });
+        pages.push({ label, url: page.url(), findings, colorScheme, ...(walkthrough && { walkthrough }) });
       } catch (err) {
         // One bad route shouldn't sink the whole run — record it and continue.
         const message = err instanceof Error ? err.message : String(err);
@@ -286,6 +314,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     frameworkPrefixes,
     keyboard,
     focusTraps = false,
+    walkthrough = false,
     darkClass,
     darkAttribute,
   } = options;
@@ -300,6 +329,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     frameworkPrefixes,
     keyboard,
     focusTraps,
+    walkthrough,
     setup,
     beforeScan,
     darkClass,
@@ -314,8 +344,8 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
       pages = await scanPass(browser, colorScheme, config);
     } else {
       const light = await scanPass(browser, 'light', config);
-      // A keyboard trap doesn't depend on the theme; walking it twice only costs time.
-      const dark = await scanPass(browser, 'dark', { ...config, focusTraps: false });
+      // Keyboard traps and the tab order don't depend on the theme; doing them twice only costs time.
+      const dark = await scanPass(browser, 'dark', { ...config, focusTraps: false, walkthrough: false });
       // Interleave per route (light, then its dark) and keep only what dark adds.
       pages = light.flatMap((lightPage, i) => {
         const darkPage = dark[i];
@@ -334,6 +364,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     ...(tags && { tags }),
     keyboard: keyboard ?? false,
     focusTraps,
+    ...(walkthrough && { walkthrough }),
   };
   return { generatedAt: new Date().toISOString(), checks, pages };
 }

@@ -84,4 +84,41 @@ describe('pill settings menu', () => {
     expect(document.querySelector('button[aria-label="a11y devtools settings"]')).toBeNull();
     expect(() => pill!.setStatus({ found: 1, shown: 1, pages: 1 })).not.toThrow();
   });
+
+  it('lists the page\'s components, keeps a chosen one after its issues go, and reports the choice', () => {
+    const onComponentChange = vi.fn();
+    pill = createTogglePill({
+      enabled: true,
+      onToggle: () => {},
+      menu: { settings, onChange: () => {}, onDownload: () => {}, onComponentChange },
+    });
+    const select = (): HTMLSelectElement => panel().querySelector('select[id$="-component"]')!;
+    const options = () => [...select().options].map((o) => o.textContent);
+    pill.setStatus({ found: 3, shown: 3, pages: 1, components: [{ name: 'Header', count: 2 }, { name: 'Card', count: 1 }], component: null });
+    expect(options()).toEqual(['All components', 'Header (2)', 'Card (1)']);
+
+    select().value = 'Card';
+    select().dispatchEvent(new Event('change'));
+    expect(onComponentChange).toHaveBeenLastCalledWith('Card');
+
+    const before = select().options[1];
+    pill.setStatus({ found: 3, shown: 1, pages: 1, components: [{ name: 'Header', count: 2 }, { name: 'Card', count: 1 }], component: 'Card' });
+    expect(select().options[1]).not.toBe(before); // rebuilt: the selection changed
+    const same = select().options[1];
+    pill.setStatus({ found: 3, shown: 1, pages: 1, components: [{ name: 'Header', count: 2 }, { name: 'Card', count: 1 }], component: 'Card' });
+    expect(select().options[1]).toBe(same); // unchanged: not rebuilt under the user
+
+    pill.setStatus({ found: 2, shown: 0, pages: 1, components: [{ name: 'Header', count: 2 }], component: 'Card' });
+    expect(options()).toEqual(['All components', 'Header (2)', 'Card (0)']);
+    expect(select().value).toBe('Card');
+
+    select().value = '';
+    select().dispatchEvent(new Event('change'));
+    expect(onComponentChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it('has no component filter when the app gives no handler', () => {
+    open();
+    expect(panel().querySelector('select[id$="-component"]')).toBeNull();
+  });
 });

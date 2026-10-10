@@ -1,5 +1,6 @@
 import type { A11yFinding, Impact } from '../scan.js';
 import type { BaselineDiff } from './baseline.js';
+import type { Walkthrough, WalkthroughStep } from '../keyboard/walkthrough.js';
 
 /**
  * Pure formatting for report-mode: grouping + Markdown/JSON serialization. Kept
@@ -23,11 +24,38 @@ export interface PageReport {
    * ones that don't also appear in the light pass of the same route.
    */
   darkOnly?: boolean;
+  /** The tab order with each stop's computed role and name, when the run asked for it. */
+  walkthrough?: Walkthrough;
 }
 
 /** One-line explanation for a dark-only page, shared by the Markdown and HTML reports. */
 export const DARK_ONLY_NOTE =
   'Dark mode: lists only issues that don’t also appear in light mode on this route.';
+
+/**
+ * Heading note for the walkthrough, shared by the Markdown and HTML reports. Same
+ * honesty rule as the overlay's Focus preview: computed, not a screen reader.
+ */
+export const WALKTHROUGH_NOTE =
+  'Each tab stop in order, with its computed role, name and states. A computed approximation, ' +
+  'not what any one screen reader announces.';
+
+/** One walkthrough step as a single line, e.g. `button "Save" (disabled) — SaveBarComponent`. */
+export function formatStep(step: WalkthroughStep): string {
+  const role = step.role ?? `<${step.tag}>`;
+  const name = step.name ? `"${step.name}"` : '(no accessible name)';
+  const states = step.states.length ? ` (${step.states.join(', ')})` : '';
+  const tabindex = step.positive ? ' [positive tabindex]' : '';
+  const component = step.component ? ` — ${step.component}` : '';
+  return `${role} ${name}${states}${tabindex}${component}`;
+}
+
+/** "Showing the first 300 of 412 tab stops." when the list was capped, else ''. */
+export function walkthroughCapNote(walkthrough: Walkthrough): string {
+  return walkthrough.total > walkthrough.steps.length
+    ? `Showing the first ${walkthrough.steps.length} of ${walkthrough.total} tab stops.`
+    : '';
+}
 
 /**
  * Report title, shared by every format. Says "automated scan" on purpose: a file
@@ -58,6 +86,8 @@ export interface ScanChecks {
   keyboard: boolean;
   /** The real-Tab keyboard-trap walk (`ngbr/focus-trap`) ran. */
   focusTraps: boolean;
+  /** Each page lists its tab order with computed roles and names. */
+  walkthrough?: boolean;
 }
 
 /** A whole report-mode run across one or more pages. */
@@ -140,6 +170,7 @@ export function toJson(report: ScanReport, diff?: BaselineDiff): string {
         distinctRules: distinctRuleCount(p.findings),
         nodeInstances: p.findings.length,
         findings: p.findings,
+        ...(p.walkthrough && { walkthrough: p.walkthrough }),
       })),
     },
     null,
@@ -182,8 +213,13 @@ export function parseReport(json: string): ScanReport {
       ...(p.error !== undefined && { error: p.error }),
       ...(p.colorScheme && { colorScheme: p.colorScheme }),
       ...(p.darkOnly && { darkOnly: true }),
+      ...(isWalkthrough(p.walkthrough) && { walkthrough: p.walkthrough }),
     })),
   };
+}
+
+function isWalkthrough(w: unknown): w is Walkthrough {
+  return Array.isArray((w as Walkthrough)?.steps) && typeof (w as Walkthrough).total === 'number';
 }
 
 /** UI primitives and directives a finding came through, for a "via …" note. */
@@ -266,6 +302,7 @@ export function toMarkdown(report: ScanReport, diff?: BaselineDiff): string {
     if (page.findings.length === 0) {
       lines.push('No automated violations found. ✅');
       lines.push('');
+      lines.push(...markdownWalkthrough(page));
       continue;
     }
     lines.push(
@@ -289,7 +326,27 @@ export function toMarkdown(report: ScanReport, diff?: BaselineDiff): string {
       }
       lines.push('');
     }
+    lines.push(...markdownWalkthrough(page));
   }
 
   return lines.join('\n');
+}
+
+/** A page's walkthrough as a numbered Markdown list under its own heading, or nothing. */
+function markdownWalkthrough(page: PageReport): string[] {
+  const walkthrough = page.walkthrough;
+  if (!walkthrough) return [];
+  const lines = ['### Tab order walkthrough', '', `_${WALKTHROUGH_NOTE}_`, ''];
+  if (walkthrough.steps.length === 0) {
+    lines.push('No tab stops on this page.', '');
+    return lines;
+  }
+  const cap = walkthroughCapNote(walkthrough);
+  if (cap) lines.push(cap, '');
+  // Names are page text: escape anything Markdown would read as markup.
+  for (const step of walkthrough.steps) {
+    lines.push(`${step.order}. ${formatStep(step).replace(/([<>*_`[\]\\|&])/g, '\\$1')}`);
+  }
+  lines.push('');
+  return lines;
 }

@@ -48,6 +48,15 @@ async function chromiumInstalled(): Promise<boolean> {
 const ready = existsSync(distReport) && (await chromiumInstalled());
 
 const PAGES: Record<string, string> = {
+  // The walkthrough: a positive tabindex jumps ahead; an icon button has no name.
+  '/walkthrough': `
+    <main>
+      <h1>Sign in</h1>
+      <label for="email">Email</label><input id="email" type="email" required>
+      <button type="button" aria-expanded="false">More options</button>
+      <button type="button"><svg width="16" height="16" aria-hidden="true"></svg></button>
+      <a href="#help" tabindex="2">Help</a>
+    </main>`,
   // Healthy: native controls in order, plus an iframe (Tab inside a frame shows
   // up as repeated focus on the <iframe>, which must not read as a trap).
   '/clean': `
@@ -229,6 +238,24 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
   };
   const ids = (label: string) => page(label).findings.map((f) => f.id);
 
+  it('lists no walkthrough unless asked', () => {
+    expect(page('/walkthrough').walkthrough).toBeUndefined();
+  });
+
+  it('walks the tab order with computed roles, names and states', async () => {
+    const { scanPages } = (await import(distReport)) as typeof import('../report/index');
+    const r = await scanPages({ baseUrl, routes: ['/walkthrough'], waitMs: 50, walkthrough: true });
+    expect(r.checks?.walkthrough).toBe(true);
+    const walk = r.pages[0].walkthrough!;
+    expect(walk.total).toBe(4);
+    expect(walk.steps.map((s) => [s.order, s.role, s.name, s.states, s.positive])).toEqual([
+      [1, 'link', 'Help', [], true],
+      [2, 'textbox', 'Email', ['required'], false],
+      [3, 'button', 'More options', ['collapsed'], false],
+      [4, 'button', '', [], false],
+    ]);
+  }, 60_000);
+
   it('scans every route without errors', () => {
     expect(report.pages.map((p) => p.label)).toEqual(Object.keys(PAGES));
   });
@@ -368,6 +395,23 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
       expect(readFileSync(join(dir, 'baseline.md'), 'utf8')).toContain('# Automated accessibility scan');
       expect(JSON.parse(readFileSync(join(dir, 'baseline.json'), 'utf8')).pages).toHaveLength(2);
       expect(readFileSync(join(dir, 'baseline.html'), 'utf8')).toMatch(/^<!doctype html>/);
+    }, 60_000);
+
+    it('--walkthrough adds the tab order to every format, and --from keeps it', async () => {
+      const { code } = await runCli([
+        '--base', baseUrl, '--route', '/walkthrough', '--wait', '50', '--walkthrough',
+        '--out', join(dir, 'walk'), '--format', 'all',
+      ]);
+      expect(code).toBe(0);
+      const json = JSON.parse(readFileSync(join(dir, 'walk.json'), 'utf8'));
+      expect(json.checks.walkthrough).toBe(true);
+      expect(json.pages[0].walkthrough.steps.map((s: { name: string }) => s.name)).toEqual([
+        'Help', 'Email', 'More options', '',
+      ]);
+      expect(readFileSync(join(dir, 'walk.md'), 'utf8')).toContain('4. button (no accessible name)');
+      expect(readFileSync(join(dir, 'walk.html'), 'utf8')).toContain('<h3>Tab order walkthrough</h3>');
+      await runCli(['--from', join(dir, 'walk.json'), '--out', join(dir, 'walk-again'), '--format', 'md']);
+      expect(readFileSync(join(dir, 'walk-again.md'), 'utf8')).toBe(readFileSync(join(dir, 'walk.md'), 'utf8'));
     }, 60_000);
 
     it('--from re-renders that real scan byte-for-byte, without scanning', async () => {
