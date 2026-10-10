@@ -53,17 +53,33 @@ function loadAxe(): Promise<AxeCommons> {
  * built — e.g. a scan is mid-flight — so a focus-follow caller degrades quietly.
  */
 export async function describeElement(element: Element): Promise<AxDescription> {
+  return (await describeElements([element]))[0];
+}
+
+/**
+ * {@link describeElement} for many elements of one document, building axe's
+ * tree once instead of once per element (a page's whole tab order, say).
+ */
+export async function describeElements(elements: readonly Element[]): Promise<AxDescription[]> {
+  if (elements.length === 0) return [];
   const axe = await loadAxe();
-  const doc = element.ownerDocument ?? document;
-  let role: string | null = null;
-  let name = '';
+  const doc = elements[0].ownerDocument ?? document;
+  const computed: { role: string | null; name: string }[] = elements.map(() => ({ role: null, name: '' }));
   let didSetup = false;
   try {
     axe.setup(doc);
     didSetup = true;
-    const vnode = axe.utils.getNodeFromTree(element);
-    role = axe.commons.aria.getRole(element) ?? null;
-    name = vnode ? (axe.commons.text.accessibleTextVirtual(vnode) ?? '') : '';
+    elements.forEach((element, i) => {
+      try {
+        const vnode = axe.utils.getNodeFromTree(element);
+        computed[i] = {
+          role: axe.commons.aria.getRole(element) ?? null,
+          name: vnode ? (axe.commons.text.accessibleTextVirtual(vnode) ?? '') : '',
+        };
+      } catch {
+        // Leave this one at role=null / name=''.
+      }
+    });
   } catch {
     // Leave role=null / name='' — axe couldn't build a tree (e.g. run in flight).
   } finally {
@@ -77,7 +93,11 @@ export async function describeElement(element: Element): Promise<AxDescription> 
       }
     }
   }
-  return { role, name, description: accessibleDescription(element), states: ariaStates(element) };
+  return elements.map((element, i) => ({
+    ...computed[i],
+    description: accessibleDescription(element),
+    states: ariaStates(element),
+  }));
 }
 
 /** The accessible description: `aria-describedby` targets' text, else the `title`. */

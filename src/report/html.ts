@@ -3,12 +3,16 @@ import {
   addedBySeverity,
   COVERAGE_URL,
   DARK_ONLY_NOTE,
+  formatStep,
   REPORT_SCOPE_NOTE,
   REPORT_TITLE,
   bySeverity,
   distinctRuleCount,
   groupByComponent,
   viaNames,
+  walkthroughCapNote,
+  WALKTHROUGH_NOTE,
+  type PageReport,
   type ScanReport,
 } from './format.js';
 
@@ -92,6 +96,9 @@ ul.findings > li { padding: 10px 0; border-top: 1px solid var(--line); }
 .diff { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
   margin-top: 32px; padding: 4px 16px; }
 .diff h2 { border-top: 0; margin-top: 12px; padding-top: 0; }
+.walkthrough { margin: 20px 0 0; }
+.walkthrough ol { margin: 8px 0 0; padding-left: 2.5em; }
+.walkthrough li { padding: 2px 0; overflow-wrap: anywhere; }
 `;
 
 /** Render the report as one self-contained, accessible HTML document. */
@@ -171,6 +178,7 @@ export function toHtml(report: ScanReport, diff?: BaselineDiff): string {
     }
     if (page.findings.length === 0) {
       out.push('<p class="ok">No automated violations found.</p>');
+      out.push(...htmlWalkthrough(page));
       out.push('</section>');
       return;
     }
@@ -208,6 +216,7 @@ export function toHtml(report: ScanReport, diff?: BaselineDiff): string {
       out.push('</ul>');
       out.push('</div>');
     }
+    out.push(...htmlWalkthrough(page));
     out.push('</section>');
   });
 
@@ -215,4 +224,22 @@ export function toHtml(report: ScanReport, diff?: BaselineDiff): string {
   out.push('</body>');
   out.push('</html>');
   return out.join('\n');
+}
+
+/** A page's walkthrough as an ordered list under its own heading, or nothing. */
+function htmlWalkthrough(page: PageReport): string[] {
+  const walkthrough = page.walkthrough;
+  if (!walkthrough) return [];
+  const out = ['<div class="walkthrough">', '<h3>Tab order walkthrough</h3>'];
+  out.push(`<p class="meta">${escapeHtml(WALKTHROUGH_NOTE)}</p>`);
+  if (walkthrough.steps.length === 0) {
+    out.push('<p>No tab stops on this page.</p>', '</div>');
+    return out;
+  }
+  const cap = walkthroughCapNote(walkthrough);
+  if (cap) out.push(`<p>${escapeHtml(cap)}</p>`);
+  out.push('<ol>');
+  for (const step of walkthrough.steps) out.push(`<li>${escapeHtml(formatStep(step))}</li>`);
+  out.push('</ol>', '</div>');
+  return out;
 }

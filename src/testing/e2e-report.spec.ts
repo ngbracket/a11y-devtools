@@ -48,6 +48,15 @@ async function chromiumInstalled(): Promise<boolean> {
 const ready = existsSync(distReport) && (await chromiumInstalled());
 
 const PAGES: Record<string, string> = {
+  // The walkthrough: a positive tabindex jumps ahead; an icon button has no name.
+  '/walkthrough': `
+    <main>
+      <h1>Sign in</h1>
+      <label for="email">Email</label><input id="email" type="email" required>
+      <button type="button" aria-expanded="false">More options</button>
+      <button type="button"><svg width="16" height="16" aria-hidden="true"></svg></button>
+      <a href="#help" tabindex="2">Help</a>
+    </main>`,
   // Healthy: native controls in order, plus an iframe (Tab inside a frame shows
   // up as repeated focus on the <iframe>, which must not read as a trap).
   '/clean': `
@@ -228,6 +237,24 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
     return found;
   };
   const ids = (label: string) => page(label).findings.map((f) => f.id);
+
+  it('lists no walkthrough unless asked', () => {
+    expect(page('/walkthrough').walkthrough).toBeUndefined();
+  });
+
+  it('walks the tab order with computed roles, names and states', async () => {
+    const { scanPages } = (await import(distReport)) as typeof import('../report/index');
+    const r = await scanPages({ baseUrl, routes: ['/walkthrough'], waitMs: 50, walkthrough: true });
+    expect(r.checks?.walkthrough).toBe(true);
+    const walk = r.pages[0].walkthrough!;
+    expect(walk.total).toBe(4);
+    expect(walk.steps.map((s) => [s.order, s.role, s.name, s.states, s.positive])).toEqual([
+      [1, 'link', 'Help', [], true],
+      [2, 'textbox', 'Email', ['required'], false],
+      [3, 'button', 'More options', ['collapsed'], false],
+      [4, 'button', '', [], false],
+    ]);
+  }, 60_000);
 
   it('scans every route without errors', () => {
     expect(report.pages.map((p) => p.label)).toEqual(Object.keys(PAGES));

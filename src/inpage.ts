@@ -1,5 +1,6 @@
 import type { RunOptions as AxeRunOptions } from 'axe-core';
 import { createFocusWalkProbe } from './keyboard/focus-walk.js';
+import { linearWalkthrough, type Walkthrough } from './keyboard/walkthrough.js';
 import { scan, type A11yFinding, type ScanOptions } from './scan.js';
 
 /**
@@ -25,3 +26,8 @@ const run: InPageScan = (options, scanOptions) => scan(document, options, scanOp
 (globalThis as unknown as {
   __ngbA11yCreateFocusProbe: (prefixes?: readonly string[]) => ReturnType<typeof createFocusWalkProbe>;
 }).__ngbA11yCreateFocusProbe = (prefixes) => createFocusWalkProbe(document, prefixes);
+
+// The linear walkthrough: the tab order with each stop's computed role and name.
+(globalThis as unknown as {
+  __ngbA11yWalkthrough: (prefixes?: readonly string[]) => Promise<Walkthrough>;
+}).__ngbA11yWalkthrough = (prefixes) => linearWalkthrough(document, { frameworkPrefixes: prefixes });

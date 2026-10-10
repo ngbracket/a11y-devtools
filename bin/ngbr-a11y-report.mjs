@@ -61,6 +61,9 @@ Options:
   --focus-traps      Also walk each route with real Tab presses to find keyboard
                      traps — focus that cycles inside part of the page and
                      never moves on (ngbr/focus-trap). Runs after the scan
+  --walkthrough      Also list each route's tab order with every stop's computed
+                     role, name, states and component (an approximation, not
+                     any one screen reader's output)
   --color-scheme <s> light | dark | both — scan with the browser emulating that
                      prefers-color-scheme (default light). "both" scans each
                      route twice; dark pages list only issues light doesn't have
@@ -99,6 +102,7 @@ function parseArgs(argv) {
       case '--no-skip-primitives': opts.frameworkPrefixes = []; break;
       case '--keyboard': opts.keyboard = true; break;
       case '--focus-traps': opts.focusTraps = true; break;
+      case '--walkthrough': opts.walkthrough = true; break;
       case '--color-scheme': opts.colorScheme = next(); break;
       case '--dark-class': opts.darkClass = next(); break;
       case '--dark-attribute': opts.darkAttribute = next(); break;
@@ -117,7 +121,7 @@ const opts = parseArgs(process.argv.slice(2));
 const SCAN_ONLY = {
   base: '--base', serve: '--serve', serveTimeout: '--serve-timeout', routes: '--route', tags: '--tags',
   wait: '--wait', frameworkPrefixes: '--framework-prefixes / --no-skip-primitives', keyboard: '--keyboard',
-  focusTraps: '--focus-traps', colorScheme: '--color-scheme', darkClass: '--dark-class',
+  focusTraps: '--focus-traps', walkthrough: '--walkthrough', colorScheme: '--color-scheme', darkClass: '--dark-class',
   darkAttribute: '--dark-attribute', headed: '--headed',
 };
 if (opts.from && !opts.help) {
@@ -245,6 +249,7 @@ if (!report) {
       frameworkPrefixes: opts.frameworkPrefixes,
       keyboard: opts.keyboard,
       focusTraps: opts.focusTraps,
+      walkthrough: opts.walkthrough,
       colorScheme: opts.colorScheme,
       darkClass: opts.darkClass,
       darkAttribute,

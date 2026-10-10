@@ -12,11 +12,14 @@ export {
   toJson,
   toMarkdown,
   DARK_ONLY_NOTE,
+  formatStep,
+  WALKTHROUGH_NOTE,
   type PageReport,
   type ScanChecks,
   type ScanReport,
 } from './format.js';
 export { toHtml } from './html.js';
+export type { Walkthrough, WalkthroughStep } from '../keyboard/walkthrough.js';
 export {
   diffAgainstBaseline,
   findingKey,
