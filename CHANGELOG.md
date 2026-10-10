@@ -23,8 +23,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - The pill menu has a **Show component** filter that lists the components with
   issues on the current page, each with its count at the chosen severity.
   Choosing one draws only that component's highlights and updates the badge.
-  The choice isn't saved, and it goes back to all components when the route
-  changes.
+  The choice isn't saved, and it goes back to all components when the path
+  changes. A query-string change (`?page=2`) keeps it.
 
 ### Changed
 

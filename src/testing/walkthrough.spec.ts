@@ -51,6 +51,11 @@ describe('walkthrough in reports', () => {
     expect(md).toContain('2. link "Help \\<b\\>\\*now\\*\\</b\\>"');
   });
 
+  it('escapes pipes and ampersands in Markdown too', () => {
+    const md = toMarkdown(report({ steps: [step({ name: 'A|B & C' })], total: 1 }));
+    expect(md).toContain('1. button "A\\|B \\& C"');
+  });
+
   it('lists the steps as an ordered list in HTML, escaped', () => {
     const html = toHtml(report(walk));
     expect(html).toContain('<h3>Tab order walkthrough</h3>');

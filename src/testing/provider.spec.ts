@@ -291,6 +291,7 @@ describe('provideA11yDevtools', () => {
   });
 
   it('filters highlights by component, and the pill badge counts what the filters let through', async () => {
+    const logger = makeLogger();
     // Unattributed (outside any component): a serious keyboard finding.
     const fake = document.createElement('div');
     fake.setAttribute('role', 'button');
@@ -300,7 +301,7 @@ describe('provideA11yDevtools', () => {
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
-        provideA11yDevtools({ root: () => host, logger: makeLogger(), debounceMs: 0, overlay: true, keyboard: true }),
+        provideA11yDevtools({ root: () => host, logger, debounceMs: 0, overlay: true, keyboard: true }),
       ],
     });
     const fixture = TestBed.createComponent(AppComponent);
@@ -346,16 +347,37 @@ describe('provideA11yDevtools', () => {
     severity.value = 'minor';
     severity.dispatchEvent(new Event('change'));
 
-    // A route change puts the filter back to all components.
+    // A rescan of the same page keeps the filter, even with a new query string.
     select.value = 'UserCardComponent';
     select.dispatchEvent(new Event('change'));
-    const start = location.pathname;
-    history.pushState({}, '', '/elsewhere');
+    const start = location.pathname + location.search;
+    const scans = () => (logger.info as ReturnType<typeof vi.fn>).mock.calls.length;
+    // A native dialog closing outside Angular triggers a rescan.
+    const rescan = async (): Promise<void> => {
+      const before = scans();
+      document.body.dispatchEvent(new Event('close'));
+      await waitFor(() => scans() > before);
+      await wait(20);
+    };
     try {
+      history.pushState({}, '', `${location.pathname}?page=2`);
+      await rescan();
+      expect(select.value).toBe('UserCardComponent');
+      expect(Number(badge().textContent)).toBe(matching);
+
+      // SPA navigation to another path, with the tool left on, resets it.
+      history.pushState({}, '', '/elsewhere');
+      await rescan();
+      expect(select.value).toBe('');
+      expect(Number(badge().textContent)).toBe(total);
+
+      // So does navigating while it's off.
+      select.value = 'UserCardComponent';
+      select.dispatchEvent(new Event('change'));
       pill()!.click(); // off
+      history.pushState({}, '', '/third');
       pill()!.click(); // on: scans straight away
       await waitFor(() => select.value === '');
-      expect(Number(badge().textContent)).toBe(total);
     } finally {
       history.pushState({}, '', start);
     }

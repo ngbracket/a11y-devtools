@@ -179,7 +179,7 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
       // Show one component's issues only (null: all). Not remembered, and reset
       // on a route change: the components change from page to page.
       let componentFilter: string | null = null;
-      let lastRoute: string | undefined;
+      let lastPath: string | undefined;
 
       /** Draw (or clear) each overlay layer from the last scan and the settings. */
       function draw(): void {
@@ -355,8 +355,9 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
             if (!enabled) return; // switched off mid-scan: draw nothing
             lastFindings = findings;
             const route = location.pathname + location.search;
-            if (lastRoute !== undefined && route !== lastRoute) componentFilter = null;
-            lastRoute = route;
+            // A new path is a new page; a query-string change (?page=2) keeps the filter.
+            if (lastPath !== undefined && location.pathname !== lastPath) componentFilter = null;
+            lastPath = location.pathname;
             // Label by route: a single-page app usually keeps one title on every route.
             visited.set(route, { label: route, url: location.href, findings });
             draw();
