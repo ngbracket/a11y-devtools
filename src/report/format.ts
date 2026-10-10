@@ -29,6 +29,9 @@ export interface PageReport {
 }
 
 /** One-line explanation for a dark-only page, shared by the Markdown and HTML reports. */
+export const DARK_ONLY_NOTE =
+  'Dark mode: lists only issues that don’t also appear in light mode on this route.';
+
 /**
  * Heading note for the walkthrough, shared by the Markdown and HTML reports. Same
  * honesty rule as the overlay's Focus preview: computed, not a screen reader.
@@ -53,9 +56,6 @@ export function walkthroughCapNote(walkthrough: Walkthrough): string {
     ? `Showing the first ${walkthrough.steps.length} of ${walkthrough.total} tab stops.`
     : '';
 }
-
-export const DARK_ONLY_NOTE =
-  'Dark mode: lists only issues that don’t also appear in light mode on this route.';
 
 /**
  * Report title, shared by every format. Says "automated scan" on purpose: a file
@@ -345,7 +345,7 @@ function markdownWalkthrough(page: PageReport): string[] {
   if (cap) lines.push(cap, '');
   // Names are page text: escape anything Markdown would read as markup.
   for (const step of walkthrough.steps) {
-    lines.push(`${step.order}. ${formatStep(step).replace(/([<>*_`[\]\\])/g, '\\$1')}`);
+    lines.push(`${step.order}. ${formatStep(step).replace(/([<>*_`[\]\\|&])/g, '\\$1')}`);
   }
   lines.push('');
   return lines;

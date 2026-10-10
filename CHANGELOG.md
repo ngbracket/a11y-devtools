@@ -13,17 +13,18 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   `button "Save" (disabled) — SaveBarComponent`. A stop with no name reads
   `(no accessible name)`, and a positive `tabindex` is flagged. The list is in
   the JSON, Markdown and HTML reports, under a note that it is a computed
-  approximation and not the output of any one screen reader. It runs on the
-  light pass only and stops at 300 stops per page; the report gives the real
-  total when it is cut short.
+  approximation and not the output of any one screen reader. With
+  `--color-scheme both` it runs on the light pass only. It stops at 300 stops
+  per page; the report gives the real total when it is cut short.
 - The pill shows a count badge: the issues on the page that pass the menu's
   filters, coloured by the most severe of them (green at 0). The switch gets the
   count in words as its description, for example "5 issues of 14 on this page
   match the filters".
 - The pill menu has a **Show component** filter that lists the components with
-  issues on the current page, with a count for each. Choosing one draws only
-  that component's highlights and updates the badge. The choice isn't saved,
-  because the components change from page to page.
+  issues on the current page, each with its count at the chosen severity.
+  Choosing one draws only that component's highlights and updates the badge.
+  The choice isn't saved, and it goes back to all components when the route
+  changes.
 
 ### Changed
 

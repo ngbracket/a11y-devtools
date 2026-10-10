@@ -93,7 +93,8 @@ export interface ScanPagesOptions {
    * Also list each route's tab order with every stop's computed role, name,
    * states and owning component: a reading list for checking the keyboard and
    * screen-reader path without opening the app. A computed approximation, not
-   * what any one screen reader says. Light pass only. Default false.
+   * what any one screen reader says. With `colorScheme: 'both'` it runs on the
+   * light pass only. Default false.
    */
   walkthrough?: boolean;
 }

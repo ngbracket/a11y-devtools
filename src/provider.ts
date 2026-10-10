@@ -176,9 +176,10 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
       let lastFindings: A11yFinding[] = [];
       const visited = new Map<string, PageReport>();
 
-      // Show one component's issues only (null: all). Not remembered: the
-      // components change from page to page.
+      // Show one component's issues only (null: all). Not remembered, and reset
+      // on a route change: the components change from page to page.
       let componentFilter: string | null = null;
+      let lastRoute: string | undefined;
 
       /** Draw (or clear) each overlay layer from the last scan and the settings. */
       function draw(): void {
@@ -190,7 +191,8 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
           pages: visited.size,
           matching: matching.length,
           worst: worstImpact(matching),
-          components: componentCounts(lastFindings),
+          // Counted at the chosen severity, so an option's count matches the badge.
+          components: componentCounts(visibleFindings(lastFindings, settings.minImpact)),
           component: componentFilter,
         });
         if (!overlayView) return;
@@ -353,6 +355,8 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
             if (!enabled) return; // switched off mid-scan: draw nothing
             lastFindings = findings;
             const route = location.pathname + location.search;
+            if (lastRoute !== undefined && route !== lastRoute) componentFilter = null;
+            lastRoute = route;
             // Label by route: a single-page app usually keeps one title on every route.
             visited.set(route, { label: route, url: location.href, findings });
             draw();

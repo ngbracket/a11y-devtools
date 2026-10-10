@@ -397,6 +397,23 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
       expect(readFileSync(join(dir, 'baseline.html'), 'utf8')).toMatch(/^<!doctype html>/);
     }, 60_000);
 
+    it('--walkthrough adds the tab order to every format, and --from keeps it', async () => {
+      const { code } = await runCli([
+        '--base', baseUrl, '--route', '/walkthrough', '--wait', '50', '--walkthrough',
+        '--out', join(dir, 'walk'), '--format', 'all',
+      ]);
+      expect(code).toBe(0);
+      const json = JSON.parse(readFileSync(join(dir, 'walk.json'), 'utf8'));
+      expect(json.checks.walkthrough).toBe(true);
+      expect(json.pages[0].walkthrough.steps.map((s: { name: string }) => s.name)).toEqual([
+        'Help', 'Email', 'More options', '',
+      ]);
+      expect(readFileSync(join(dir, 'walk.md'), 'utf8')).toContain('4. button (no accessible name)');
+      expect(readFileSync(join(dir, 'walk.html'), 'utf8')).toContain('<h3>Tab order walkthrough</h3>');
+      await runCli(['--from', join(dir, 'walk.json'), '--out', join(dir, 'walk-again'), '--format', 'md']);
+      expect(readFileSync(join(dir, 'walk-again.md'), 'utf8')).toBe(readFileSync(join(dir, 'walk.md'), 'utf8'));
+    }, 60_000);
+
     it('--from re-renders that real scan byte-for-byte, without scanning', async () => {
       const { code } = await runCli([
         '--from', join(dir, 'baseline.json'), '--out', join(dir, 'rerender'), '--format', 'all',

@@ -338,6 +338,28 @@ describe('provideA11yDevtools', () => {
     expect(count('serious')).toBe(1);
     expect(Number(badge().textContent)).toBe(total);
 
+    // Option counts follow the severity filter, like the badge.
+    const severity = document.querySelector<HTMLSelectElement>('[data-ngb-a11y-overlay] select[id$="-severity"]')!;
+    severity.value = 'critical';
+    severity.dispatchEvent(new Event('change'));
+    expect([...select.options].map((o) => o.value)).not.toContain('(unknown component)');
+    severity.value = 'minor';
+    severity.dispatchEvent(new Event('change'));
+
+    // A route change puts the filter back to all components.
+    select.value = 'UserCardComponent';
+    select.dispatchEvent(new Event('change'));
+    const start = location.pathname;
+    history.pushState({}, '', '/elsewhere');
+    try {
+      pill()!.click(); // off
+      pill()!.click(); // on: scans straight away
+      await waitFor(() => select.value === '');
+      expect(Number(badge().textContent)).toBe(total);
+    } finally {
+      history.pushState({}, '', start);
+    }
+
     // Switched off: no badge and no description.
     pill()!.click();
     expect(badge().hidden).toBe(true);
