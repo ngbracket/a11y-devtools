@@ -34,9 +34,37 @@ export function meetsMinImpact(impact: Impact, min: MinImpact): boolean {
   return IMPACT_RANK[impact] >= IMPACT_RANK[min];
 }
 
-/** The findings to draw, given the severity filter. */
-export function visibleFindings(findings: A11yFinding[], min: MinImpact): A11yFinding[] {
-  return min === 'minor' ? findings : findings.filter((f) => meetsMinImpact(f.impact, min));
+/** Component filter value for findings with no owning component. */
+export const UNKNOWN_COMPONENT = '(unknown component)';
+
+/**
+ * The findings to draw, given the severity filter and, optionally, one owning
+ * component (`UNKNOWN_COMPONENT` for unattributed findings).
+ */
+export function visibleFindings(findings: A11yFinding[], min: MinImpact, component?: string | null): A11yFinding[] {
+  const bySeverity = min === 'minor' ? findings : findings.filter((f) => meetsMinImpact(f.impact, min));
+  return component ? bySeverity.filter((f) => (f.component ?? UNKNOWN_COMPONENT) === component) : bySeverity;
+}
+
+/** The most severe impact among `findings`, or null when there are none (or none has an impact). */
+export function worstImpact(findings: A11yFinding[]): Impact {
+  let worst: Impact = null;
+  for (const f of findings) {
+    if (f.impact && (!worst || IMPACT_RANK[f.impact] > IMPACT_RANK[worst])) worst = f.impact;
+  }
+  return worst;
+}
+
+/** Each owning component on the page with its issue count, most issues first. */
+export function componentCounts(findings: A11yFinding[]): { name: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const f of findings) {
+    const name = f.component ?? UNKNOWN_COMPONENT;
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return [...counts]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
 /**

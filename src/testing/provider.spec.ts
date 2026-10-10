@@ -290,6 +290,60 @@ describe('provideA11yDevtools', () => {
     expect(count('critical')).toBe(1);
   });
 
+  it('filters highlights by component, and the pill badge counts what the filters let through', async () => {
+    // Unattributed (outside any component): a serious keyboard finding.
+    const fake = document.createElement('div');
+    fake.setAttribute('role', 'button');
+    fake.textContent = 'Fake button';
+    host.appendChild(fake);
+
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideA11yDevtools({ root: () => host, logger: makeLogger(), debounceMs: 0, overlay: true, keyboard: true }),
+      ],
+    });
+    const fixture = TestBed.createComponent(AppComponent);
+    host.appendChild(fixture.nativeElement);
+    await fixture.whenStable();
+    const count = (impact: string): number => document.querySelectorAll(`[data-impact="${impact}"]`).length;
+    await waitFor(() => count('critical') > 0 && count('serious') > 0);
+
+    const description = () => document.getElementById(pill()!.getAttribute('aria-describedby') ?? '')?.textContent;
+    const badge = () => [...pill()!.querySelectorAll<HTMLElement>('span[aria-hidden="true"]')].find((s) => /^\d+$/.test(s.textContent ?? ''))!;
+    const total = Number(badge().textContent);
+    expect(total).toBeGreaterThanOrEqual(2);
+    expect(badge().hidden).toBe(false);
+    expect(description()).toBe(`${total} issues on this page`);
+
+    const select = document.querySelector<HTMLSelectElement>('[data-ngb-a11y-overlay] select[id$="-component"]')!;
+    const label = document.querySelector(`label[for="${select.id}"]`)?.textContent;
+    expect(label).toBe('Show component');
+    const names = [...select.options].map((o) => o.value);
+    expect(names[0]).toBe(''); // All components
+    expect(names).toContain('UserCardComponent');
+    expect(names).toContain('(unknown component)');
+
+    select.value = 'UserCardComponent';
+    select.dispatchEvent(new Event('change'));
+    expect(count('serious')).toBe(0);
+    expect(count('critical')).toBe(1);
+    const matching = Number(badge().textContent);
+    expect(matching).toBeLessThan(total);
+    expect(badge().style.background).toBe('rgb(211, 32, 41)'); // worst left is critical
+    expect(description()).toBe(`${matching} ${matching === 1 ? 'issue' : 'issues'} of ${total} on this page match the filters`);
+
+    select.value = '';
+    select.dispatchEvent(new Event('change'));
+    expect(count('serious')).toBe(1);
+    expect(Number(badge().textContent)).toBe(total);
+
+    // Switched off: no badge and no description.
+    pill()!.click();
+    expect(badge().hidden).toBe(true);
+    expect(pill()!.hasAttribute('aria-describedby')).toBe(false);
+  });
+
   it('rescans when a native dialog closes outside Angular (e.g. Escape)', async () => {
     const logger = makeLogger();
     TestBed.configureTestingModule({

@@ -60,11 +60,11 @@ export const appConfig: ApplicationConfig = {
 };
 ```
 
-![Keyboard & Focus Mode over the demo page: numbered tab-order badges (badge 1 in
-orange flags a positive tabindex) joined by a connector path, severity-coloured
-finding highlights labelled with their owning component (including the ngbr/*
-keyboard findings), and the Focus preview card showing the focused button's
-computed role, name and states.](./demo/keyboard-layer-2026-09.png)
+![Keyboard & Focus Mode over the demo page's Keyboard section: numbered tab-order
+badges joined by a dashed path (badge 1 in orange flags a positive tabindex), two
+serious keyboard findings labelled with their owning component, the Focus preview
+card showing the focused Menu button's computed role, name and states, and the a11y
+pill in the corner with a red 5, the count of issues that pass the severity filter.](./demo/keyboard-layer-2026-10.png)
 
 In CI (`--serve` starts `ng serve`, waits for it, and stops it after the scan):
 
@@ -116,12 +116,6 @@ ever becomes reachable through a static import.
 
 ## Roadmap
 
-### Planned
-
-- A headless "linear walkthrough": the tab sequence as a reading list per route in
-  report mode. The Focus preview is overlay-only for now.
-- Per-component filtering and a violation-count badge.
-
 ### Done
 
 - Component attribution: the nearest app-owned component, skipping UI primitives.
@@ -144,3 +138,5 @@ ever becomes reachable through a static import.
 - Report mode can start the dev server (`--serve`).
 - ACR evaluation worksheet by WCAG 2.2 A/AA criterion (`--format acr`).
 - Re-render a saved JSON report in any format without scanning (`--from`).
+- Issue-count badge on the pill and a per-component filter in its menu.
+- Tab order walkthrough in report mode (`--walkthrough`).

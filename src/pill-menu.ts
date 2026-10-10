@@ -6,6 +6,8 @@ export interface PillMenuOptions {
   onChange: (settings: DevtoolsSettings) => void;
   /** Download the report for the pages visited so far. */
   onDownload: () => void;
+  /** Show only one component's issues (`null`: every component). */
+  onComponentChange?: (component: string | null) => void;
   /** Open the panel above the button (pill at the bottom) or below it. */
   opensUp: boolean;
   /** Align the panel's left edge (pill on the left) or right edge. */
@@ -19,6 +21,10 @@ export interface PillMenuStatus {
   shown: number;
   /** Pages recorded for the report. */
   pages: number;
+  /** Components with issues on this page, most issues first. */
+  components?: { name: string; count: number }[];
+  /** The component filter in force, or null for every component. */
+  component?: string | null;
 }
 
 export interface PillMenu {
@@ -143,7 +149,7 @@ export function createPillMenu(doc: Document, options: PillMenuOptions): PillMen
     select.append(opt);
   }
   select.value = settings.minImpact;
-  Object.assign(select.style, {
+  const selectStyle = {
     width: '100%',
     minHeight: '28px',
     marginBottom: '10px',
@@ -152,8 +158,42 @@ export function createPillMenu(doc: Document, options: PillMenuOptions): PillMen
     background: '#2a2e37',
     border: '1px solid rgba(255,255,255,0.3)',
     borderRadius: '4px',
-  });
+  };
+  Object.assign(select.style, selectStyle);
   select.addEventListener('change', () => update({ minImpact: select.value as MinImpact }));
+
+  // Per-component filter. Its options follow the components on the current page.
+  const componentLabel = doc.createElement('label');
+  componentLabel.textContent = 'Show component';
+  Object.assign(componentLabel.style, { display: 'block', fontWeight: '700', marginBottom: '4px' });
+  const componentSelect = doc.createElement('select');
+  componentSelect.id = `${id}-component`;
+  componentLabel.htmlFor = componentSelect.id;
+  Object.assign(componentSelect.style, selectStyle);
+  componentSelect.addEventListener('change', () => options.onComponentChange?.(componentSelect.value || null));
+  let componentOptionsKey = '';
+
+  /** Rebuild the options only when they change, so an open select isn't reset under the user. */
+  function setComponentOptions(components: { name: string; count: number }[], selected: string | null): void {
+    const list = [...components];
+    // Keep a chosen component listed after its issues are fixed, so the filter stays visible.
+    if (selected && !list.some((c) => c.name === selected)) list.push({ name: selected, count: 0 });
+    const key = JSON.stringify([list, selected]);
+    if (key === componentOptionsKey) return;
+    componentOptionsKey = key;
+    const all = doc.createElement('option');
+    all.value = '';
+    all.textContent = 'All components';
+    const opts = list.map(({ name, count }) => {
+      const opt = doc.createElement('option');
+      opt.value = name;
+      opt.textContent = `${name} (${count})`;
+      return opt;
+    });
+    componentSelect.replaceChildren(all, ...opts);
+    componentSelect.value = selected ?? '';
+  }
+  setComponentOptions([], null);
 
   const download = doc.createElement('button');
   download.type = 'button';
@@ -172,7 +212,8 @@ export function createPillMenu(doc: Document, options: PillMenuOptions): PillMen
   const pagesNote = doc.createElement('p');
   Object.assign(pagesNote.style, { margin: '4px 0 0', fontSize: '12px', color: muted });
 
-  panel.append(status, fieldset, severityLabel, select, download, pagesNote);
+  const componentControls = options.onComponentChange ? [componentLabel, componentSelect] : [];
+  panel.append(status, fieldset, severityLabel, select, ...componentControls, download, pagesNote);
 
   function update(patch: Partial<DevtoolsSettings>): void {
     settings = { ...settings, ...patch };
@@ -203,7 +244,7 @@ export function createPillMenu(doc: Document, options: PillMenuOptions): PillMen
   doc.addEventListener('pointerdown', onPointerDown, true);
 
   // Inline styles can't do :focus-visible; draw the rings from focus events.
-  for (const el of [button, download, select]) {
+  for (const el of [button, download, select, componentSelect]) {
     el.addEventListener('focus', () => {
       if (el.matches(':focus-visible')) {
         el.style.outline = '2px solid #7ab8ff';
@@ -218,7 +259,8 @@ export function createPillMenu(doc: Document, options: PillMenuOptions): PillMen
   return {
     button,
     panel,
-    setStatus({ found, shown, pages }) {
+    setStatus({ found, shown, pages, components, component }) {
+      if (components) setComponentOptions(components, component ?? null);
       const issues = `${found} ${found === 1 ? 'issue' : 'issues'} on this page`;
       status.textContent = shown === found ? issues : `${issues}, ${shown} shown`;
       pagesNote.textContent = `Covers ${pages} ${pages === 1 ? 'page' : 'pages'} visited since the app loaded.`;
