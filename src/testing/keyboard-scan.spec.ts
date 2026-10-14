@@ -396,7 +396,7 @@ describe('scanKeyboard', () => {
         withNg(listeners, new Map(), () => expect(unreachable(host)).toEqual([]));
       });
 
-      it('is still reported when it has content, is not aria-hidden, or has no native control beside it', () => {
+      it('is still reported when it has content, is not aria-hidden, or has no checkbox or radio beside it', () => {
         const host = fixture(`
           <div><span id="text" aria-hidden="true">Edit</span><input type="checkbox" /></div>
           <div><span id="shown"></span><input type="checkbox" /></div>
@@ -408,6 +408,24 @@ describe('scanKeyboard', () => {
         withNg(listeners, new Map(), () =>
           expect(unreachable(host)).toEqual(['span#text', 'span#shown', 'span#alone', 'span#hidden-input']),
         );
+      });
+
+      it('is still reported beside a text field or a button (a clear "×" drawn in CSS)', () => {
+        const host = fixture(`
+          <div class="field"><input type="text" /><span id="clear" aria-hidden="true"></span></div>
+          <div class="bar"><button>Save</button><span id="close" aria-hidden="true"></span></div>`);
+        const listeners = new Map<Element, string[]>(
+          ['#clear', '#close'].map((id) => [host.querySelector(id)!, ['click']]),
+        );
+        withNg(listeners, new Map(), () => expect(unreachable(host)).toEqual(['span#clear', 'span#close']));
+      });
+
+      it('gets no hover finding either', () => {
+        const host = checkbox();
+        const touch = host.querySelector('#touch')!;
+        touch.setAttribute('title', 'Toggle');
+        const listeners = new Map<Element, string[]>([[touch, ['click', 'mouseenter']]]);
+        withNg(listeners, new Map(), () => expect(scanKeyboard(host)).toEqual([]));
       });
     });
 

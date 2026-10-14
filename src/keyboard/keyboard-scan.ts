@@ -304,19 +304,23 @@ function partOfKeyboardOperatedWidget(
 }
 
 /**
- * True when `element` is an empty, `aria-hidden` hit area beside a native
- * control: a larger click or touch target that forwards to the control, which
- * the keyboard reaches and operates on its own. Angular Material up to 21 draws
- * one in every checkbox and radio button (`.mat-mdc-checkbox-touch-target`,
- * `.mat-mdc-radio-touch-target`, each with a click handler). Disabled controls
+ * True when `element` is an empty, `aria-hidden` hit area beside a checkbox or
+ * radio input: a larger click or touch target that toggles the input, which the
+ * keyboard reaches and operates on its own. Angular Material up to 21 draws one
+ * in every checkbox and radio button (`.mat-mdc-checkbox-touch-target`,
+ * `.mat-mdc-radio-touch-target`, each with a click handler). Disabled inputs
  * count too: their hit area does nothing either.
+ *
+ * Only checkbox and radio inputs: an empty `aria-hidden` icon with a click
+ * handler beside a text field or a button (a clear "×" drawn in CSS) is a
+ * separate action Tab can't reach, and is still reported.
  */
-function hitAreaForNativeControl(element: Element): boolean {
+function hitAreaForToggleInput(element: Element): boolean {
   if (element.getAttribute('aria-hidden') !== 'true') return false;
   if (element.children.length || element.textContent?.trim()) return false;
   const parent = element.parentElement;
   if (!parent) return false;
-  return [...parent.children].some((sibling) => sibling !== element && isNativelyFocusable(sibling));
+  return [...parent.children].some((sibling) => sibling.matches('input[type="checkbox" i], input[type="radio" i]'));
 }
 
 /**
@@ -397,6 +401,8 @@ export function scanKeyboard(
   const sharedCache: SharedStopCache = new Map();
   /** Elements reported as unreachable controls, so the hover check doesn't repeat them. */
   const unreachable = new Set<Element>();
+  /** Checkbox and radio hit areas, skipped by the hover check too. */
+  const hitAreas = new Set<Element>();
   /** Angular listener names per element, read once and shared by both passes. */
   const listenerEvents = new Map<Element, string[]>();
   const eventsOf = (el: Element): string[] => {
@@ -516,8 +522,11 @@ export function scanKeyboard(
       // A click-only part of something the keyboard operates is a mouse shortcut.
       // Only for unreachable elements: one Tab reaches is still checked below.
       if (!interactiveByRole && partOfKeyboardOperatedWidget(element, isVisible, keyCache, sharedCache)) continue;
-      // A mouse/touch hit area for a native control next to it (Material's touch targets).
-      if (!interactiveByRole && hitAreaForNativeControl(element)) continue;
+      // A mouse/touch hit area for the checkbox or radio next to it (Material's touch targets).
+      if (!interactiveByRole && hitAreaForToggleInput(element)) {
+        hitAreas.add(element);
+        continue;
+      }
       const within = interactiveByRole ? reachedWithinWidget(element, isVisible, keyCache, sharedCache) : false;
       if (within === 'reached') continue;
       if (within === 'no-keys') {
@@ -572,8 +581,9 @@ export function scanKeyboard(
 
   // Hover-only content: a tooltip, hover listener or icon `title` on something
   // Tab can't reach, so keyboard users may never see what it shows.
-  // Seeded with the unreachable controls, so an icon inside one isn't reported again.
-  const hoverFlagged = new Set<Element>(unreachable);
+  // Seeded with the unreachable controls, so an icon inside one isn't reported
+  // again, and with the skipped checkbox/radio hit areas.
+  const hoverFlagged = new Set<Element>([...unreachable, ...hitAreas]);
   for (const element of root.querySelectorAll('*')) {
     if (modal && !modal.contains(element)) continue;
     if (hoverFlagged.has(element) || element.closest(OVERLAY_EXCLUDE_SELECTOR)) continue;
