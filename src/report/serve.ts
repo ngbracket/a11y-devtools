@@ -53,9 +53,10 @@ export async function isServing(url: string): Promise<boolean> {
 /**
  * Start a dev server and resolve once `url` answers — for report mode in CI,
  * where nothing is running yet. Rejects (after stopping the process) if the
- * command exits first, the Angular build fails, or `timeoutMs` passes; the error
- * includes the last lines of its output. Always `stop()` the result when the scan is done. Until then,
- * SIGINT/SIGTERM stop the server before the process ends.
+ * command exits first, the Angular build fails, or `timeoutMs` passes; the
+ * error includes the last lines of its output. Always `stop()` the result when
+ * the scan is done. Until then, SIGINT/SIGTERM stop the server before the
+ * process ends.
  */
 export async function startDevServer(options: DevServerOptions): Promise<DevServer> {
   const { command, url, timeoutMs = 180_000, reuseExisting = true } = options;
@@ -77,19 +78,36 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   // Set when the build fails; `buildErrorsDone` once its error lines are in.
   let buildFailedAt: number | undefined;
   let buildErrorsDone = false;
-  const collect = (chunk: Buffer) => {
-    for (const line of chunk.toString().split(/\r?\n/)) {
-      if (!line.trim()) continue;
-      options.onOutput?.(line);
-      tail.push(line);
-      if (tail.length > OUTPUT_TAIL) tail.shift();
-      const plain = stripAnsi(line);
-      if (buildFailedAt === undefined && BUILD_FAILED.test(plain)) buildFailedAt = Date.now();
-      else if (buildFailedAt !== undefined && WATCHING.test(plain)) buildErrorsDone = true;
-    }
+  const addLine = (line: string) => {
+    if (!line.trim()) return;
+    options.onOutput?.(line);
+    tail.push(line);
+    if (tail.length > OUTPUT_TAIL) tail.shift();
+    const plain = stripAnsi(line);
+    if (buildFailedAt === undefined && BUILD_FAILED.test(plain)) buildFailedAt = Date.now();
+    else if (buildFailedAt !== undefined && WATCHING.test(plain)) buildErrorsDone = true;
   };
-  child.stdout?.on('data', collect);
-  child.stderr?.on('data', collect);
+  // A chunk can end mid-line, so each stream keeps its unfinished last line
+  // until the rest arrives (or the stream ends).
+  const lineReader = () => {
+    let partial = '';
+    return {
+      data: (chunk: Buffer) => {
+        const lines = (partial + chunk.toString()).split(/\r?\n/);
+        partial = lines.pop() ?? '';
+        lines.forEach(addLine);
+      },
+      end: () => {
+        addLine(partial);
+        partial = '';
+      },
+    };
+  };
+  for (const stream of [child.stdout, child.stderr]) {
+    const reader = lineReader();
+    stream?.on('data', reader.data);
+    stream?.on('end', reader.end);
+  }
 
   let exitCode: number | null | undefined;
   const exited = new Promise<void>((done) => {

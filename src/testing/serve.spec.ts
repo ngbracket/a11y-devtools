@@ -103,6 +103,18 @@ describe('startDevServer', () => {
     );
   });
 
+  it('spots a build failure split across two chunks of output', async () => {
+    const port = await freePort();
+    const js =
+      `process.stdout.write('Application bundle gen');` +
+      `setTimeout(() => process.stdout.write('eration failed.\\nWatch mode enabled.\\n'), 200);` +
+      `setInterval(() => {}, 1000);`;
+    const command = `"${process.execPath}" -e "${js}"`;
+    await expect(
+      startDevServer({ command, url: `http://127.0.0.1:${port}/`, timeoutMs: 4000 }),
+    ).rejects.toThrow(/Angular build failed[\s\S]*Application bundle generation failed/);
+  });
+
   it('times out, stops the command, and says why', async () => {
     const port = await freePort();
     const url = `http://127.0.0.1:${port}/`;
