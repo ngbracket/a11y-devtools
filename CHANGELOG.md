@@ -3,6 +3,19 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.18.1
+
+### Fixed
+
+- `ngbr/unreachable-control` no longer reports the touch target in Angular
+  Material 15 to 21 checkboxes and radio buttons
+  (`.mat-mdc-checkbox-touch-target`, `.mat-mdc-radio-touch-target`). The
+  target is an empty element with a click handler that toggles the native
+  input beside it, and Tab reaches that input. The rule now skips an empty
+  element with a click listener and no role when its parent holds a checkbox
+  or radio input. The same element beside a text field or a button is still
+  reported. Material 22 removed the handler, so apps on 22 were not affected.
+
 ## 0.18.0
 
 ### Added

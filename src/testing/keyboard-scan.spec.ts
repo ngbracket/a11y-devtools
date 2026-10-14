@@ -362,6 +362,80 @@ describe('scanKeyboard', () => {
       });
     });
 
+    describe('a hit area beside a checkbox or radio (Angular Material 15-21 touch targets)', () => {
+      // Markup trimmed from MatCheckbox and MatRadioButton in Material 21.2. Material
+      // 15 to 20 render the same touch target without aria-hidden.
+      const checkbox = (inputAttrs = '', touchAttrs = 'aria-hidden="true"') =>
+        fixture(`
+          <div class="mdc-checkbox">
+            <div id="touch" class="mat-mdc-checkbox-touch-target" ${touchAttrs}></div>
+            <input type="checkbox" class="mdc-checkbox__native-control" id="terms" ${inputAttrs} />
+            <div class="mdc-checkbox__ripple" aria-hidden="true"></div>
+          </div>
+          <label for="terms">I accept the terms</label>`);
+
+      it('is not reported for a checkbox', () => {
+        const host = checkbox();
+        const listeners = new Map<Element, string[]>([[host.querySelector('#touch')!, ['click']]]);
+        withNg(listeners, new Map(), () => expect(unreachable(host)).toEqual([]));
+      });
+
+      it('is not reported for a Material 15-20 checkbox (no aria-hidden)', () => {
+        const host = checkbox('', '');
+        const listeners = new Map<Element, string[]>([[host.querySelector('#touch')!, ['click']]]);
+        withNg(listeners, new Map(), () => expect(unreachable(host)).toEqual([]));
+      });
+
+      it('is not reported for a disabled checkbox', () => {
+        const host = checkbox('disabled');
+        const listeners = new Map<Element, string[]>([[host.querySelector('#touch')!, ['click']]]);
+        withNg(listeners, new Map(), () => expect(unreachable(host)).toEqual([]));
+      });
+
+      it('is not reported for a radio button', () => {
+        const host = fixture(`
+          <div class="mdc-radio">
+            <div id="touch" class="mat-mdc-radio-touch-target" aria-hidden="true"></div>
+            <input type="radio" class="mdc-radio__native-control" name="size" id="small" />
+          </div>
+          <label for="small">Small</label>`);
+        const listeners = new Map<Element, string[]>([[host.querySelector('#touch')!, ['click']]]);
+        withNg(listeners, new Map(), () => expect(unreachable(host)).toEqual([]));
+      });
+
+      it('is still reported when it has content, has a role, or has no checkbox or radio beside it', () => {
+        const host = fixture(`
+          <div><span id="text">Edit</span><input type="checkbox" /></div>
+          <div><span id="role" role="button"></span><input type="checkbox" /></div>
+          <div><span id="alone"></span><span>no control</span></div>
+          <div><span id="hidden-input"></span><input type="hidden" /></div>`);
+        const listeners = new Map<Element, string[]>(
+          ['#text', '#role', '#alone', '#hidden-input'].map((id) => [host.querySelector(id)!, ['click']]),
+        );
+        withNg(listeners, new Map(), () =>
+          expect(unreachable(host)).toEqual(['span#text', 'span#role', 'span#alone', 'span#hidden-input']),
+        );
+      });
+
+      it('is still reported beside a text field or a button (a clear "×" drawn in CSS)', () => {
+        const host = fixture(`
+          <div class="field"><input type="text" /><span id="clear" aria-hidden="true"></span></div>
+          <div class="bar"><button>Save</button><span id="close" aria-hidden="true"></span></div>`);
+        const listeners = new Map<Element, string[]>(
+          ['#clear', '#close'].map((id) => [host.querySelector(id)!, ['click']]),
+        );
+        withNg(listeners, new Map(), () => expect(unreachable(host)).toEqual(['span#clear', 'span#close']));
+      });
+
+      it('gets no hover finding either', () => {
+        const host = checkbox();
+        const touch = host.querySelector('#touch')!;
+        touch.setAttribute('title', 'Toggle');
+        const listeners = new Map<Element, string[]>([[touch, ['click', 'mouseenter']]]);
+        withNg(listeners, new Map(), () => expect(scanKeyboard(host)).toEqual([]));
+      });
+    });
+
     it('still flags a tabindex="-1" control that is not in a composite widget', () => {
       const host = fixture(`<div><div role="button" tabindex="0">A</div><div id="lone" role="button" tabindex="-1">B</div></div>`);
       withNg(new Map(), new Map(), () => expect(unreachable(host)).toEqual(['div#lone']));
