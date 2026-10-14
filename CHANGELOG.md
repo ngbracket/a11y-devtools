@@ -13,7 +13,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   target is an empty, `aria-hidden` element with a click handler that forwards
   to the native input beside it, and Tab reaches that input. The rule now skips
   any empty `aria-hidden` element with a click listener whose parent holds a
-  native control. Material 22 removed the handler, so apps on 22 never saw this.
+  native control. Material 22 removed the handler, so apps on 22 were not affected.
 
 ## 0.18.0
 
