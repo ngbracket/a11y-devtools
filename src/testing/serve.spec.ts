@@ -77,6 +77,32 @@ describe('startDevServer', () => {
     );
   });
 
+  it('fails fast when the Angular build fails, with the build errors', async () => {
+    const port = await freePort();
+    // Like `ng serve` after a failed build: prints the errors, then keeps watching.
+    const js =
+      `console.log('\\x1b[31mApplication bundle generation failed.\\x1b[0m [4.486 seconds]');` +
+      `console.error('[ERROR] Could not resolve styles.css');` +
+      `console.log('Watch mode enabled. Watching for file changes...');` +
+      `setInterval(() => {}, 1000);`;
+    const command = `"${process.execPath}" -e "${js}"`;
+    const started = Date.now();
+    await expect(startDevServer({ command, url: `http://127.0.0.1:${port}/` })).rejects.toThrow(
+      /Angular build failed[\s\S]*Could not resolve styles\.css/,
+    );
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
+
+  it('stops a failed build after a short wait when no "Watch mode" line follows', async () => {
+    const port = await freePort();
+    // Webpack's wording, and no "Watch mode" line to say the errors are all in.
+    const js = `console.log('Failed to compile.'); setInterval(() => {}, 1000);`;
+    const command = `"${process.execPath}" -e "${js}"`;
+    await expect(startDevServer({ command, url: `http://127.0.0.1:${port}/` })).rejects.toThrow(
+      /Angular build failed[\s\S]*Failed to compile/,
+    );
+  });
+
   it('times out, stops the command, and says why', async () => {
     const port = await freePort();
     const url = `http://127.0.0.1:${port}/`;

@@ -28,6 +28,16 @@ export interface DevServer {
 /** Lines of dev-server output kept for the error message when it fails to start. */
 const OUTPUT_TAIL = 30;
 const POLL_MS = 500;
+/**
+ * What `ng serve` prints when a build fails: the application builder (esbuild),
+ * then the older browser builder (webpack). Either way the server keeps watching
+ * and never answers, so waiting for the timeout only wastes CI time.
+ */
+const BUILD_FAILED = /Application bundle generation failed|Failed to compile/;
+/** `ng serve` prints this once it has listed the build errors. */
+const WATCHING = /Watch mode enabled/;
+/** After a failed build, how long to keep collecting its error lines (ms). */
+const BUILD_ERRORS_MS = 2000;
 
 /** True when something at `url` answers with a non-5xx response. */
 export async function isServing(url: string): Promise<boolean> {
@@ -43,8 +53,8 @@ export async function isServing(url: string): Promise<boolean> {
 /**
  * Start a dev server and resolve once `url` answers — for report mode in CI,
  * where nothing is running yet. Rejects (after stopping the process) if the
- * command exits first or `timeoutMs` passes; the error includes the last lines
- * of its output. Always `stop()` the result when the scan is done. Until then,
+ * command exits first, the Angular build fails, or `timeoutMs` passes; the error
+ * includes the last lines of its output. Always `stop()` the result when the scan is done. Until then,
  * SIGINT/SIGTERM stop the server before the process ends.
  */
 export async function startDevServer(options: DevServerOptions): Promise<DevServer> {
@@ -64,12 +74,18 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   });
 
   const tail: string[] = [];
+  // Set when the build fails; `buildErrorsDone` once its error lines are in.
+  let buildFailedAt: number | undefined;
+  let buildErrorsDone = false;
   const collect = (chunk: Buffer) => {
     for (const line of chunk.toString().split(/\r?\n/)) {
       if (!line.trim()) continue;
       options.onOutput?.(line);
       tail.push(line);
       if (tail.length > OUTPUT_TAIL) tail.shift();
+      const plain = stripAnsi(line);
+      if (buildFailedAt === undefined && BUILD_FAILED.test(plain)) buildFailedAt = Date.now();
+      else if (buildFailedAt !== undefined && WATCHING.test(plain)) buildErrorsDone = true;
     }
   };
   child.stdout?.on('data', collect);
@@ -123,13 +139,24 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
       await stop();
       throw withOutput(`Dev server command exited (code ${exitCode}) before ${url} answered: ${command}`);
     }
-    if (await isServing(url)) return { reused: false, stop };
+    if (
+      buildFailedAt !== undefined &&
+      (buildErrorsDone || Date.now() - buildFailedAt >= BUILD_ERRORS_MS)
+    ) {
+      await stop();
+      throw withOutput(`The Angular build failed, so the dev server never started: ${command}`);
+    }
+    if (buildFailedAt === undefined && (await isServing(url))) return { reused: false, stop };
     if (Date.now() >= deadline) {
       await stop();
       throw withOutput(`Dev server didn't answer at ${url} within ${Math.round(timeoutMs / 1000)}s: ${command}`);
     }
     await Promise.race([exited, new Promise((r) => setTimeout(r, POLL_MS))]);
   }
+}
+
+function stripAnsi(text: string): string {
+  return text.replace(/\x1b\[[0-9;]*m/g, '');
 }
 
 function killTree(child: ChildProcess, signal: NodeJS.Signals): void {

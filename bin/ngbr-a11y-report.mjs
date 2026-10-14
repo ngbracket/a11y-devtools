@@ -28,7 +28,8 @@ Options:
                      answers, scan, then stop it — e.g. --serve "npx ng serve".
                      If --base already answers, that server is used as-is
   --serve-timeout <s>
-                     Seconds to wait for --serve to answer (default 180)
+                     Seconds to wait for --serve to answer (default 180).
+                     A failed Angular build stops it straight away
   --route <path>     Route to scan; repeat for multiple routes
   --from <file>      Don't scan: read a previous run's JSON report (from --out)
                      and write it in the --format(s) asked for — e.g. add an

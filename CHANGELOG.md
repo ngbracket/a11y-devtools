@@ -3,6 +3,19 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.18.2
+
+### Fixed
+
+- `--serve` stops as soon as the Angular build fails. `ng serve` keeps
+  watching after a failed build and never answers, so report mode used to wait
+  the full `--serve-timeout` (180 s by default) and then say the server didn't
+  answer. It now waits until Angular has printed the build errors, stops the
+  server, and exits with code 2 and "The Angular build failed", followed by
+  the last lines of output. Both the application builder and the older
+  webpack builder are covered. `--serve-timeout` still applies to servers
+  that never print a failure.
+
 ## 0.18.1
 
 ### Fixed
