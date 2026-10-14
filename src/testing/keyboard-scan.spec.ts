@@ -362,6 +362,55 @@ describe('scanKeyboard', () => {
       });
     });
 
+    describe('a hit area beside a native control (Angular Material 15-21 touch targets)', () => {
+      // Markup trimmed from MatCheckbox and MatRadioButton in Material 21.2.
+      const checkbox = (inputAttrs = '') =>
+        fixture(`
+          <div class="mdc-checkbox">
+            <div id="touch" class="mat-mdc-checkbox-touch-target" aria-hidden="true"></div>
+            <input type="checkbox" class="mdc-checkbox__native-control" id="terms" ${inputAttrs} />
+            <div class="mdc-checkbox__ripple" aria-hidden="true"></div>
+          </div>
+          <label for="terms">I accept the terms</label>`);
+
+      it('is not reported for a checkbox', () => {
+        const host = checkbox();
+        const listeners = new Map<Element, string[]>([[host.querySelector('#touch')!, ['click']]]);
+        withNg(listeners, new Map(), () => expect(unreachable(host)).toEqual([]));
+      });
+
+      it('is not reported for a disabled checkbox', () => {
+        const host = checkbox('disabled');
+        const listeners = new Map<Element, string[]>([[host.querySelector('#touch')!, ['click']]]);
+        withNg(listeners, new Map(), () => expect(unreachable(host)).toEqual([]));
+      });
+
+      it('is not reported for a radio button', () => {
+        const host = fixture(`
+          <div class="mdc-radio">
+            <div id="touch" class="mat-mdc-radio-touch-target" aria-hidden="true"></div>
+            <input type="radio" class="mdc-radio__native-control" name="size" id="small" />
+          </div>
+          <label for="small">Small</label>`);
+        const listeners = new Map<Element, string[]>([[host.querySelector('#touch')!, ['click']]]);
+        withNg(listeners, new Map(), () => expect(unreachable(host)).toEqual([]));
+      });
+
+      it('is still reported when it has content, is not aria-hidden, or has no native control beside it', () => {
+        const host = fixture(`
+          <div><span id="text" aria-hidden="true">Edit</span><input type="checkbox" /></div>
+          <div><span id="shown"></span><input type="checkbox" /></div>
+          <div><span id="alone" aria-hidden="true"></span><span>no control</span></div>
+          <div><span id="hidden-input" aria-hidden="true"></span><input type="hidden" /></div>`);
+        const listeners = new Map<Element, string[]>(
+          ['#text', '#shown', '#alone', '#hidden-input'].map((id) => [host.querySelector(id)!, ['click']]),
+        );
+        withNg(listeners, new Map(), () =>
+          expect(unreachable(host)).toEqual(['span#text', 'span#shown', 'span#alone', 'span#hidden-input']),
+        );
+      });
+    });
+
     it('still flags a tabindex="-1" control that is not in a composite widget', () => {
       const host = fixture(`<div><div role="button" tabindex="0">A</div><div id="lone" role="button" tabindex="-1">B</div></div>`);
       withNg(new Map(), new Map(), () => expect(unreachable(host)).toEqual(['div#lone']));

@@ -304,6 +304,22 @@ function partOfKeyboardOperatedWidget(
 }
 
 /**
+ * True when `element` is an empty, `aria-hidden` hit area beside a native
+ * control: a larger click or touch target that forwards to the control, which
+ * the keyboard reaches and operates on its own. Angular Material up to 21 draws
+ * one in every checkbox and radio button (`.mat-mdc-checkbox-touch-target`,
+ * `.mat-mdc-radio-touch-target`, each with a click handler). Disabled controls
+ * count too: their hit area does nothing either.
+ */
+function hitAreaForNativeControl(element: Element): boolean {
+  if (element.getAttribute('aria-hidden') !== 'true') return false;
+  if (element.children.length || element.textContent?.trim()) return false;
+  const parent = element.parentElement;
+  if (!parent) return false;
+  return [...parent.children].some((sibling) => sibling !== element && isNativelyFocusable(sibling));
+}
+
+/**
  * Each rule's page: what the message means, who it affects, exactly what
  * triggers it, how to fix and check it, and the WCAG/APG reference.
  */
@@ -500,6 +516,8 @@ export function scanKeyboard(
       // A click-only part of something the keyboard operates is a mouse shortcut.
       // Only for unreachable elements: one Tab reaches is still checked below.
       if (!interactiveByRole && partOfKeyboardOperatedWidget(element, isVisible, keyCache, sharedCache)) continue;
+      // A mouse/touch hit area for a native control next to it (Material's touch targets).
+      if (!interactiveByRole && hitAreaForNativeControl(element)) continue;
       const within = interactiveByRole ? reachedWithinWidget(element, isVisible, keyCache, sharedCache) : false;
       if (within === 'reached') continue;
       if (within === 'no-keys') {
