@@ -362,12 +362,13 @@ describe('scanKeyboard', () => {
       });
     });
 
-    describe('a hit area beside a native control (Angular Material 15-21 touch targets)', () => {
-      // Markup trimmed from MatCheckbox and MatRadioButton in Material 21.2.
-      const checkbox = (inputAttrs = '') =>
+    describe('a hit area beside a checkbox or radio (Angular Material 15-21 touch targets)', () => {
+      // Markup trimmed from MatCheckbox and MatRadioButton in Material 21.2. Material
+      // 15 to 20 render the same touch target without aria-hidden.
+      const checkbox = (inputAttrs = '', touchAttrs = 'aria-hidden="true"') =>
         fixture(`
           <div class="mdc-checkbox">
-            <div id="touch" class="mat-mdc-checkbox-touch-target" aria-hidden="true"></div>
+            <div id="touch" class="mat-mdc-checkbox-touch-target" ${touchAttrs}></div>
             <input type="checkbox" class="mdc-checkbox__native-control" id="terms" ${inputAttrs} />
             <div class="mdc-checkbox__ripple" aria-hidden="true"></div>
           </div>
@@ -375,6 +376,12 @@ describe('scanKeyboard', () => {
 
       it('is not reported for a checkbox', () => {
         const host = checkbox();
+        const listeners = new Map<Element, string[]>([[host.querySelector('#touch')!, ['click']]]);
+        withNg(listeners, new Map(), () => expect(unreachable(host)).toEqual([]));
+      });
+
+      it('is not reported for a Material 15-20 checkbox (no aria-hidden)', () => {
+        const host = checkbox('', '');
         const listeners = new Map<Element, string[]>([[host.querySelector('#touch')!, ['click']]]);
         withNg(listeners, new Map(), () => expect(unreachable(host)).toEqual([]));
       });
@@ -396,17 +403,17 @@ describe('scanKeyboard', () => {
         withNg(listeners, new Map(), () => expect(unreachable(host)).toEqual([]));
       });
 
-      it('is still reported when it has content, is not aria-hidden, or has no checkbox or radio beside it', () => {
+      it('is still reported when it has content, has a role, or has no checkbox or radio beside it', () => {
         const host = fixture(`
-          <div><span id="text" aria-hidden="true">Edit</span><input type="checkbox" /></div>
-          <div><span id="shown"></span><input type="checkbox" /></div>
-          <div><span id="alone" aria-hidden="true"></span><span>no control</span></div>
-          <div><span id="hidden-input" aria-hidden="true"></span><input type="hidden" /></div>`);
+          <div><span id="text">Edit</span><input type="checkbox" /></div>
+          <div><span id="role" role="button"></span><input type="checkbox" /></div>
+          <div><span id="alone"></span><span>no control</span></div>
+          <div><span id="hidden-input"></span><input type="hidden" /></div>`);
         const listeners = new Map<Element, string[]>(
-          ['#text', '#shown', '#alone', '#hidden-input'].map((id) => [host.querySelector(id)!, ['click']]),
+          ['#text', '#role', '#alone', '#hidden-input'].map((id) => [host.querySelector(id)!, ['click']]),
         );
         withNg(listeners, new Map(), () =>
-          expect(unreachable(host)).toEqual(['span#text', 'span#shown', 'span#alone', 'span#hidden-input']),
+          expect(unreachable(host)).toEqual(['span#text', 'span#role', 'span#alone', 'span#hidden-input']),
         );
       });
 

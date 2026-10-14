@@ -304,19 +304,18 @@ function partOfKeyboardOperatedWidget(
 }
 
 /**
- * True when `element` is an empty, `aria-hidden` hit area beside a checkbox or
- * radio input: a larger click or touch target that toggles the input, which the
- * keyboard reaches and operates on its own. Angular Material up to 21 draws one
- * in every checkbox and radio button (`.mat-mdc-checkbox-touch-target`,
- * `.mat-mdc-radio-touch-target`, each with a click handler). Disabled inputs
- * count too: their hit area does nothing either.
+ * True when `element` is an empty hit area beside a checkbox or radio input: a
+ * larger click or touch target that toggles the input, which the keyboard
+ * reaches and operates on its own. Angular Material 15 to 21 draws one in every
+ * checkbox and radio button (`.mat-mdc-checkbox-touch-target`,
+ * `.mat-mdc-radio-touch-target`, each with a click handler; only 21 also marks
+ * it `aria-hidden`). Disabled inputs count too: their hit area does nothing either.
  *
- * Only checkbox and radio inputs: an empty `aria-hidden` icon with a click
- * handler beside a text field or a button (a clear "×" drawn in CSS) is a
- * separate action Tab can't reach, and is still reported.
+ * Only checkbox and radio inputs: an empty clickable beside a text field or a
+ * button (a clear "×" drawn in CSS) is a separate action Tab can't reach, and
+ * is still reported.
  */
 function hitAreaForToggleInput(element: Element): boolean {
-  if (element.getAttribute('aria-hidden') !== 'true') return false;
   if (element.children.length || element.textContent?.trim()) return false;
   const parent = element.parentElement;
   if (!parent) return false;
