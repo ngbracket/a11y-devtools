@@ -214,7 +214,14 @@ async function scanPass(
   config: PassConfig,
 ): Promise<PageReport[]> {
   const { baseUrl, routes, labels, waitMs, axeOptions, inPageScript, frameworkPrefixes } = config;
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme });
+  // bypassCSP: the scan runs as an injected inline script (plus a style tag that
+  // hides the overlay), which a strict Content-Security-Policy or Trusted Types
+  // would block. It only lifts the policy in this scanning browser.
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    colorScheme,
+    bypassCSP: true,
+  });
   const pages: PageReport[] = [];
   try {
     const page = await context.newPage();

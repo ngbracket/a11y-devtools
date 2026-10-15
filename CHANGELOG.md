@@ -3,6 +3,17 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.18.3
+
+### Fixed
+
+- Report mode now scans pages served with a strict Content-Security-Policy or
+  Trusted Types. The scan runs as an injected script, which a policy such as
+  `script-src 'self'` or `require-trusted-types-for 'script'` blocked, so the
+  page was reported as an error with no findings. The scanning browser now
+  bypasses the page's CSP. Your app's policy is unchanged; only the headless
+  browser that report mode starts ignores it.
+
 ## 0.18.2
 
 ### Fixed

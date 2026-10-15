@@ -57,6 +57,13 @@ const PAGES: Record<string, string> = {
       <button type="button"><svg width="16" height="16" aria-hidden="true"></svg></button>
       <a href="#help" tabindex="2">Help</a>
     </main>`,
+  // Served with a strict Content-Security-Policy and Trusted Types (see the
+  // server below), which block the injected scan unless the browser bypasses CSP.
+  '/csp': `
+    <main>
+      <h1>Strict CSP</h1>
+      <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
+    </main>`,
   // Healthy: native controls in order, plus an iframe (Tab inside a frame shows
   // up as repeated focus on the <iframe>, which must not read as a trap).
   '/clean': `
@@ -210,7 +217,13 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
   beforeAll(async () => {
     server = createServer((req, res) => {
       const body = PAGES[req.url ?? ''];
-      res.writeHead(body ? 200 : 404, { 'content-type': 'text/html; charset=utf-8' });
+      res.writeHead(body ? 200 : 404, {
+        'content-type': 'text/html; charset=utf-8',
+        ...(req.url === '/csp' && {
+          'content-security-policy':
+            "default-src 'self'; img-src data:; script-src 'self'; style-src 'self'; require-trusted-types-for 'script'",
+        }),
+      });
       res.end(body ? html(body) : 'not found');
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
@@ -258,6 +271,10 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
 
   it('scans every route without errors', () => {
     expect(report.pages.map((p) => p.label)).toEqual(Object.keys(PAGES));
+  });
+
+  it('scans a page with a strict Content-Security-Policy and Trusted Types', () => {
+    expect(ids('/csp')).toContain('image-alt');
   });
 
   it('checks contrast below the fold even when the app runs the in-app overlay', () => {
