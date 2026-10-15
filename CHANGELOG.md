@@ -11,8 +11,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   Trusted Types. The scan runs as an injected script, which a policy such as
   `script-src 'self'` or `require-trusted-types-for 'script'` blocked, so the
   page was reported as an error with no findings. The scanning browser now
-  bypasses the page's CSP. Your app's policy is unchanged; only the headless
-  browser that report mode starts ignores it.
+  ignores the page's CSP, whether it comes from a header or a `<meta>` tag.
+  Your app's policy is unchanged. Because the scan runs without the policy,
+  anything the policy would block for real users (a web font, an inline style)
+  loads during the scan, so a problem caused by the CSP itself isn't reported.
 
 ## 0.18.2
 

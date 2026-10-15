@@ -64,6 +64,13 @@ const PAGES: Record<string, string> = {
       <h1>Strict CSP</h1>
       <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
     </main>`,
+  // The same policy set by a <meta http-equiv> tag instead (the server adds it
+  // to <head>), which is how many Angular apps ship a CSP.
+  '/csp-meta': `
+    <main>
+      <h1>Strict CSP in a meta tag</h1>
+      <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
+    </main>`,
   // Healthy: native controls in order, plus an iframe (Tab inside a frame shows
   // up as repeated focus on the <iframe>, which must not read as a trap).
   '/clean': `
@@ -205,6 +212,10 @@ const PAGES: Record<string, string> = {
     <main><h1>Sidebar</h1></main>`,
 };
 
+/** Blocks inline scripts and styles and requires Trusted Types. */
+const STRICT_CSP =
+  "default-src 'self'; img-src data:; script-src 'self'; style-src 'self'; require-trusted-types-for 'script'";
+
 function html(body: string): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Fixture</title></head><body>${body}</body></html>`;
 }
@@ -220,11 +231,15 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
       res.writeHead(body ? 200 : 404, {
         'content-type': 'text/html; charset=utf-8',
         ...(req.url === '/csp' && {
-          'content-security-policy':
-            "default-src 'self'; img-src data:; script-src 'self'; style-src 'self'; require-trusted-types-for 'script'",
+          'content-security-policy': STRICT_CSP,
         }),
       });
-      res.end(body ? html(body) : 'not found');
+      const page = body ? html(body) : 'not found';
+      res.end(
+        req.url === '/csp-meta'
+          ? page.replace('<head>', `<head><meta http-equiv="Content-Security-Policy" content="${STRICT_CSP}">`)
+          : page,
+      );
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -275,6 +290,10 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
 
   it('scans a page with a strict Content-Security-Policy and Trusted Types', () => {
     expect(ids('/csp')).toContain('image-alt');
+  });
+
+  it('scans a page whose strict policy is set in a meta tag', () => {
+    expect(ids('/csp-meta')).toContain('image-alt');
   });
 
   it('checks contrast below the fold even when the app runs the in-app overlay', () => {
