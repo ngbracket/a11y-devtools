@@ -3,6 +3,17 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.18.4
+
+### Fixed
+
+- A flagged element can be clicked while the overlay is on. Each highlight box
+  took clicks, so a flagged button couldn't be pressed, and a flagged dialog
+  (for example one with no accessible name) was covered completely: its close
+  button and every other control inside it stopped working, and the page had
+  to be reloaded unless Escape closed the dialog. The box now lets clicks
+  through to the element. Clicking the label still scrolls to the element.
+
 ## 0.18.3
 
 ### Fixed

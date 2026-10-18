@@ -126,16 +126,25 @@ describe('createOverlay', () => {
     expect(overlayRoot()!.querySelectorAll('[data-impact]')).toHaveLength(1);
   });
 
-  it('scrolls the offending node into view when its box is clicked', () => {
+  it('scrolls the offending node into view when its label is clicked', () => {
     const el = targetEl('target');
     const scrollIntoView = vi.fn();
     el.scrollIntoView = scrollIntoView;
 
     overlay.render([finding({ target: '#target' })]);
-    const box = overlayRoot()!.querySelector('[data-impact]') as HTMLElement;
-    box.click();
+    const label = overlayRoot()!.querySelector('[data-impact] > span') as HTMLElement;
+    label.click();
 
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' });
+  });
+
+  it('lets clicks through the box to the flagged element; only the label takes them', () => {
+    targetEl('target');
+    overlay.render([finding({ target: '#target' })]);
+    const box = overlayRoot()!.querySelector('[data-impact]') as HTMLElement;
+    const label = box.querySelector('span') as HTMLElement;
+    expect(box.style.pointerEvents).toBe('none');
+    expect(label.style.pointerEvents).toBe('auto');
   });
 
   it('removes its container on destroy', () => {

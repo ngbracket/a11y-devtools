@@ -43,6 +43,8 @@ const PAGE = `<!doctype html>
     import { createOverlay } from '/dist/overlay.js';
     import { createTogglePill } from '/dist/toggle.js';
     window.clicks = 0;
+    window.innerClicks = 0;
+    document.getElementById('inner').addEventListener('click', () => window.innerClicks++);
     window.overlay = createOverlay();
     window.pill = createTogglePill({ enabled: true, onToggle: () => window.clicks++ });
     window.ready = true;
@@ -111,13 +113,36 @@ describe.skipIf(!ready)('overlay + pill over the top layer (real Chromium)', () 
     });
     await settle();
 
-    // The target is at dialog (40,40) + (100,100): its highlight must be on top.
-    expect(await topAt(180, 160)).toBe('highlight');
+    // The target is at dialog (40,40) + (100,100). Its label sits on top, just
+    // above it; the box itself lets clicks through to the target.
+    const label = await page.evaluate(() => {
+      const r = document.querySelector('[data-impact] > span')!.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    });
+    expect(await topAt(label.x, label.y)).toBe('highlight');
+    expect(await topAt(180, 160)).toBe('target');
 
     const { x, y } = await pillCentre();
     expect(await topAt(x, y)).toBe('pill');
     await page.mouse.click(x, y); // a real click: fails if the pill is inert
     expect(await page.evaluate(() => (window as unknown as { clicks: number }).clicks)).toBe(1);
+  });
+
+  it('a highlight over the whole dialog leaves the controls inside it clickable', async () => {
+    await page.evaluate(() => {
+      const w = window as unknown as { overlay: { render(f: unknown[]): void } };
+      w.overlay.render([
+        { id: 'aria-dialog-name', impact: 'serious', help: 'x', helpUrl: '', component: null, directives: [], target: '#dlg', html: '' },
+      ]);
+    });
+    await settle();
+    const inner = await page.evaluate(() => {
+      const r = document.getElementById('inner')!.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    });
+    expect(await topAt(inner.x, inner.y)).toBe('inner');
+    await page.mouse.click(inner.x, inner.y);
+    expect(await page.evaluate(() => (window as unknown as { innerClicks: number }).innerClicks)).toBe(1);
   });
 
   it('goes back to <body> when the dialog closes', async () => {

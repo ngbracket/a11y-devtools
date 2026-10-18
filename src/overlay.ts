@@ -123,7 +123,7 @@ export function createOverlay(options: OverlayOptions = {}): A11yOverlay {
   Object.assign(container.style, {
     position: 'fixed',
     inset: '0',
-    pointerEvents: 'none', // pass clicks through; individual boxes opt back in
+    pointerEvents: 'none', // pass clicks through; finding labels opt back in
     zIndex: '2147483646',
   });
   doc.body.appendChild(container);
@@ -259,8 +259,7 @@ export function createOverlay(options: OverlayOptions = {}): A11yOverlay {
     for (const finding of findings) {
       const target = resolveTarget(doc, finding.locator ?? finding.target);
       if (!target) continue; // node gone since the scan (e.g. re-rendered)
-      const box = buildBox(doc, finding);
-      box.addEventListener('click', () => flashAndScroll(target, box));
+      const box = buildBox(doc, finding, () => flashAndScroll(target, box));
       container.appendChild(box);
       positionBox(box, target);
       highlights.push({ finding, target, box });
@@ -392,22 +391,26 @@ function resolveTarget(doc: Document, target: string): Element | null {
   }
 }
 
-function buildBox(doc: Document, finding: A11yFinding): HTMLElement {
+/**
+ * The box lets clicks through to the flagged element, so a flagged button or a
+ * whole flagged dialog stays usable. Only the label takes clicks.
+ */
+function buildBox(doc: Document, finding: A11yFinding, onLabelClick: () => void): HTMLElement {
   const color = colorFor(finding.impact);
   const box = doc.createElement('div');
   box.setAttribute('data-impact', finding.impact ?? 'none');
-  box.title = `${finding.id}: ${finding.help}`;
   Object.assign(box.style, {
     position: 'fixed',
     boxSizing: 'border-box',
     border: `2px solid ${color}`,
     borderRadius: '2px',
     background: `${color}1a`, // ~10% alpha
-    pointerEvents: 'auto',
-    cursor: 'pointer',
+    pointerEvents: 'none',
   });
 
   const label = doc.createElement('span');
+  label.title = `${finding.id}: ${finding.help}`;
+  label.addEventListener('click', onLabelClick);
   label.textContent = finding.component
     ? `${finding.component} · ${finding.id}`
     : finding.id;
@@ -421,6 +424,8 @@ function buildBox(doc: Document, finding: A11yFinding): HTMLElement {
     color: '#fff',
     background: IMPACT_LABEL_FILL[finding.impact ?? 'none'],
     whiteSpace: 'nowrap',
+    pointerEvents: 'auto',
+    cursor: 'pointer',
   });
   box.appendChild(label);
   return box;
