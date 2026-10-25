@@ -3,6 +3,28 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.18.6
+
+### Fixed
+
+- A baseline no longer reports a known finding as new when the markup around
+  it was reordered. axe's selectors can contain positional parts such as
+  `li:nth-child(3)` and generated ids such as `#mat-input-3`. Adding an item
+  above the element, or another field earlier in the form, changed them, so
+  the finding failed to match its baseline entry and failed the CI gate.
+  Findings still unmatched after the exact comparison are now compared again
+  with those parts left out, for the same route, rule and owning component.
+  Only ids with at least two words before the number count as generated
+  (`#mat-input-3`, `#cdk-overlay-12`); `#h2`, `#col-12` and `#item-2024` are
+  compared as written, and so are ids with a number in the middle such as
+  `#mat-mdc-checkbox-2-input`. A positional part inside `:not()`, `:is()`,
+  `:where()` or `:has()` is kept. Duplicates
+  are still counted, so a component that gains a real extra instance of a
+  rule reports it as new. One case can't be told apart: if one instance is
+  fixed and another appears in the same component and rule in the same run,
+  and their selectors differ only in position or id counter, the count is
+  unchanged and neither is reported.
+
 ## 0.18.5
 
 ### Fixed

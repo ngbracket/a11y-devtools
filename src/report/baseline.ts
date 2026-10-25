@@ -53,6 +53,59 @@ export function findingKey(page: string, finding: A11yFinding): string {
 }
 
 /**
+ * Positional parts of a selector: `:nth-child(3)`, `:nth-of-type(2)`,
+ * `:first-child`, `:last-of-type` and the like. They change when markup is
+ * reordered even though the element is the same.
+ */
+const POSITIONAL = /:(?:nth-(?:last-)?(?:child|of-type)\([^)]*\)|(?:first|last|only)-(?:child|of-type))/g;
+
+/** Selector functions whose argument is itself a selector. */
+const SELECTOR_FUNCTION = /:(?:not|is|where|has)\(/g;
+
+/**
+ * Remove {@link POSITIONAL} parts, except inside `:not()`, `:is()`, `:where()`
+ * and `:has()`: there a positional part is what tells `li:not(.x:first-child)`
+ * from `li:not(.x:last-child)`, so it stays.
+ */
+function stripPositional(selector: string): string {
+  let out = '';
+  let from = 0;
+  for (const match of selector.matchAll(SELECTOR_FUNCTION)) {
+    const open = match.index + match[0].length;
+    if (match.index < from) continue; // nested inside a function already kept
+    let depth = 1;
+    let end = open;
+    while (end < selector.length && depth > 0) {
+      if (selector[end] === '(') depth++;
+      else if (selector[end] === ')') depth--;
+      end++;
+    }
+    out += selector.slice(from, match.index).replace(POSITIONAL, '') + selector.slice(match.index, end);
+    from = end;
+  }
+  return out + selector.slice(from).replace(POSITIONAL, '');
+}
+
+/**
+ * The counter at the end of a generated id: `#mat-input-3`, `#cdk-overlay-12`,
+ * `#pn_id_3`. Only ids with at least two words before the number count, so
+ * `#h2`, `#col-12` and `#item-2024`, where the number is part of the name,
+ * stay distinct.
+ */
+const ID_COUNTER = /(#[A-Za-z][A-Za-z0-9]*[-_][\w-]*?[-_])\d+(?=[\s>+~.:#[]|$)/g;
+
+/**
+ * A looser identity for the second matching pass: {@link findingKey} with the
+ * positional parts and id counters taken out of the selector. A markup
+ * reorder changes those, so without this pass a known finding came back as
+ * "new" and failed the CI gate.
+ */
+function looseKey(page: string, finding: A11yFinding): string {
+  const target = stripPositional(normalizeTarget(finding.target)).replace(ID_COUNTER, '$1#');
+  return [page, finding.id, finding.component ?? '', target].join('\u0000');
+}
+
+/**
  * The findings in `findings` that aren't also in `reference`, matched by
  * {@link findingKey} with counts. Used for a dark-mode pass, so it reports only
  * what dark mode adds rather than repeating every light-mode finding.
@@ -74,9 +127,11 @@ export function findingsNotIn(findings: A11yFinding[], reference: A11yFinding[])
 
 /**
  * Compare `current` with `baseline`. Matching is by {@link findingKey} with
- * counts, so two identical keys in the current run against one in the baseline
- * leaves one new. Pages are matched by label; a route the baseline never
- * scanned counts entirely as new (add it to the baseline when you add it to CI).
+ * counts, then by a looser key that ignores positional selector parts and id
+ * counters for whatever is still unpaired. Two identical keys in the current
+ * run against one in the baseline leaves one new. Pages are matched by label;
+ * a route the baseline never scanned counts entirely as new (add it to the
+ * baseline when you add it to CI).
  * Pages that failed to scan in the current run are skipped, so an outage
  * doesn't report everything on that page as fixed. Pages that failed in the
  * *baseline* are skipped too — there's nothing to compare against, so their
@@ -86,34 +141,56 @@ export function diffAgainstBaseline(current: ScanReport, baseline: BaselineRepor
   const failed = new Set(current.pages.filter((p) => p.error).map((p) => p.label));
   const baselineFailed = new Set(baseline.pages.filter((p) => p.error).map((p) => p.label));
 
-  const remaining = new Map<string, NewFinding[]>();
-  for (const page of baseline.pages) {
-    if (failed.has(page.label)) continue;
-    for (const finding of page.findings) {
-      const key = findingKey(page.label, finding);
-      const bucket = remaining.get(key);
-      if (bucket) bucket.push({ page: page.label, finding });
-      else remaining.set(key, [{ page: page.label, finding }]);
-    }
-  }
+  let before: NewFinding[] = baseline.pages
+    .filter((page) => !failed.has(page.label))
+    .flatMap((page) => page.findings.map((finding) => ({ page: page.label, finding })));
+  let after: NewFinding[] = current.pages
+    .filter((page) => !baselineFailed.has(page.label))
+    .flatMap((page) => page.findings.map((finding) => ({ page: page.label, finding })));
 
-  const added: NewFinding[] = [];
+  // Exact keys first, then the loose key for what's left, so a finding whose
+  // selector only moved (a reordered list, a shifted id counter) still pairs
+  // with its baseline entry. Both passes match with counts: a component that
+  // gains a real extra instance of a rule still reports it as added.
   let unchanged = 0;
-  for (const page of current.pages) {
-    if (baselineFailed.has(page.label)) continue;
-    for (const finding of page.findings) {
-      const bucket = remaining.get(findingKey(page.label, finding));
-      if (bucket && bucket.length > 0) {
-        bucket.pop();
-        unchanged++;
-      } else {
-        added.push({ page: page.label, finding });
-      }
+  for (const key of [findingKey, looseKey]) {
+    const result = pair(after, before, key);
+    unchanged += result.matched;
+    after = result.unmatched;
+    before = result.leftover;
+  }
+  return { added: after, fixed: before, unchanged };
+}
+
+/**
+ * Pair each item of `current` with one of `baseline` that has the same key.
+ * Returns how many paired, the current items with no partner, and the baseline
+ * items nobody claimed.
+ */
+function pair(
+  current: NewFinding[],
+  baseline: NewFinding[],
+  key: (page: string, finding: A11yFinding) => string,
+): { matched: number; unmatched: NewFinding[]; leftover: NewFinding[] } {
+  const remaining = new Map<string, NewFinding[]>();
+  for (const item of baseline) {
+    const k = key(item.page, item.finding);
+    const bucket = remaining.get(k);
+    if (bucket) bucket.push(item);
+    else remaining.set(k, [item]);
+  }
+  let matched = 0;
+  const unmatched: NewFinding[] = [];
+  for (const item of current) {
+    const bucket = remaining.get(key(item.page, item.finding));
+    if (bucket && bucket.length > 0) {
+      bucket.pop();
+      matched++;
+    } else {
+      unmatched.push(item);
     }
   }
-
-  const fixed = [...remaining.values()].flat();
-  return { added, fixed, unchanged };
+  return { matched, unmatched, leftover: [...remaining.values()].flat() };
 }
 
 /**
