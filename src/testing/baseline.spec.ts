@@ -66,6 +66,76 @@ describe('diffAgainstBaseline', () => {
     expect(diff.unchanged).toBe(1);
   });
 
+  describe('markup reordered between runs', () => {
+    const diff = (current: A11yFinding[], baseline: A11yFinding[]) =>
+      diffAgainstBaseline(report([{ label: '/', url: 'u', findings: current }]), {
+        pages: [{ label: '/', findings: baseline }],
+      });
+
+    it('pairs a finding whose :nth-child position moved', () => {
+      const result = diff(
+        [finding({ target: 'ul > li:nth-child(4) > img' })],
+        [finding({ target: 'ul > li:nth-child(3) > img' })],
+      );
+      expect(result).toEqual({ added: [], fixed: [], unchanged: 1 });
+    });
+
+    it('pairs a finding whose :first-child or :nth-of-type part changed', () => {
+      const result = diff(
+        [finding({ target: 'tr:nth-of-type(2) > td > img' }), finding({ id: 'label', target: 'li:last-child > input' })],
+        [finding({ target: 'tr:first-of-type > td > img' }), finding({ id: 'label', target: 'li:nth-child(5) > input' })],
+      );
+      expect(result.unchanged).toBe(2);
+      expect(result.added).toEqual([]);
+    });
+
+    it('pairs a finding whose generated id counter shifted', () => {
+      const result = diff([finding({ target: '#mat-input-7' })], [finding({ target: '#mat-input-3' })]);
+      expect(result.unchanged).toBe(1);
+    });
+
+    it('still reports a real extra instance in the same component as new', () => {
+      const result = diff(
+        [
+          finding({ target: 'li:nth-child(1) > img' }),
+          finding({ target: 'li:nth-child(2) > img' }),
+          finding({ target: 'li:nth-child(3) > img' }),
+        ],
+        [finding({ target: 'li:nth-child(2) > img' }), finding({ target: 'li:nth-child(5) > img' })],
+      );
+      expect(result.unchanged).toBe(2);
+      expect(result.added).toHaveLength(1);
+      expect(result.fixed).toEqual([]);
+    });
+
+    it('prefers the exact match, so the loose pass only pairs what is left', () => {
+      const result = diff(
+        [finding({ target: 'li:nth-child(1) > img' }), finding({ target: 'li:nth-child(9) > img' })],
+        [finding({ target: 'li:nth-child(1) > img' }), finding({ target: 'li:nth-child(2) > img' })],
+      );
+      expect(result).toEqual({ added: [], fixed: [], unchanged: 2 });
+    });
+
+    it('does not pair across rules, components or element types', () => {
+      const result = diff(
+        [
+          finding({ id: 'label', target: 'li:nth-child(2) > img' }),
+          finding({ component: 'NavComponent', target: 'li:nth-child(2) > img' }),
+          finding({ target: 'li:nth-child(2) > svg' }),
+        ],
+        [finding({ target: 'li:nth-child(1) > img' })],
+      );
+      expect(result.unchanged).toBe(0);
+      expect(result.added).toHaveLength(3);
+      expect(result.fixed).toHaveLength(1);
+    });
+
+    it('keeps ids that end in a number but are not counters distinct from other ids', () => {
+      const result = diff([finding({ target: '#step2-title' })], [finding({ target: '#step3-title' })]);
+      expect(result.unchanged).toBe(0);
+    });
+  });
+
   it('treats a route the baseline never scanned as entirely new', () => {
     const diff = diffAgainstBaseline(
       report([{ label: '/new-route', url: 'u', findings: [finding()] }]),
