@@ -14,10 +14,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   the finding failed to match its baseline entry and failed the CI gate.
   Findings still unmatched after the exact comparison are now compared again
   with those parts left out, for the same route, rule and owning component.
-  Duplicates are still counted, so a component that gains a real extra
-  instance of a rule reports it as new. One case can't be told apart: if one
-  instance is fixed and another appears in the same component and rule in the
-  same run, the count is unchanged and neither is reported.
+  Only ids with at least two words before the number count as generated
+  (`#mat-input-3`, `#cdk-overlay-12`); `#h2`, `#col-12` and `#item-2024` are
+  compared as written. A positional part inside `:not()` is kept. Duplicates
+  are still counted, so a component that gains a real extra instance of a
+  rule reports it as new. One case can't be told apart: if one instance is
+  fixed and another appears in the same component and rule in the same run,
+  and their selectors differ only in position or id counter, the count is
+  unchanged and neither is reported.
 
 ## 0.18.5
 

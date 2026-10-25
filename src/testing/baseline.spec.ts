@@ -130,8 +130,23 @@ describe('diffAgainstBaseline', () => {
       expect(result.fixed).toHaveLength(1);
     });
 
-    it('keeps ids that end in a number but are not counters distinct from other ids', () => {
-      const result = diff([finding({ target: '#step2-title' })], [finding({ target: '#step3-title' })]);
+    it('treats only multi-word ids as counters: #pn_id_3 pairs with #pn_id_8', () => {
+      expect(diff([finding({ target: '#pn_id_8' })], [finding({ target: '#pn_id_3' })]).unchanged).toBe(1);
+      expect(diff([finding({ target: '#cdk-overlay-12 > img' })], [finding({ target: '#cdk-overlay-4 > img' })]).unchanged).toBe(1);
+    });
+
+    it.each([
+      ['#h2', '#h3'],
+      ['#col-12', '#col-13'],
+      ['#item-2024', '#item-2023'],
+      ['input#email2', 'input#email3'],
+      ['#step2-title', '#step3-title'],
+    ])('keeps %s and %s apart: the number is part of the name', (now, before) => {
+      expect(diff([finding({ target: now })], [finding({ target: before })]).unchanged).toBe(0);
+    });
+
+    it('keeps a positional part inside :not() apart', () => {
+      const result = diff([finding({ target: 'li:not(:first-child) > img' })], [finding({ target: 'li:not(:last-child) > img' })]);
       expect(result.unchanged).toBe(0);
     });
   });

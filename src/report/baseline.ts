@@ -55,15 +55,18 @@ export function findingKey(page: string, finding: A11yFinding): string {
 /**
  * Positional parts of a selector: `:nth-child(3)`, `:nth-of-type(2)`,
  * `:first-child`, `:last-of-type` and the like. They change when markup is
- * reordered even though the element is the same.
+ * reordered even though the element is the same. One directly inside `:not(`
+ * is kept, so `li:not(:first-child)` and `li:not(:last-child)` stay apart.
  */
-const POSITIONAL = /:(?:nth-(?:last-)?(?:child|of-type)\([^)]*\)|(?:first|last|only)-(?:child|of-type))/g;
+const POSITIONAL = /(?<!:not\():(?:nth-(?:last-)?(?:child|of-type)\([^)]*\)|(?:first|last|only)-(?:child|of-type))/g;
 
 /**
- * Numbers in an id selector (`#mat-input-3`, `#ngbr-field-12`). Generated ids
- * come from a counter, so they shift when an element is added or moved.
+ * The counter at the end of a generated id: `#mat-input-3`, `#cdk-overlay-12`,
+ * `#pn_id_3`. Only ids with at least two words before the number count, so
+ * `#h2`, `#col-12` and `#item-2024`, where the number is part of the name,
+ * stay distinct.
  */
-const ID_NUMBER = /(#[A-Za-z_-][\w-]*?)-?\d+(?=[\s>+~.:#[]|$)/g;
+const ID_COUNTER = /(#[A-Za-z][A-Za-z0-9]*[-_][\w-]*?[-_])\d+(?=[\s>+~.:#[]|$)/g;
 
 /**
  * A looser identity for the second matching pass: {@link findingKey} with the
@@ -72,7 +75,7 @@ const ID_NUMBER = /(#[A-Za-z_-][\w-]*?)-?\d+(?=[\s>+~.:#[]|$)/g;
  * "new" and failed the CI gate.
  */
 function looseKey(page: string, finding: A11yFinding): string {
-  const target = normalizeTarget(finding.target).replace(POSITIONAL, '').replace(ID_NUMBER, '$1-#');
+  const target = normalizeTarget(finding.target).replace(POSITIONAL, '').replace(ID_COUNTER, '$1#');
   return [page, finding.id, finding.component ?? '', target].join('\u0000');
 }
 
@@ -100,8 +103,9 @@ export function findingsNotIn(findings: A11yFinding[], reference: A11yFinding[])
  * Compare `current` with `baseline`. Matching is by {@link findingKey} with
  * counts, then by a looser key that ignores positional selector parts and id
  * counters for whatever is still unpaired. Two identical keys in the current
- * run against one in the baseline leaves one new. Pages are matched by label; a route the baseline never
- * scanned counts entirely as new (add it to the baseline when you add it to CI).
+ * run against one in the baseline leaves one new. Pages are matched by label;
+ * a route the baseline never scanned counts entirely as new (add it to the
+ * baseline when you add it to CI).
  * Pages that failed to scan in the current run are skipped, so an outage
  * doesn't report everything on that page as fixed. Pages that failed in the
  * *baseline* are skipped too — there's nothing to compare against, so their
