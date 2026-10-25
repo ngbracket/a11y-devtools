@@ -109,6 +109,12 @@ describe('createTogglePill', () => {
     expect(b.textContent).toContain('on'); // state not by colour alone
   });
 
+  it('sits in a labelled region, so page scans find it inside a landmark', () => {
+    pill = createTogglePill({ enabled: true, onToggle: () => {} });
+    const region = button().closest('[role="region"]');
+    expect(region?.getAttribute('aria-label')).toBe('a11y devtools');
+  });
+
   it('flips state and reports it on click', () => {
     const onToggle = vi.fn();
     pill = createTogglePill({ enabled: true, onToggle });

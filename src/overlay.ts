@@ -133,6 +133,8 @@ export function createOverlay(options: OverlayOptions = {}): A11yOverlay {
 
   // The tab-order connector lives on its own SVG layer under the badges, so the
   // findings highlights and the tab-order path render and clear independently.
+  // Clipped to the viewport: a path left to overflow it covers text below the
+  // fold, and axe's color-contrast then gives up on that text ("needs review").
   const svg = doc.createElementNS(SVG_NS, 'svg');
   svg.setAttribute(OVERLAY_ATTR, '');
   Object.assign(svg.style, {
@@ -141,14 +143,16 @@ export function createOverlay(options: OverlayOptions = {}): A11yOverlay {
     width: '100%',
     height: '100%',
     pointerEvents: 'none',
-    overflow: 'visible',
+    overflow: 'hidden',
   });
+  // Drawn opaque so the line passes 3:1 for non-text contrast: the teal is
+  // 3.93:1 on white, 3.61:1 on #f5f5f5, 3.5:1 on #2d2d2d and 5.34:1 on black.
+  // At 0.7 opacity it blended to about 2.5:1 on white.
   const connector = doc.createElementNS(SVG_NS, 'polyline');
   connector.setAttribute('fill', 'none');
   connector.setAttribute('stroke', TAB_ORDER_COLOR);
   connector.setAttribute('stroke-width', '2');
   connector.setAttribute('stroke-dasharray', '4 3');
-  connector.setAttribute('opacity', '0.7');
   svg.appendChild(connector);
   container.appendChild(svg); // under the badges, which are appended later
 

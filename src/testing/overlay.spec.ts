@@ -243,6 +243,15 @@ describe('createOverlay', () => {
     expect(line.getAttribute('points')).toBe('40,110 50,210');
   });
 
+  it('draws the connector opaque, on an SVG clipped to the viewport', () => {
+    const line = overlayRoot()!.querySelector('polyline') as SVGPolylineElement;
+    // Translucent teal blended under 3:1 on white; an overflowing SVG covered
+    // text below the fold for axe's color-contrast.
+    expect(line.hasAttribute('opacity')).toBe(false);
+    expect(line.getAttribute('stroke')).toBe('#0b8f8f');
+    expect((line.ownerSVGElement as SVGSVGElement).style.overflow).toBe('hidden');
+  });
+
   it('clears the tab-order layer independently of the findings highlights', () => {
     const a = targetEl('a');
     overlay.render([finding({ target: '#a' })]);

@@ -198,12 +198,14 @@ interface PassConfig {
 const THEME_SETTLE_MS = 300;
 
 /**
- * Hides the in-app overlay (if the app runs it) for the headless scan. Its
- * tab-order path is a fixed SVG that overflows the viewport, and axe's
- * color-contrast counts it as covering text below the fold: that text came
- * back "needs review" instead of pass/fail, so its contrast was never
- * reported. Excluding the overlay from axe's context isn't enough; the exclude
- * stops axe checking the overlay, not seeing it.
+ * Hides the in-app overlay (if the app runs it) for the headless scan. Up to
+ * 0.18.4 its tab-order path was a fixed SVG that overflowed the viewport, and
+ * axe's color-contrast counted it as covering text below the fold: that text
+ * came back "needs review" instead of pass/fail, so its contrast was never
+ * reported. The SVG is clipped to the viewport since 0.18.5, but the app being
+ * scanned may run an older overlay than this report, so the hide stays.
+ * Excluding the overlay from axe's context isn't enough; the exclude stops axe
+ * checking the overlay, not seeing it.
  */
 const HIDE_OVERLAY_CSS = `${OVERLAY_EXCLUDE_SELECTOR} { display: none !important; }`;
 
