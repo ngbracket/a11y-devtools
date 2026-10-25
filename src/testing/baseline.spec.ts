@@ -145,9 +145,18 @@ describe('diffAgainstBaseline', () => {
       expect(diff([finding({ target: now })], [finding({ target: before })]).unchanged).toBe(0);
     });
 
-    it('keeps a positional part inside :not() apart', () => {
-      const result = diff([finding({ target: 'li:not(:first-child) > img' })], [finding({ target: 'li:not(:last-child) > img' })]);
-      expect(result.unchanged).toBe(0);
+    it.each([
+      ['li:not(:first-child) > img', 'li:not(:last-child) > img'],
+      ['li:not(.x:first-child) > img', 'li:not(.x:last-child) > img'],
+      ['li:not(:first-child, :last-child) > img', 'li:not(:first-child, :only-child) > img'],
+      ['div:has(> p:first-child) img', 'div:has(> p:last-child) img'],
+    ])('keeps positional parts inside a selector function: %s vs %s', (now, before) => {
+      expect(diff([finding({ target: now })], [finding({ target: before })]).unchanged).toBe(0);
+    });
+
+    it('still strips positions outside a selector function', () => {
+      const result = diff([finding({ target: 'li:nth-child(4):not(.x) > img' })], [finding({ target: 'li:nth-child(2):not(.x) > img' })]);
+      expect(result.unchanged).toBe(1);
     });
   });
 

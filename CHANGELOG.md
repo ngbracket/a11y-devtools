@@ -16,7 +16,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   with those parts left out, for the same route, rule and owning component.
   Only ids with at least two words before the number count as generated
   (`#mat-input-3`, `#cdk-overlay-12`); `#h2`, `#col-12` and `#item-2024` are
-  compared as written. A positional part inside `:not()` is kept. Duplicates
+  compared as written, and so are ids with a number in the middle such as
+  `#mat-mdc-checkbox-2-input`. A positional part inside `:not()`, `:is()`,
+  `:where()` or `:has()` is kept. Duplicates
   are still counted, so a component that gains a real extra instance of a
   rule reports it as new. One case can't be told apart: if one instance is
   fixed and another appears in the same component and rule in the same run,

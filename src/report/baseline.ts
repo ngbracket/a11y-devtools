@@ -55,10 +55,36 @@ export function findingKey(page: string, finding: A11yFinding): string {
 /**
  * Positional parts of a selector: `:nth-child(3)`, `:nth-of-type(2)`,
  * `:first-child`, `:last-of-type` and the like. They change when markup is
- * reordered even though the element is the same. One directly inside `:not(`
- * is kept, so `li:not(:first-child)` and `li:not(:last-child)` stay apart.
+ * reordered even though the element is the same.
  */
-const POSITIONAL = /(?<!:not\():(?:nth-(?:last-)?(?:child|of-type)\([^)]*\)|(?:first|last|only)-(?:child|of-type))/g;
+const POSITIONAL = /:(?:nth-(?:last-)?(?:child|of-type)\([^)]*\)|(?:first|last|only)-(?:child|of-type))/g;
+
+/** Selector functions whose argument is itself a selector. */
+const SELECTOR_FUNCTION = /:(?:not|is|where|has)\(/g;
+
+/**
+ * Remove {@link POSITIONAL} parts, except inside `:not()`, `:is()`, `:where()`
+ * and `:has()`: there a positional part is what tells `li:not(.x:first-child)`
+ * from `li:not(.x:last-child)`, so it stays.
+ */
+function stripPositional(selector: string): string {
+  let out = '';
+  let from = 0;
+  for (const match of selector.matchAll(SELECTOR_FUNCTION)) {
+    const open = match.index + match[0].length;
+    if (match.index < from) continue; // nested inside a function already kept
+    let depth = 1;
+    let end = open;
+    while (end < selector.length && depth > 0) {
+      if (selector[end] === '(') depth++;
+      else if (selector[end] === ')') depth--;
+      end++;
+    }
+    out += selector.slice(from, match.index).replace(POSITIONAL, '') + selector.slice(match.index, end);
+    from = end;
+  }
+  return out + selector.slice(from).replace(POSITIONAL, '');
+}
 
 /**
  * The counter at the end of a generated id: `#mat-input-3`, `#cdk-overlay-12`,
@@ -75,7 +101,7 @@ const ID_COUNTER = /(#[A-Za-z][A-Za-z0-9]*[-_][\w-]*?[-_])\d+(?=[\s>+~.:#[]|$)/g
  * "new" and failed the CI gate.
  */
 function looseKey(page: string, finding: A11yFinding): string {
-  const target = normalizeTarget(finding.target).replace(POSITIONAL, '').replace(ID_COUNTER, '$1#');
+  const target = stripPositional(normalizeTarget(finding.target)).replace(ID_COUNTER, '$1#');
   return [page, finding.id, finding.component ?? '', target].join('\u0000');
 }
 
