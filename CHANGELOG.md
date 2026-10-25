@@ -7,20 +7,21 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- The dashed line joining the tab-order badges now has enough contrast. It was
-  drawn at 70% opacity, which blended the teal to about 2.5:1 on a white page,
-  under the 3:1 that WCAG 1.4.11 asks of non-text content. It is now drawn
-  opaque: 3.93:1 on white and 5.34:1 on black.
+- The dashed line joining the tab-order badges is drawn opaque. At 70% opacity
+  the teal blended to about 2.5:1 on a white page, under the 3:1 that WCAG
+  1.4.11 asks of non-text content. Opaque, it measures 3.93:1 on white, 3.61:1
+  on #f5f5f5, 3.5:1 on #2d2d2d and 5.34:1 on black. On a mid-tone page it can
+  still fall under 3:1.
 - The tab-order layer is clipped to the viewport. When the path ran past the
   bottom of the window, axe's color-contrast check treated it as covering the
   text below the fold and returned "needs review" for that text. A
-  low-contrast paragraph under the path was never reported as a violation.
+  low-contrast paragraph under the path was not reported as a violation.
   Report mode already hid the overlay before scanning and still does, because
   the app it scans may run an older overlay.
-- The on/off pill and its menu now sit in a region labelled "a11y devtools".
-  A page scan that doesn't exclude the overlay, such as an axe browser
-  extension, reported the pill under the best-practice `region` rule as
-  content outside any landmark.
+- The on/off pill and its menu now sit in a region labelled "Accessibility
+  developer tools". A page scan that doesn't exclude the overlay, such as an
+  axe browser extension, reported the pill under the best-practice `region`
+  rule as content outside any landmark.
 
 ## 0.18.4
 

@@ -22,6 +22,13 @@ describe('pill settings menu', () => {
     pill = undefined;
   });
 
+  it('keeps the open panel inside the pill region', () => {
+    open();
+    menuButton().click();
+    expect(panel().closest('[role="region"]')).toBe(menuButton().closest('[role="region"]'));
+    expect(panel().closest('[role="region"]')).not.toBeNull();
+  });
+
   it('is a disclosure: collapsed by default, expands on click', () => {
     open();
     expect(menuButton().getAttribute('aria-expanded')).toBe('false');

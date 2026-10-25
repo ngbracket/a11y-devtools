@@ -37,7 +37,8 @@ const ready = existsSync(join(dist, 'toggle.js')) && (await chromiumInstalled())
 
 // Two links in view and one far below the fold, off to the right, so the
 // tab-order path runs diagonally past the bottom of the viewport and crosses the
-// paragraph. The low-contrast paragraph below the fold must come
+// paragraph. The diagonal matters: axe samples points inside the text box, and a
+// vertical path along its left edge didn't reproduce the "needs review" result. The low-contrast paragraph below the fold must come
 // back as a color-contrast violation, not "needs review".
 const PAGE = `<!doctype html>
 <html lang="en"><head><title>Overlay scan</title></head><body style="margin:0">
@@ -131,6 +132,6 @@ describe.skipIf(!ready)('overlay under an axe scan (real Chromium)', () => {
     const result = await runRule('region', false);
     expect(result.violations).toEqual([]);
     const name = await page.evaluate(() => document.querySelector('[role="switch"]')!.closest('[role="region"]')?.getAttribute('aria-label'));
-    expect(name).toBe('a11y devtools');
+    expect(name).toBe('Accessibility developer tools');
   });
 });
