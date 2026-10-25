@@ -272,8 +272,13 @@ export function createTogglePill(options: TogglePillOptions): TogglePill {
     pointerEvents: 'none',
     zIndex: '2147483647',
   });
-  // The switch, the optional menu button and its panel sit together in a corner.
+  // The switch, the optional menu button and its panel sit together in a corner,
+  // in a labelled region so a page scan doesn't report the pill as content
+  // outside any landmark (axe's `region` rule). The region's name differs from
+  // the switch's, so tabbing in doesn't announce "a11y devtools" twice.
   const group = doc.createElement('div');
+  group.setAttribute('role', 'region');
+  group.setAttribute('aria-label', 'Accessibility developer tools');
   Object.assign(group.style, {
     position: 'fixed',
     [vertical]: '12px',
