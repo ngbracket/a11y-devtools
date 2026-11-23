@@ -7,6 +7,7 @@ import {
 } from './attribution.js';
 import { OVERLAY_EXCLUDE_SELECTOR } from './overlay.js';
 import { scanKeyboard } from './keyboard/keyboard-scan.js';
+import { criterionForTag } from './report/wcag.js';
 
 export type Impact = 'minor' | 'moderate' | 'serious' | 'critical' | null;
 
@@ -35,6 +36,12 @@ export interface A11yFinding {
   impact: Impact;
   help: string;
   helpUrl: string;
+  /**
+   * WCAG 2.2 A and AA criteria the axe rule is tagged with, e.g. `['1.4.3']`.
+   * Empty for axe's best-practice rules; absent on the tool's own `ngbr/*`
+   * findings (see `findingCriteria`).
+   */
+  wcag?: string[];
   /** Owning component name, or null when attribution isn't available (prod). */
   component: string | null;
   /** Owning components from the flagged node up to the root, nearest first, each once; [] in prod. */
@@ -100,6 +107,7 @@ async function runAxeOnce(
         impact: (violation.impact ?? null) as Impact,
         help: violation.help,
         helpUrl: violation.helpUrl,
+        wcag: violation.tags.flatMap((tag) => criterionForTag(tag)?.id ?? []),
         component: appComponentFromPath(componentPath, frameworkPrefixes),
         componentPath,
         directives: element ? resolveDirectiveNames(element) : [],

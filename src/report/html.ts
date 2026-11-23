@@ -15,6 +15,7 @@ import {
   type PageReport,
   type ScanReport,
 } from './format.js';
+import { findingCriteria, referenceUrl } from './wcag.js';
 
 /**
  * A single self-contained HTML report: inline CSS, no scripts, no external
@@ -209,6 +210,9 @@ export function toHtml(report: ScanReport, diff?: BaselineDiff): string {
           out.push(
             ` · <a href="${href}">Rule reference<span class="visually-hidden"> for ${escapeHtml(finding.id)}</span></a>`,
           );
+        }
+        for (const c of findingCriteria(finding)) {
+          out.push(` · <a href="${referenceUrl(c)}">WCAG ${escapeHtml(c.id)} ${escapeHtml(c.name)}</a>`);
         }
         out.push('</p>');
         out.push('</li>');

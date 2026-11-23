@@ -28,6 +28,8 @@ describe('scan + runner (real axe + attribution)', () => {
     expect(imgAlt).toBeDefined();
     expect(imgAlt!.component).toBe('UserCardComponent');
     expect(imgAlt!.directives).toContain('TooltipDirective');
+    // From axe's wcag111 tag; the reports link it to the reference.
+    expect(imgAlt!.wcag).toEqual(['1.1.1']);
   });
 
   it('serializes concurrent scans (axe is a singleton)', async () => {

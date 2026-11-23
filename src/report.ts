@@ -1,5 +1,6 @@
 import type { A11yFinding } from './scan.js';
 import { groupByComponent } from './report/format.js';
+import { findingCriteria, referenceUrl } from './report/wcag.js';
 
 /** Minimal console-shaped sink, so reporting is testable without the real console. */
 export interface Logger {
@@ -32,7 +33,10 @@ export function logFindings(findings: A11yFinding[], logger: Logger = console): 
       const via = finding.directives.length ? ` [via ${finding.directives.join(', ')}]` : '';
       logger.warn(
         `${finding.impact ?? 'n/a'} · ${finding.id}: ${finding.help}${via}`,
-        `\n  ${finding.target}\n  ${finding.helpUrl}`,
+        `\n  ${finding.target}\n  ${finding.helpUrl}` +
+          findingCriteria(finding)
+            .map((c) => `\n  WCAG ${c.id} ${c.name}: ${referenceUrl(c)}`)
+            .join(''),
       );
     }
     logger.groupEnd();
