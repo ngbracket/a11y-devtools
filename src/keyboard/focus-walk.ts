@@ -27,6 +27,7 @@ import {
 import type { A11yFinding } from '../scan.js';
 import { shortHtml, shortSelector } from './keyboard-scan.js';
 import { tabSequence } from './tab-sequence.js';
+import { ngbrRuleCriteria } from '../report/wcag.js';
 
 /** One observation from the walk: a focused element's id, or null when focus is on `<body>`/nothing. */
 export type FocusObservation = number | null;
@@ -191,6 +192,7 @@ export function createFocusWalkProbe(
           `Tab (e.g. a code editor), it must tell users how to leave (such as Escape); otherwise ` +
           `let Tab move focus on. Found by real Tab presses — verify manually.`,
         helpUrl: FOCUS_TRAP_DOCS,
+        wcag: ngbrRuleCriteria('ngbr/focus-trap'),
         component: appComponentFromPath(componentPath, frameworkPrefixes),
         componentPath,
         directives: resolveDirectiveNames(owner),

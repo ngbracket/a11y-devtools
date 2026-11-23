@@ -50,6 +50,7 @@ describe('scanKeyboard', () => {
       expect(finding).toBeDefined();
       expect(finding!.impact).toBe('serious');
       expect(finding!.component).toBe('ToolbarComponent');
+      expect(finding!.wcag).toEqual(['2.1.1']);
     });
   });
 

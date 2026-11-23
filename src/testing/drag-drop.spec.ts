@@ -66,6 +66,7 @@ describe('ngbr/drag-without-keyboard', () => {
     expect(found[0].help).toContain('3 items here move');
     expect(found[0].help).toContain('Heuristic — verify manually');
     expect(found[0].helpUrl).toBe(`${RULE_DOCS}/drag-without-keyboard`);
+    expect(found[0].wcag).toEqual(['2.1.1', '2.5.7']);
   });
 
   it('skips a list with Move up / Move down buttons in its rows', () => {

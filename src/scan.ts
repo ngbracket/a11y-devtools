@@ -37,9 +37,10 @@ export interface A11yFinding {
   help: string;
   helpUrl: string;
   /**
-   * WCAG 2.2 A and AA criteria the axe rule is tagged with, e.g. `['1.4.3']`.
-   * Empty for axe's best-practice rules; absent on the tool's own `ngbr/*`
-   * findings (see `findingCriteria`).
+   * WCAG 2.2 A and AA criteria the rule checks, e.g. `['1.4.3']`: from the
+   * axe rule's tags, or from the docs page of an `ngbr/*` rule. Empty for
+   * axe's best-practice rules. Optional because reports saved before 0.19.0
+   * don't have it.
    */
   wcag?: string[];
   /** Owning component name, or null when attribution isn't available (prod). */

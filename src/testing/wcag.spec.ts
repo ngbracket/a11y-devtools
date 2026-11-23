@@ -11,7 +11,7 @@ describe('findingCriteria', () => {
     expect(findingCriteria({ id: 'region', wcag: [] })).toEqual([]);
   });
 
-  it('knows the criteria of the tool\'s own rules', () => {
+  it('falls back to the rule\'s criteria for an ngbr/* finding saved before 0.19.0', () => {
     expect(findingCriteria({ id: 'ngbr/drag-without-keyboard' }).map((c) => c.id)).toEqual(['2.1.1', '2.5.7']);
     expect(findingCriteria({ id: 'ngbr/focus-trap' }).map((c) => c.id)).toEqual(['2.1.2']);
     expect(findingCriteria({ id: 'some-unknown-rule' })).toEqual([]);

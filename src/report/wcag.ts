@@ -99,9 +99,9 @@ export function referenceUrl(criterion: WcagCriterion): string {
 
 /**
  * The criteria the tool's own `ngbr/*` rules check, from the "Standard" row of
- * each rule's docs page. axe findings carry theirs in `wcag`, from axe's tags.
+ * each rule's docs page. axe findings take theirs from axe's tags.
  */
-const NGBR_RULE_CRITERIA: Readonly<Record<string, readonly string[]>> = {
+export const NGBR_RULE_CRITERIA: Readonly<Record<string, readonly string[]>> = {
   'ngbr/unreachable-control': ['2.1.1'],
   'ngbr/click-without-key': ['2.1.1'],
   'ngbr/hover-only-content': ['2.1.1'],
@@ -111,10 +111,16 @@ const NGBR_RULE_CRITERIA: Readonly<Record<string, readonly string[]>> = {
   'ngbr/focus-trap': ['2.1.2'],
 };
 
+/** The `wcag` list for an `ngbr/*` finding; [] for an unknown id. */
+export function ngbrRuleCriteria(id: string): string[] {
+  return [...(NGBR_RULE_CRITERIA[id] ?? [])];
+}
+
 /**
  * The WCAG 2.2 A and AA criteria a finding relates to, in document order:
- * its `wcag` list for an axe rule, or the fixed list for an `ngbr/*` rule.
- * Empty for axe's best-practice rules, which have no criterion.
+ * its `wcag` list, or for an `ngbr/*` finding saved before 0.19.0 (no `wcag`),
+ * the rule's fixed list. Empty for axe's best-practice rules, which have no
+ * criterion.
  */
 export function findingCriteria(finding: { id: string; wcag?: readonly string[] }): WcagCriterion[] {
   const ids = new Set(finding.wcag ?? NGBR_RULE_CRITERIA[finding.id] ?? []);
