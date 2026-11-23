@@ -34,6 +34,7 @@ import { findUncontainedModals } from './focus-trap.js';
 import { hoverSignal, type HoverSignal } from './hover-content.js';
 import { dragGroups, dragHandles, hasMoveControl } from './drag-drop.js';
 import { blockingModalDialog } from '../top-layer.js';
+import { ngbrRuleCriteria } from '../report/wcag.js';
 import { OVERLAY_EXCLUDE_SELECTOR } from '../overlay.js';
 
 export interface KeyboardScanOptions {
@@ -482,6 +483,7 @@ export function scanKeyboard(
       impact,
       help,
       helpUrl,
+      wcag: ngbrRuleCriteria(id),
       component: appComponentFromPath(componentPath, prefixes),
       componentPath,
       directives: resolveDirectiveNames(element),

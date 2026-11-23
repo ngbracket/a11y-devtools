@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import type { A11yFinding, Impact } from '../scan.js';
 import { impactRank, type ScanChecks, type ScanReport } from './format.js';
 import { escapeHtml, safeHref, STYLES } from './html.js';
-import { criterionForTag, understandingUrl, WCAG22_A_AA, type WcagCriterion } from './wcag.js';
+import { criterionForTag, NGBR_RULE_CRITERIA, understandingUrl, WCAG22_A_AA, type WcagCriterion } from './wcag.js';
 
 /**
  * ACR worksheet: an automated scan organised by WCAG 2.2 A/AA success
@@ -69,14 +69,14 @@ export interface AxeRuleMeta {
  * their findings are candidates to verify (a trap can be intended, with a
  * documented way out; an order mismatch can be deliberate).
  */
-const NGBR_RULES: Record<string, { criteria: string[]; ranWhen: keyof Pick<ScanChecks, 'keyboard' | 'focusTraps'> }> = {
-  'ngbr/unreachable-control': { criteria: ['2.1.1'], ranWhen: 'keyboard' },
-  'ngbr/click-without-key': { criteria: ['2.1.1'], ranWhen: 'keyboard' },
-  'ngbr/hover-only-content': { criteria: ['2.1.1'], ranWhen: 'keyboard' },
-  'ngbr/drag-without-keyboard': { criteria: ['2.1.1', '2.5.7'], ranWhen: 'keyboard' },
-  'ngbr/tab-order-mismatch': { criteria: ['2.4.3'], ranWhen: 'keyboard' },
-  'ngbr/modal-focus-not-contained': { criteria: ['2.4.3'], ranWhen: 'keyboard' },
-  'ngbr/focus-trap': { criteria: ['2.1.2'], ranWhen: 'focusTraps' },
+const NGBR_RULES: Record<string, { criteria: readonly string[]; ranWhen: keyof Pick<ScanChecks, 'keyboard' | 'focusTraps'> }> = {
+  'ngbr/unreachable-control': { criteria: NGBR_RULE_CRITERIA['ngbr/unreachable-control'], ranWhen: 'keyboard' },
+  'ngbr/click-without-key': { criteria: NGBR_RULE_CRITERIA['ngbr/click-without-key'], ranWhen: 'keyboard' },
+  'ngbr/hover-only-content': { criteria: NGBR_RULE_CRITERIA['ngbr/hover-only-content'], ranWhen: 'keyboard' },
+  'ngbr/drag-without-keyboard': { criteria: NGBR_RULE_CRITERIA['ngbr/drag-without-keyboard'], ranWhen: 'keyboard' },
+  'ngbr/tab-order-mismatch': { criteria: NGBR_RULE_CRITERIA['ngbr/tab-order-mismatch'], ranWhen: 'keyboard' },
+  'ngbr/modal-focus-not-contained': { criteria: NGBR_RULE_CRITERIA['ngbr/modal-focus-not-contained'], ranWhen: 'keyboard' },
+  'ngbr/focus-trap': { criteria: NGBR_RULE_CRITERIA['ngbr/focus-trap'], ranWhen: 'focusTraps' },
 };
 
 export function loadAxeRules(): AxeRuleMeta[] {
@@ -189,7 +189,7 @@ export function buildAcrWorksheet(report: ScanReport, axeRules: AxeRuleMeta[] = 
   };
 }
 
-function criteriaFor(rule: string, tagsById: Map<string, string[]>): string[] {
+function criteriaFor(rule: string, tagsById: Map<string, string[]>): readonly string[] {
   if (rule in NGBR_RULES) return NGBR_RULES[rule].criteria;
   const ids = (tagsById.get(rule) ?? []).map((t) => criterionForTag(t)?.id).filter((id): id is string => !!id);
   return [...new Set(ids)];

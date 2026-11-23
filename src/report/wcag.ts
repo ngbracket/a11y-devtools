@@ -88,3 +88,41 @@ export function criterionForTag(tag: string): WcagCriterion | undefined {
 }
 
 const BY_DIGITS = new Map(WCAG22_A_AA.map((c) => [c.id.replace(/\./g, ''), c]));
+
+/** Where the NgBracket accessibility reference explains each criterion. */
+export const REFERENCE_WCAG_URL = 'https://ngbracket.com/reference/wcag';
+
+/** The criterion's page in the NgBracket accessibility reference. */
+export function referenceUrl(criterion: WcagCriterion): string {
+  return `${REFERENCE_WCAG_URL}/${criterion.slug}`;
+}
+
+/**
+ * The criteria the tool's own `ngbr/*` rules check, from the "Standard" row of
+ * each rule's docs page. axe findings take theirs from axe's tags.
+ */
+export const NGBR_RULE_CRITERIA: Readonly<Record<string, readonly string[]>> = {
+  'ngbr/unreachable-control': ['2.1.1'],
+  'ngbr/click-without-key': ['2.1.1'],
+  'ngbr/hover-only-content': ['2.1.1'],
+  'ngbr/drag-without-keyboard': ['2.1.1', '2.5.7'],
+  'ngbr/tab-order-mismatch': ['2.4.3'],
+  'ngbr/modal-focus-not-contained': ['2.4.3'],
+  'ngbr/focus-trap': ['2.1.2'],
+};
+
+/** The `wcag` list for an `ngbr/*` finding; [] for an unknown id. */
+export function ngbrRuleCriteria(id: string): string[] {
+  return [...(NGBR_RULE_CRITERIA[id] ?? [])];
+}
+
+/**
+ * The WCAG 2.2 A and AA criteria a finding relates to, in document order:
+ * its `wcag` list, or for an `ngbr/*` finding saved before 0.19.0 (no `wcag`),
+ * the rule's fixed list. Empty for axe's best-practice rules, which have no
+ * criterion.
+ */
+export function findingCriteria(finding: { id: string; wcag?: readonly string[] }): WcagCriterion[] {
+  const ids = new Set(finding.wcag ?? NGBR_RULE_CRITERIA[finding.id] ?? []);
+  return WCAG22_A_AA.filter((c) => ids.has(c.id));
+}

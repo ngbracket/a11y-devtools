@@ -1,5 +1,6 @@
 import type { A11yFinding, Impact } from '../scan.js';
 import type { BaselineDiff } from './baseline.js';
+import { findingCriteria, referenceUrl } from './wcag.js';
 import type { Walkthrough, WalkthroughStep } from '../keyboard/walkthrough.js';
 
 /**
@@ -323,6 +324,10 @@ export function toMarkdown(report: ScanReport, diff?: BaselineDiff): string {
         lines.push(`- ${isNew}**${finding.impact ?? 'n/a'} · ${finding.id}**: ${finding.help}${suffix}`);
         lines.push(`  - \`${finding.target}\``);
         lines.push(`  - ${finding.helpUrl}`);
+        const criteria = findingCriteria(finding);
+        if (criteria.length) {
+          lines.push(`  - WCAG ${criteria.map((c) => `[${c.id} ${c.name}](${referenceUrl(c)})`).join(', ')}`);
+        }
       }
       lines.push('');
     }

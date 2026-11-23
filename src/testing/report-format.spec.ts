@@ -170,3 +170,23 @@ describe('toMarkdown', () => {
     expect(withPrimitive).toContain('_(via NbButtonComponent)_');
   });
 });
+
+describe('toMarkdown reference links', () => {
+  it('lists each WCAG criterion with a link to the reference, and nothing for a best-practice rule', () => {
+    const md = toMarkdown({
+      generatedAt: 'x',
+      pages: [
+        {
+          label: 'p',
+          url: 'u',
+          findings: [finding({ id: 'link-name', wcag: ['4.1.2', '2.4.4'] }), finding({ id: 'region', wcag: [] })],
+        },
+      ],
+    });
+    expect(md).toContain(
+      '  - WCAG [2.4.4 Link Purpose (In Context)](https://ngbracket.com/reference/wcag/link-purpose-in-context), ' +
+        '[4.1.2 Name, Role, Value](https://ngbracket.com/reference/wcag/name-role-value)',
+    );
+    expect(md.match(/ - WCAG \[/g)).toHaveLength(1);
+  });
+});

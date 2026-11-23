@@ -3,6 +3,22 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.19.0
+
+### Added
+
+- Each finding now links to the WCAG criteria it relates to, in the
+  [NgBracket accessibility reference](https://ngbracket.com/reference). The
+  console, the Markdown report and the HTML report show a link such as
+  "WCAG 1.4.3 Contrast (Minimum)" after the axe rule link, which stays as it
+  was. The reference page says what the criterion asks, where Angular apps
+  usually fail it and how to check it.
+- Every finding has a new `wcag` field listing the WCAG 2.2 A and AA
+  criteria its rule checks, such as `['1.4.3']`, in the JSON report too.
+  axe findings take theirs from the rule's tags. axe's best-practice rules
+  have none, so they get no link. The tool's own `ngbr/*` rules use the
+  criteria on their docs pages, such as `['2.1.2']` for `ngbr/focus-trap`.
+
 ## 0.18.6
 
 ### Fixed

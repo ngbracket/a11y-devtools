@@ -75,4 +75,15 @@ describe('logFindings', () => {
     expect(logger.info).toHaveBeenCalledWith('♿ a11y-devtools: no violations found');
     expect(logger.groupCollapsed).not.toHaveBeenCalled();
   });
+
+  it('adds a link to the reference for each WCAG criterion, after the axe rule link', () => {
+    const logger = fakeLogger();
+    logFindings([finding({ id: 'color-contrast', wcag: ['1.4.3'] }), finding({ id: 'region', wcag: [] })], logger);
+    const [[, first], [, second]] = (logger.warn as Mock).mock.calls;
+    expect(first).toBe(
+      '\n  img\n  https://example.test/image-alt' +
+        '\n  WCAG 1.4.3 Contrast (Minimum): https://ngbracket.com/reference/wcag/contrast-minimum',
+    );
+    expect(second).toBe('\n  img\n  https://example.test/image-alt');
+  });
 });

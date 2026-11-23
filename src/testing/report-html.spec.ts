@@ -127,6 +127,18 @@ describe('toHtml', () => {
     expect(link.textContent).toContain('Rule reference');
   });
 
+  it('links each WCAG criterion to the reference after the rule reference', () => {
+    const doc = parse(toHtml({
+      generatedAt: 'x',
+      pages: [{ label: 'p', url: 'u', findings: [finding({ id: 'color-contrast', wcag: ['1.4.3'] })] }],
+    }));
+    const links = [...doc.querySelectorAll('.findings a')].map((a) => [a.textContent, a.getAttribute('href')]);
+    expect(links).toEqual([
+      ['Rule reference for color-contrast', 'https://example.test/image-alt'],
+      ['WCAG 1.4.3 Contrast (Minimum)', 'https://ngbracket.com/reference/wcag/contrast-minimum'],
+    ]);
+  });
+
   it('with a baseline, adds a comparison section and labels new findings as text', () => {
     const [first, ...rest] = run.pages[0].findings;
     const diff = diffAgainstBaseline(run, { pages: [{ label: 'Dashboard', findings: rest }] });
