@@ -57,6 +57,16 @@ describe('diffAgainstBaseline', () => {
     expect(diff.unchanged).toBe(1);
   });
 
+  it('matches a baseline saved before 0.19.0, which has no wcag field', () => {
+    const { wcag: _, ...old } = finding({ wcag: ['1.1.1'] });
+    const diff = diffAgainstBaseline(
+      report([{ label: '/', url: 'u', findings: [finding({ wcag: ['1.1.1'] })] }]),
+      { pages: [{ label: '/', findings: [old] }] },
+    );
+    expect(diff.added).toEqual([]);
+    expect(diff.unchanged).toBe(1);
+  });
+
   it('matches with counts, so a second identical finding is new', () => {
     const diff = diffAgainstBaseline(
       report([{ label: '/', url: 'u', findings: [finding(), finding()] }]),
