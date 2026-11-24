@@ -2,6 +2,7 @@ import type { A11yFinding, Impact } from '../scan.js';
 import type { BaselineDiff } from './baseline.js';
 import { findingCriteria, referenceUrl } from './wcag.js';
 import type { Walkthrough, WalkthroughStep } from '../keyboard/walkthrough.js';
+import { describeNavigation, type NavigationRecord } from '../navigation/record.js';
 
 /**
  * Pure formatting for report-mode: grouping + Markdown/JSON serialization. Kept
@@ -27,6 +28,8 @@ export interface PageReport {
   darkOnly?: boolean;
   /** The tab order with each stop's computed role and name, when the run asked for it. */
   walkthrough?: Walkthrough;
+  /** How the route change into this page went, when the run moved between routes in the app. */
+  navigation?: NavigationRecord;
 }
 
 /** One-line explanation for a dark-only page, shared by the Markdown and HTML reports. */
@@ -40,6 +43,22 @@ export const DARK_ONLY_NOTE =
 export const WALKTHROUGH_NOTE =
   'Each tab stop in order, with its computed role, name and states. A computed approximation, ' +
   'not what any one screen reader announces.';
+
+/** Heading note for the route change, shared by the Markdown and HTML reports. */
+export const NAVIGATION_NOTE =
+  'The run moved here from the previous route inside the app, the way a keyboard user would. ' +
+  'Where focus went, whether the page title changed, and what live regions announced.';
+
+/** The route change as one line, saying how the run made it. */
+export function formatNavigation(record: NavigationRecord): string {
+  const how =
+    record.via === 'link'
+      ? ' (pressed Enter on a link)'
+      : record.via === 'history'
+        ? ' (no link to this route, so the run changed the URL with history.pushState)'
+        : '';
+  return `${describeNavigation(record)}${how}`;
+}
 
 /** One walkthrough step as a single line, e.g. `button "Save" (disabled) — SaveBarComponent`. */
 export function formatStep(step: WalkthroughStep): string {
@@ -89,6 +108,8 @@ export interface ScanChecks {
   focusTraps: boolean;
   /** Each page lists its tab order with computed roles and names. */
   walkthrough?: boolean;
+  /** The run moved between the routes inside the app and checked focus each time. */
+  navigation?: boolean;
 }
 
 /** A whole report-mode run across one or more pages. */
@@ -172,6 +193,7 @@ export function toJson(report: ScanReport, diff?: BaselineDiff): string {
         nodeInstances: p.findings.length,
         findings: p.findings,
         ...(p.walkthrough && { walkthrough: p.walkthrough }),
+        ...(p.navigation && { navigation: p.navigation }),
       })),
     },
     null,
@@ -215,8 +237,19 @@ export function parseReport(json: string): ScanReport {
       ...(p.colorScheme && { colorScheme: p.colorScheme }),
       ...(p.darkOnly && { darkOnly: true }),
       ...(isWalkthrough(p.walkthrough) && { walkthrough: p.walkthrough }),
+      ...(isNavigationRecord(p.navigation) && { navigation: p.navigation }),
     })),
   };
+}
+
+function isNavigationRecord(n: unknown): n is NavigationRecord {
+  const r = n as NavigationRecord;
+  return (
+    typeof r?.from === 'string' &&
+    typeof r.to === 'string' &&
+    typeof r.focus === 'string' &&
+    Array.isArray(r.announcements)
+  );
 }
 
 function isWalkthrough(w: unknown): w is Walkthrough {
@@ -303,6 +336,7 @@ export function toMarkdown(report: ScanReport, diff?: BaselineDiff): string {
     if (page.findings.length === 0) {
       lines.push('No automated violations found. ✅');
       lines.push('');
+      lines.push(...markdownNavigation(page));
       lines.push(...markdownWalkthrough(page));
       continue;
     }
@@ -331,10 +365,19 @@ export function toMarkdown(report: ScanReport, diff?: BaselineDiff): string {
       }
       lines.push('');
     }
+    lines.push(...markdownNavigation(page));
     lines.push(...markdownWalkthrough(page));
   }
 
   return lines.join('\n');
+}
+
+/** The route change into a page under its own heading, or nothing. */
+function markdownNavigation(page: PageReport): string[] {
+  if (!page.navigation) return [];
+  // Titles and announcements are page text: escape anything Markdown would read as markup.
+  const line = formatNavigation(page.navigation).replace(/([<>*_`[\]\\|&])/g, '\\$1');
+  return ['### Route change', '', `_${NAVIGATION_NOTE}_`, '', line, ''];
 }
 
 /** A page's walkthrough as a numbered Markdown list under its own heading, or nothing. */

@@ -109,6 +109,8 @@ export const NGBR_RULE_CRITERIA: Readonly<Record<string, readonly string[]>> = {
   'ngbr/tab-order-mismatch': ['2.4.3'],
   'ngbr/modal-focus-not-contained': ['2.4.3'],
   'ngbr/focus-trap': ['2.1.2'],
+  'ngbr/focus-lost-on-navigation': ['2.4.3'],
+  'ngbr/focus-lost-on-rerender': ['2.4.3'],
 };
 
 /** The `wcag` list for an `ngbr/*` finding; [] for an unknown id. */

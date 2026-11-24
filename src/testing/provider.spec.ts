@@ -1,4 +1,4 @@
-import { provideZonelessChangeDetection } from '@angular/core';
+import { ApplicationRef, provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { provideA11yDevtools } from '../provider';
@@ -408,5 +408,98 @@ describe('provideA11yDevtools', () => {
     host.appendChild(dialog);
     dialog.dispatchEvent(new Event('close')); // what Escape fires; Angular never sees it
     await waitFor(() => scans() > before);
+  });
+  describe('focus lost between scans', () => {
+    const warned = (logger: Logger, id: string): boolean =>
+      (logger.warn as ReturnType<typeof vi.fn>).mock.calls.some((args) => String(args[0]).includes(id));
+
+    async function removeFocused(): Promise<void> {
+      const button = document.createElement('button');
+      button.textContent = 'Remove';
+      host.appendChild(button);
+      button.focus();
+      button.remove();
+      await wait(250); // past the probe's grace period
+    }
+
+    it('reports a focused element removed by a re-render when keyboard is on', async () => {
+      const logger = makeLogger();
+      TestBed.configureTestingModule({
+        providers: [
+          provideZonelessChangeDetection(),
+          provideA11yDevtools({ root: () => host, logger, debounceMs: 0, keyboard: true, pill: false }),
+        ],
+      });
+      const fixture = TestBed.createComponent(AppComponent);
+      host.appendChild(fixture.nativeElement);
+      await fixture.whenStable();
+
+      await removeFocused();
+      expect(warned(logger, 'ngbr/focus-lost-on-rerender')).toBe(true);
+    });
+
+    it('lists route changes in the pill menu and reports a lost focus once per change', async () => {
+      const logger = makeLogger();
+      TestBed.configureTestingModule({
+        providers: [
+          provideZonelessChangeDetection(),
+          provideA11yDevtools({ root: () => host, logger, debounceMs: 0, keyboard: true, overlay: true }),
+        ],
+      });
+      const fixture = TestBed.createComponent(AppComponent);
+      host.appendChild(fixture.nativeElement);
+      await fixture.whenStable();
+      const start = location.pathname + location.search;
+      try {
+        for (const next of ['/route-a', '/route-b']) {
+          const view = document.createElement('nav');
+          view.innerHTML = `<a href="${next}">Go</a>`;
+          host.appendChild(view);
+          view.querySelector('a')!.focus();
+          history.pushState(null, '', next);
+          view.remove();
+          await wait(50);
+          // Any change detection makes the app settle again, which runs the check.
+          fixture.componentRef.changeDetectorRef.markForCheck();
+          TestBed.inject(ApplicationRef).tick();
+          await waitFor(() => (logger.info as ReturnType<typeof vi.fn>).mock.calls.some((c) => String(c[0]).includes(`→ ${next}`)));
+        }
+        const items = [...document.querySelectorAll('[aria-labelledby$="-routes"] li')].map((li) => li.textContent);
+        expect(items[0]).toContain('→ /route-b: focus on body');
+        expect(items[1]).toContain('→ /route-a: focus on body');
+        const lost = (logger.warn as ReturnType<typeof vi.fn>).mock.calls.filter((c) =>
+          String(c[0]).includes('ngbr/focus-lost-on-navigation'),
+        );
+        expect(lost).toHaveLength(2);
+      } finally {
+        history.pushState(null, '', start);
+      }
+    });
+
+    it('does not watch with navigation:false, or after the app is destroyed', async () => {
+      const logger = makeLogger();
+      TestBed.configureTestingModule({
+        providers: [
+          provideZonelessChangeDetection(),
+          provideA11yDevtools({ root: () => host, logger, debounceMs: 0, keyboard: true, navigation: false, pill: false }),
+        ],
+      });
+      TestBed.createComponent(AppComponent);
+      await removeFocused();
+      expect(warned(logger, 'ngbr/focus-lost-on-rerender')).toBe(false);
+
+      TestBed.resetTestingModule();
+      const second = makeLogger();
+      TestBed.configureTestingModule({
+        providers: [
+          provideZonelessChangeDetection(),
+          provideA11yDevtools({ root: () => host, logger: second, debounceMs: 0, keyboard: true, pill: false }),
+        ],
+      });
+      TestBed.createComponent(AppComponent);
+      TestBed.resetTestingModule();
+      await removeFocused();
+      expect(warned(second, 'ngbr/focus-lost-on-rerender')).toBe(false);
+    });
   });
 });

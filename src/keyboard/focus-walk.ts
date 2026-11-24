@@ -100,7 +100,7 @@ export interface FocusWalkProbe {
 const FOCUS_TRAP_DOCS = 'https://ngbracket.com/tools/a11y-devtools/docs/focus-trap';
 
 /** The element that really has focus, through open shadow roots. */
-function deepActiveElement(doc: Document): Element | null {
+export function deepActiveElement(doc: Document): Element | null {
   let active: Element | null = doc.activeElement;
   while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
   return active;

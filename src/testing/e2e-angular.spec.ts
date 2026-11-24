@@ -226,4 +226,95 @@ describe.skipIf(!ready)('attribution in a real Angular app (E2E)', () => {
       await browser.close();
     }
   }, 60_000);
+
+  it('the in-app overlay reports focus lost when a re-render removes the focused button', async () => {
+    const { chromium } = await import('playwright');
+    const browser = await chromium.launch();
+    try {
+      const tab = await browser.newPage();
+      await tab.goto(`${dev}/focus-lost?overlay`);
+      const remove = tab.locator('button.remove').first();
+      await remove.focus();
+      await tab.keyboard.press('Enter');
+      await expect.poll(() => tab.evaluate(() => document.activeElement === document.body)).toBe(true);
+      const labels = tab.locator('[data-ngb-a11y-overlay] [data-impact] > span');
+      await expect
+        .poll(() => labels.allTextContents(), { timeout: 15_000 })
+        .toContain('FocusLostPageComponent · ngbr/focus-lost-on-rerender');
+    } finally {
+      await browser.close();
+    }
+  }, 60_000);
+  describe('report mode, --navigation', () => {
+    let report: ScanReport;
+    const page = (label: string) => report.pages.find((p) => p.label === label)!;
+    const ids = (label: string) => page(label).findings.map((f) => f.id);
+
+    beforeAll(async () => {
+      report = await scanPages({
+        baseUrl: dev,
+        routes: ['/nav-start', '/nav-plain', '/nav-managed', '/settings'],
+        waitMs: 300,
+        navigation: true,
+      });
+    }, 90_000);
+
+    it('says the run checked route changes', () => {
+      expect(report.checks?.navigation).toBe(true);
+    });
+
+    it('reports focus left on the body when the clicked link went with the old view', () => {
+      expect(page('/nav-plain').navigation).toMatchObject({
+        from: '/nav-start',
+        to: '/nav-plain',
+        via: 'link',
+        focus: 'body',
+        focusBefore: 'a.to-plain',
+      });
+      const lost = page('/nav-plain').findings.find((f) => f.id === 'ngbr/focus-lost-on-navigation');
+      expect(lost).toMatchObject({ component: 'NavStartPageComponent', target: 'a.to-plain' });
+    });
+
+    it('reports nothing when the new page focuses its heading, and records the new title', () => {
+      expect(page('/nav-managed').navigation).toMatchObject({
+        via: 'link',
+        focus: 'target',
+        focusedTarget: 'h1',
+        titleChanged: true,
+        titleAfter: 'Managed page',
+      });
+      expect(ids('/nav-managed')).not.toContain('ngbr/focus-lost-on-navigation');
+    });
+
+    it('changes the URL itself when no link goes to the route', () => {
+      expect(page('/settings').navigation).toMatchObject({ from: '/nav-managed', to: '/settings', via: 'history' });
+    });
+
+    it('records nothing for the first route', () => {
+      expect(page('/nav-start').navigation).toBeUndefined();
+    });
+  });
+
+  it('--navigation: a repeated route gets its own record, and the first route none', async () => {
+    const report = await scanPages({
+      baseUrl: dev,
+      routes: ['/nav-start', '/nav-plain', '/nav-start'],
+      waitMs: 300,
+      navigation: true,
+    });
+    expect(report.pages[0].navigation).toBeUndefined();
+    expect(report.pages[1].navigation).toMatchObject({ from: '/nav-start', to: '/nav-plain', via: 'link' });
+    expect(report.pages[2].navigation).toMatchObject({ from: '/nav-plain', to: '/nav-start', via: 'history' });
+  }, 90_000);
+
+  it('--navigation: skips a link that loads a new page, and does not claim the check ran', async () => {
+    const report = await scanPages({
+      baseUrl: dev,
+      routes: ['/nav-plain', '/settings'],
+      waitMs: 300,
+      navigation: true,
+    });
+    expect(report.pages[1].navigation).toBeUndefined();
+    expect(report.checks?.navigation).toBeUndefined();
+  }, 90_000);
 });

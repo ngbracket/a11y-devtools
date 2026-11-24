@@ -69,7 +69,10 @@ export interface AxeRuleMeta {
  * their findings are candidates to verify (a trap can be intended, with a
  * documented way out; an order mismatch can be deliberate).
  */
-const NGBR_RULES: Record<string, { criteria: readonly string[]; ranWhen: keyof Pick<ScanChecks, 'keyboard' | 'focusTraps'> }> = {
+const NGBR_RULES: Record<
+  string,
+  { criteria: readonly string[]; ranWhen?: keyof Pick<ScanChecks, 'keyboard' | 'focusTraps' | 'navigation'> }
+> = {
   'ngbr/unreachable-control': { criteria: NGBR_RULE_CRITERIA['ngbr/unreachable-control'], ranWhen: 'keyboard' },
   'ngbr/click-without-key': { criteria: NGBR_RULE_CRITERIA['ngbr/click-without-key'], ranWhen: 'keyboard' },
   'ngbr/hover-only-content': { criteria: NGBR_RULE_CRITERIA['ngbr/hover-only-content'], ranWhen: 'keyboard' },
@@ -77,6 +80,13 @@ const NGBR_RULES: Record<string, { criteria: readonly string[]; ranWhen: keyof P
   'ngbr/tab-order-mismatch': { criteria: NGBR_RULE_CRITERIA['ngbr/tab-order-mismatch'], ranWhen: 'keyboard' },
   'ngbr/modal-focus-not-contained': { criteria: NGBR_RULE_CRITERIA['ngbr/modal-focus-not-contained'], ranWhen: 'keyboard' },
   'ngbr/focus-trap': { criteria: NGBR_RULE_CRITERIA['ngbr/focus-trap'], ranWhen: 'focusTraps' },
+  'ngbr/focus-lost-on-navigation': {
+    criteria: NGBR_RULE_CRITERIA['ngbr/focus-lost-on-navigation'],
+    ranWhen: 'navigation',
+  },
+  // Only the in-app overlay can see a re-render remove the focused element: no
+  // run checks for it, so it counts only when a report has its findings.
+  'ngbr/focus-lost-on-rerender': { criteria: NGBR_RULE_CRITERIA['ngbr/focus-lost-on-rerender'] },
 };
 
 export function loadAxeRules(): AxeRuleMeta[] {
@@ -126,7 +136,8 @@ export function buildAcrWorksheet(report: ScanReport, axeRules: AxeRuleMeta[] = 
     }
     for (const [rule, { criteria, ranWhen }] of Object.entries(NGBR_RULES)) {
       // A hand-built report has no `checks`: count a rule as run if it produced findings.
-      const ran = report.checks ? report.checks[ranWhen] : allFindings.some((f) => f.id === rule);
+      const ran =
+        report.checks && ranWhen ? report.checks[ranWhen] === true : allFindings.some((f) => f.id === rule);
       if (ran) criteria.forEach((id) => check(id, rule));
     }
   }

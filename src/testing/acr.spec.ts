@@ -127,6 +127,18 @@ describe('buildAcrWorksheet', () => {
     expect(row(tagged.rows, '2.5.8')).toMatchObject({ result: 'no-failures-detected', checkedBy: ['target-size'] });
   });
 
+  it('counts the route-change rule only when the run moved between routes', () => {
+    const page = [{ label: '/', url: 'http://x/', findings: [] }];
+    const on = buildAcrWorksheet(report(page, { checks: { ...checks, navigation: true } }), RULES);
+    expect(row(on.rows, '2.4.3').checkedBy).toEqual(['ngbr/focus-lost-on-navigation']);
+    // A re-render is only seen in the app, so that rule counts only with findings.
+    const found = buildAcrWorksheet(
+      report([{ label: '/', url: 'http://x/', findings: [finding({ id: 'ngbr/focus-lost-on-rerender' })] }]),
+      RULES,
+    );
+    expect(row(found.rows, '2.4.3').checkedBy).toContain('ngbr/focus-lost-on-rerender');
+  });
+
   it('counts keyboard rules as checks only when that layer ran', () => {
     const page = [{ label: '/', url: 'http://x/', findings: [] }];
     const off = buildAcrWorksheet(report(page), RULES);

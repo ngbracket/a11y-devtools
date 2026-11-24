@@ -33,6 +33,9 @@ Part of the `@ngbracket` Angular tooling family.
 - Keyboard & Focus Mode: numbers the tab order, adds keyboard findings, shows the
   Focus preview card (computed role, name and state), and finds keyboard traps by
   pressing Tab for real.
+- Focus lost between scans: reports a re-render or a route change that removes the
+  focused element and leaves focus on the page body, named after the component.
+  Report mode checks route changes too, with `--navigation`.
 - Production weight: does nothing in production builds, and axe-core isn't loaded
   there.
 
@@ -140,3 +143,4 @@ ever becomes reachable through a static import.
 - Re-render a saved JSON report in any format without scanning (`--from`).
 - Issue-count badge on the pill and a per-component filter in its menu.
 - Tab order walkthrough in report mode (`--walkthrough`).
+- Focus lost to a re-render or a route change, with a route-change list in the pill menu.

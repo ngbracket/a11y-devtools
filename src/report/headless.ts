@@ -9,6 +9,7 @@ import { OVERLAY_EXCLUDE_SELECTOR } from '../overlay.js';
 import type { A11yFinding } from '../scan.js';
 import { findingsNotIn } from './baseline.js';
 import type { Walkthrough } from '../keyboard/walkthrough.js';
+import type { NavigationRecord } from '../navigation/record.js';
 import type { PageReport, ScanChecks, ScanReport } from './format.js';
 
 /** A colour scheme a pass is scanned in. */
@@ -97,6 +98,16 @@ export interface ScanPagesOptions {
    * light pass only. Default false.
    */
   walkthrough?: boolean;
+  /**
+   * Also move between the routes inside the app, in the order given, the way a
+   * keyboard user would: focus a link to the next route and press Enter, or
+   * when the page has no such link, change the URL with `history.pushState`.
+   * Each route then records where focus went, whether the title changed and
+   * what live regions announced, and focus left on the page body is reported
+   * as `ngbr/focus-lost-on-navigation`. Runs in its own browser session after
+   * the scan, once (in the light scheme with `colorScheme: 'both'`). Default false.
+   */
+  navigation?: boolean;
 }
 
 type PlaywrightModule = typeof import('playwright');
@@ -176,6 +187,163 @@ async function walkForFocusTrap(
   return null;
 }
 
+/** What the navigation pass found on arriving at one route. */
+interface NavigationResult {
+  record: NavigationRecord;
+  findings: A11yFinding[];
+}
+
+interface InPageFocusLossProbe {
+  notifyStable(): void;
+  settled(): Promise<void>;
+  records(): NavigationRecord[];
+  findings(): A11yFinding[];
+}
+type FocusLossWindow = {
+  __ngbA11yCreateFocusLossProbe?: (prefixes?: readonly string[]) => InPageFocusLossProbe;
+  __ngbA11yFocusLossProbe?: InPageFocusLossProbe;
+};
+
+/** A route as the focus-loss probe keys it: path and query, plus a `#/` hash. */
+function routeKey(url: URL): string {
+  return url.pathname + url.search + (url.hash.startsWith('#/') ? url.hash : '');
+}
+
+/**
+ * Load the first route, then move to each next route inside the app and ask the
+ * in-page probe what happened to focus. Results are keyed by the route's index
+ * in `routes`. A full page load (a link outside the app's router) is not a
+ * route change inside the app, so it's skipped with a warning.
+ */
+async function navigationPass(
+  browser: Browser,
+  colorScheme: ColorScheme,
+  config: PassConfig,
+): Promise<Map<number, NavigationResult>> {
+  const { baseUrl, routes, waitMs, inPageScript, frameworkPrefixes } = config;
+  const results = new Map<number, NavigationResult>();
+  if (routes.length < 2) return results;
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    colorScheme,
+    bypassCSP: true,
+  });
+  try {
+    const page = await context.newPage();
+    if (config.setup) {
+      await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+      await config.setup(page, { colorScheme });
+    }
+    const settle = async () => {
+      await page.waitForLoadState('networkidle').catch(() => undefined);
+      await page.waitForTimeout(waitMs);
+    };
+    // What the probe has reported so far, so each route takes only its own.
+    let recordCount = 0;
+    let findingCount = 0;
+    const startProbe = async () => {
+      recordCount = 0;
+      findingCount = 0;
+      await page.addStyleTag({ content: HIDE_OVERLAY_CSS });
+      await page.addScriptTag({ content: inPageScript });
+      await page.evaluate((prefixes) => {
+        const w = window as unknown as FocusLossWindow;
+        w.__ngbA11yFocusLossProbe = w.__ngbA11yCreateFocusLossProbe!(prefixes);
+      }, frameworkPrefixes);
+    };
+    const probeRunning = () =>
+      page.evaluate(() => (window as unknown as FocusLossWindow).__ngbA11yFocusLossProbe !== undefined);
+
+    const first = new URL(routes[0], baseUrl).toString();
+    await page.goto(first, { waitUntil: 'networkidle' }).catch(() => page.goto(first));
+    await page.waitForTimeout(waitMs);
+    await startProbe();
+
+    for (let i = 1; i < routes.length; i++) {
+      const route = routes[i];
+      const target = new URL(route, baseUrl);
+      try {
+        // Focus a visible link in the page that goes to this route, in the same
+        // tab. Without one, change the URL: the Angular Router (like most SPA
+        // routers) follows popstate.
+        const via = await page.evaluate((href) => {
+          const key = (u: URL) => u.pathname + u.search + (u.hash.startsWith('#/') ? u.hash : '');
+          const wanted = key(new URL(href));
+          for (const link of document.querySelectorAll('a[href]')) {
+            if (!(link instanceof HTMLAnchorElement)) continue; // an SVG <a>
+            if (link.target && link.target !== '_self') continue;
+            if (link.closest('[data-ngb-a11y-overlay], [inert], [aria-hidden="true"]')) continue;
+            if (typeof link.checkVisibility === 'function' && !link.checkVisibility()) continue;
+            let url: URL;
+            try {
+              url = new URL(link.href);
+            } catch {
+              continue;
+            }
+            if (url.origin !== location.origin || key(url) !== wanted) continue;
+            link.focus();
+            if (document.activeElement === link) return 'link' as const;
+          }
+          history.pushState(null, '', href);
+          dispatchEvent(new PopStateEvent('popstate', { state: null }));
+          return 'history' as const;
+        }, target.toString());
+        if (via === 'link') await page.keyboard.press('Enter');
+        await settle();
+
+        if (!(await probeRunning())) {
+          console.warn(
+            `ngbr-a11y-report: moving to ${route} loaded a new page, so it wasn't a route change ` +
+              `inside the app; skipped the focus check.`,
+          );
+          await startProbe();
+          continue;
+        }
+        const seen = await page.evaluate(async () => {
+          const probe = (window as unknown as FocusLossWindow).__ngbA11yFocusLossProbe!;
+          probe.notifyStable();
+          await probe.settled();
+          return { records: probe.records(), findings: probe.findings() };
+        });
+        const record = seen.records.length > recordCount ? seen.records.at(-1) : undefined;
+        recordCount = seen.records.length;
+        const findings = seen.findings.slice(findingCount);
+        findingCount = seen.findings.length;
+        if (!record) {
+          console.warn(`ngbr-a11y-report: moving to ${route} didn't change the route; skipped the focus check.`);
+          continue;
+        }
+        if (record.to !== routeKey(target)) {
+          console.warn(`ngbr-a11y-report: moving to ${route} ended on ${record.to} (a redirect?).`);
+        }
+        results.set(i, { record: { ...record, via }, findings });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`ngbr-a11y-report: route change to ${route} failed: ${message}`);
+        // Start again from what's on the page now, so the next route takes only its own results.
+        try {
+          await settle();
+          if (!(await probeRunning())) {
+            await startProbe();
+          } else {
+            const counts = await page.evaluate(() => {
+              const probe = (window as unknown as FocusLossWindow).__ngbA11yFocusLossProbe!;
+              return { records: probe.records().length, findings: probe.findings().length };
+            });
+            recordCount = counts.records;
+            findingCount = counts.findings;
+          }
+        } catch {
+          // The page is gone; the next route's own error says so.
+        }
+      }
+    }
+  } finally {
+    await context.close();
+  }
+  return results;
+}
+
 /** Everything a single colour-scheme pass needs, resolved from the options. */
 interface PassConfig {
   baseUrl: string;
@@ -188,6 +356,7 @@ interface PassConfig {
   keyboard: boolean | undefined;
   focusTraps: boolean;
   walkthrough: boolean;
+  navigation: boolean;
   setup: ScanPagesOptions['setup'];
   beforeScan: ScanPagesOptions['beforeScan'];
   darkClass: string | undefined;
@@ -324,6 +493,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     keyboard,
     focusTraps = false,
     walkthrough = false,
+    navigation = false,
     darkClass,
     darkAttribute,
   } = options;
@@ -339,6 +509,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     keyboard,
     focusTraps,
     walkthrough,
+    navigation,
     setup,
     beforeScan,
     darkClass,
@@ -348,11 +519,27 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
   const { chromium } = await loadPlaywright();
   const browser = await chromium.launch({ headless: !headed });
   let pages: PageReport[];
+  let moves = new Map<number, NavigationResult>();
   try {
+    // Route changes don't depend on the theme: check them once.
+    if (navigation && routes.length < 2) {
+      console.warn('ngbr-a11y-report: --navigation needs 2 or more routes; skipped the route-change check.');
+    }
+    moves = navigation
+      ? await navigationPass(browser, colorScheme === 'both' ? 'light' : colorScheme, config)
+      : new Map<number, NavigationResult>();
+    // A route that failed to scan keeps only its error.
+    const withMoves = (scanned: PageReport[]): PageReport[] =>
+      scanned.map((page, i) => {
+        const move = moves.get(i);
+        return move && !page.error
+          ? { ...page, findings: [...page.findings, ...move.findings], navigation: move.record }
+          : page;
+      });
     if (colorScheme !== 'both') {
-      pages = await scanPass(browser, colorScheme, config);
+      pages = withMoves(await scanPass(browser, colorScheme, config));
     } else {
-      const light = await scanPass(browser, 'light', config);
+      const light = withMoves(await scanPass(browser, 'light', config));
       // Keyboard traps and the tab order don't depend on the theme; doing them twice only costs time.
       const dark = await scanPass(browser, 'dark', { ...config, focusTraps: false, walkthrough: false });
       // Interleave per route (light, then its dark) and keep only what dark adds.
@@ -374,6 +561,8 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     keyboard: keyboard ?? false,
     focusTraps,
     ...(walkthrough && { walkthrough }),
+    // Only when at least one route change was checked, so the ACR doesn't count a check that didn't happen.
+    ...(moves.size > 0 && { navigation: true }),
   };
   return { generatedAt: new Date().toISOString(), checks, pages };
 }

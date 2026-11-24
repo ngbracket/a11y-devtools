@@ -1,5 +1,6 @@
 import type { RunOptions as AxeRunOptions } from 'axe-core';
 import { createFocusWalkProbe } from './keyboard/focus-walk.js';
+import { createFocusLossProbe, type FocusLossProbe } from './navigation/focus-loss.js';
 import { linearWalkthrough, type Walkthrough } from './keyboard/walkthrough.js';
 import { scan, type A11yFinding, type ScanOptions } from './scan.js';
 
@@ -31,3 +32,10 @@ const run: InPageScan = (options, scanOptions) => scan(document, options, scanOp
 (globalThis as unknown as {
   __ngbA11yWalkthrough: (prefixes?: readonly string[]) => Promise<Walkthrough>;
 }).__ngbA11yWalkthrough = (prefixes) => linearWalkthrough(document, { frameworkPrefixes: prefixes });
+
+// The route-change check: the driver moves between routes inside the app and
+// asks the probe what happened to focus each time.
+(globalThis as unknown as {
+  __ngbA11yCreateFocusLossProbe: (prefixes?: readonly string[]) => FocusLossProbe;
+}).__ngbA11yCreateFocusLossProbe = (prefixes) =>
+  createFocusLossProbe(document, { frameworkPrefixes: prefixes });

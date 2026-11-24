@@ -65,6 +65,11 @@ Options:
   --walkthrough      Also list each route's tab order with every stop's computed
                      role, name, states and component (an approximation, not
                      any one screen reader's output)
+  --navigation       Also move between the routes inside the app, in the order
+                     given, by focusing a link and pressing Enter (or with
+                     history.pushState when there's no link). Records where
+                     focus went and reports focus left on the page body
+                     (ngbr/focus-lost-on-navigation). Needs 2 or more routes
   --color-scheme <s> light | dark | both — scan with the browser emulating that
                      prefers-color-scheme (default light). "both" scans each
                      route twice; dark pages list only issues light doesn't have
@@ -104,6 +109,7 @@ function parseArgs(argv) {
       case '--keyboard': opts.keyboard = true; break;
       case '--focus-traps': opts.focusTraps = true; break;
       case '--walkthrough': opts.walkthrough = true; break;
+      case '--navigation': opts.navigation = true; break;
       case '--color-scheme': opts.colorScheme = next(); break;
       case '--dark-class': opts.darkClass = next(); break;
       case '--dark-attribute': opts.darkAttribute = next(); break;
@@ -122,7 +128,7 @@ const opts = parseArgs(process.argv.slice(2));
 const SCAN_ONLY = {
   base: '--base', serve: '--serve', serveTimeout: '--serve-timeout', routes: '--route', tags: '--tags',
   wait: '--wait', frameworkPrefixes: '--framework-prefixes / --no-skip-primitives', keyboard: '--keyboard',
-  focusTraps: '--focus-traps', walkthrough: '--walkthrough', colorScheme: '--color-scheme', darkClass: '--dark-class',
+  focusTraps: '--focus-traps', walkthrough: '--walkthrough', navigation: '--navigation', colorScheme: '--color-scheme', darkClass: '--dark-class',
   darkAttribute: '--dark-attribute', headed: '--headed',
 };
 if (opts.from && !opts.help) {
@@ -162,6 +168,11 @@ for (const name of String(opts.format).split(',').map((s) => s.trim()).filter(Bo
 }
 if (!opts.out && (formats.has('acr') || formats.has('acr-md'))) {
   process.stderr.write('--format acr / acr-md writes a file: add --out <prefix>\n');
+  process.exit(2);
+}
+
+if (opts.navigation && opts.routes.length < 2) {
+  process.stderr.write('--navigation moves from one route to the next: give 2 or more --route\n');
   process.exit(2);
 }
 
@@ -251,6 +262,7 @@ if (!report) {
       keyboard: opts.keyboard,
       focusTraps: opts.focusTraps,
       walkthrough: opts.walkthrough,
+      navigation: opts.navigation,
       colorScheme: opts.colorScheme,
       darkClass: opts.darkClass,
       darkAttribute,

@@ -25,6 +25,8 @@ export interface PillMenuStatus {
   components?: { name: string; count: number }[];
   /** The component filter in force, or null for every component. */
   component?: string | null;
+  /** The latest route changes, newest first, one line each. */
+  routeChanges?: string[];
 }
 
 export interface PillMenu {
@@ -212,8 +214,20 @@ export function createPillMenu(doc: Document, options: PillMenuOptions): PillMen
   const pagesNote = doc.createElement('p');
   Object.assign(pagesNote.style, { margin: '4px 0 0', fontSize: '12px', color: muted });
 
+  // The latest route changes: where focus went, the title, what was announced.
+  const routesHeading = doc.createElement('p');
+  routesHeading.id = `${id}-routes`;
+  routesHeading.textContent = 'Route changes';
+  Object.assign(routesHeading.style, { margin: '10px 0 4px', fontWeight: '700' });
+  const routesList = doc.createElement('ul');
+  routesList.setAttribute('aria-labelledby', routesHeading.id);
+  Object.assign(routesList.style, { margin: '0', padding: '0 0 0 16px', fontSize: '12px', color: muted });
+  const routes = doc.createElement('div');
+  routes.hidden = true;
+  routes.append(routesHeading, routesList);
+
   const componentControls = options.onComponentChange ? [componentLabel, componentSelect] : [];
-  panel.append(status, fieldset, severityLabel, select, ...componentControls, download, pagesNote);
+  panel.append(status, fieldset, severityLabel, select, ...componentControls, download, pagesNote, routes);
 
   function update(patch: Partial<DevtoolsSettings>): void {
     settings = { ...settings, ...patch };
@@ -259,8 +273,18 @@ export function createPillMenu(doc: Document, options: PillMenuOptions): PillMen
   return {
     button,
     panel,
-    setStatus({ found, shown, pages, components, component }) {
+    setStatus({ found, shown, pages, components, component, routeChanges }) {
       if (components) setComponentOptions(components, component ?? null);
+      if (routeChanges) {
+        routes.hidden = routeChanges.length === 0;
+        routesList.replaceChildren(
+          ...routeChanges.map((line) => {
+            const item = doc.createElement('li');
+            item.textContent = line;
+            return item;
+          }),
+        );
+      }
       const issues = `${found} ${found === 1 ? 'issue' : 'issues'} on this page`;
       status.textContent = shown === found ? issues : `${issues}, ${shown} shown`;
       pagesNote.textContent = `Covers ${pages} ${pages === 1 ? 'page' : 'pages'} visited since the app loaded.`;
