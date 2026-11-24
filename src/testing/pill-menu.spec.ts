@@ -29,6 +29,19 @@ describe('pill settings menu', () => {
     expect(panel().closest('[role="region"]')).not.toBeNull();
   });
 
+  it('lists the latest route changes, and hides the list when there are none', () => {
+    open();
+    const routes = (): HTMLElement =>
+      [...panel().querySelectorAll('p')].find((p) => p.textContent === 'Route changes')!.parentElement!;
+    pill!.setStatus({ found: 0, shown: 0, pages: 1, routeChanges: [] });
+    expect(routes().hidden).toBe(true);
+    pill!.setStatus({ found: 1, shown: 1, pages: 2, routeChanges: ['/a → /b: focus on body, title unchanged, nothing announced'] });
+    expect(routes().hidden).toBe(false);
+    expect([...routes().querySelectorAll('li')].map((li) => li.textContent)).toEqual([
+      '/a → /b: focus on body, title unchanged, nothing announced',
+    ]);
+  });
+
   it('is a disclosure: collapsed by default, expands on click', () => {
     open();
     expect(menuButton().getAttribute('aria-expanded')).toBe('false');

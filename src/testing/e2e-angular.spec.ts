@@ -226,4 +226,22 @@ describe.skipIf(!ready)('attribution in a real Angular app (E2E)', () => {
       await browser.close();
     }
   }, 60_000);
+  it('the in-app overlay reports focus lost when a re-render removes the focused button', async () => {
+    const { chromium } = await import('playwright');
+    const browser = await chromium.launch();
+    try {
+      const tab = await browser.newPage();
+      await tab.goto(`${dev}/focus-lost?overlay`);
+      const remove = tab.locator('button.remove').first();
+      await remove.focus();
+      await tab.keyboard.press('Enter');
+      await expect.poll(() => tab.evaluate(() => document.activeElement === document.body)).toBe(true);
+      const labels = tab.locator('[data-ngb-a11y-overlay] [data-impact] > span');
+      await expect
+        .poll(() => labels.allTextContents(), { timeout: 15_000 })
+        .toContain('FocusLostPageComponent · ngbr/focus-lost-on-rerender');
+    } finally {
+      await browser.close();
+    }
+  }, 60_000);
 });

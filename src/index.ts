@@ -24,6 +24,15 @@ export {
   type StopRect,
 } from './keyboard/tab-sequence.js';
 export { scanKeyboard, type KeyboardScanOptions } from './keyboard/keyboard-scan.js';
+export {
+  createFocusLossProbe,
+  describeNavigation,
+  DEFAULT_FOCUS_TARGET,
+  type FocusLossProbe,
+  type FocusLossProbeOptions,
+  type NavigationFocus,
+  type NavigationRecord,
+} from './navigation/focus-loss.js';
 export { findUncontainedModals, type UncontainedModal } from './keyboard/focus-trap.js';
 export {
   createFocusWalkProbe,

@@ -4,7 +4,7 @@
  * through the real `window.ng` debug API.
  */
 import { Dialog } from '@angular/cdk/dialog';
-import { afterNextRender, Component, Directive, inject } from '@angular/core';
+import { afterNextRender, Component, Directive, inject, signal } from '@angular/core';
 
 const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 
@@ -106,9 +106,31 @@ export class DialogPageComponent {
   }
 }
 
+/**
+ * ngbr/focus-lost-on-rerender → FocusLostPageComponent: Remove takes its own
+ * row (and the focused button) out of the page, and nothing moves focus.
+ */
+@Component({
+  selector: 'app-focus-lost-page',
+  template: `
+    <h1>Focus lost</h1>
+    <ul class="todo-list">
+      @for (item of items(); track item) {
+        <li>{{ item }} <button class="remove" (click)="remove(item)">Remove {{ item }}</button></li>
+      }
+    </ul>
+  `,
+})
+export class FocusLostPageComponent {
+  readonly items = signal(['Milk', 'Bread', 'Eggs']);
+  remove(item: string): void {
+    this.items.update((items) => items.filter((i) => i !== item));
+  }
+}
+
 @Component({
   selector: 'app-root',
-  imports: [HeaderComponent, HomePageComponent, SettingsPageComponent, DialogPageComponent],
+  imports: [HeaderComponent, HomePageComponent, SettingsPageComponent, DialogPageComponent, FocusLostPageComponent],
   template: `
     <app-header />
     <main>
@@ -116,6 +138,8 @@ export class DialogPageComponent {
         <app-settings-page />
       } @else if (page === 'dialog') {
         <app-dialog-page />
+      } @else if (page === 'focus-lost') {
+        <app-focus-lost-page />
       } @else {
         <app-home-page />
       }
@@ -128,5 +152,7 @@ export class AppComponent {
     ? 'settings'
     : location.pathname.startsWith('/dialog')
       ? 'dialog'
-      : 'home';
+      : location.pathname.startsWith('/focus-lost')
+        ? 'focus-lost'
+        : 'home';
 }

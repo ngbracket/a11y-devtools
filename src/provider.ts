@@ -37,6 +37,13 @@ import {
 } from './settings.js';
 import type { A11yFinding } from './scan.js';
 import type { PageReport } from './report/format.js';
+import { findingKey } from './report/baseline.js';
+import {
+  createFocusLossProbe,
+  describeNavigation,
+  type FocusLossProbe,
+  type NavigationRecord,
+} from './navigation/focus-loss.js';
 
 export interface A11yDevtoolsOptions {
   /** Element/Document to scan. Defaults to `document`. */
@@ -102,6 +109,20 @@ export interface A11yDevtoolsOptions {
    * issue. Developers can change it from the pill's menu. Default `'minor'`.
    */
   minImpact?: MinImpact;
+  /**
+   * Watch for focus lost between scans: a route change, or an `@if` / `@for`
+   * re-render, that removes the focused element and leaves focus on the page
+   * body. Reported as `ngbr/focus-lost-on-navigation` and
+   * `ngbr/focus-lost-on-rerender`, and each route change is listed in the
+   * pill's menu. Default: follows `keyboard`.
+   */
+  navigation?: boolean;
+  /**
+   * Where focus is expected to go after a route change, as a CSS selector. Only
+   * labels the route-change list ("focus on the target" or elsewhere); focus
+   * left on the page body is the only finding. Default `'main, [role="main"], h1'`.
+   */
+  focusTarget?: string;
 }
 
 /**
@@ -144,6 +165,8 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
     shortcut: shortcutText = DEFAULT_TOGGLE_SHORTCUT,
     layers = {},
     minImpact = 'minor',
+    navigation = keyboard,
+    focusTarget,
   } = options;
   const defaultSettings: DevtoolsSettings = {
     highlights: layers.highlights ?? true,
@@ -175,6 +198,13 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
       // and the latest findings per route visited, for the downloadable report.
       let lastFindings: A11yFinding[] = [];
       const visited = new Map<string, PageReport>();
+      // Findings the focus-loss probe reports as they happen, per route. A scan
+      // replaces lastFindings, so these are kept apart and added on top.
+      const eventFindings = new Map<string, A11yFinding[]>();
+      const routeChanges: NavigationRecord[] = [];
+      const currentRoute = (): string => location.pathname + location.search;
+      /** The last scan's findings plus the probe's findings for the current route. */
+      const pageFindings = (): A11yFinding[] => [...lastFindings, ...(eventFindings.get(currentRoute()) ?? [])];
 
       // Show one component's issues only (null: all). Not remembered, and reset
       // on a route change: the components change from page to page.
@@ -183,17 +213,19 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
 
       /** Draw (or clear) each overlay layer from the last scan and the settings. */
       function draw(): void {
-        const matching = visibleFindings(lastFindings, settings.minImpact, componentFilter);
+        const all = pageFindings();
+        const matching = visibleFindings(all, settings.minImpact, componentFilter);
         const shown = settings.highlights ? matching : [];
         pillView?.setStatus({
-          found: lastFindings.length,
+          found: all.length,
           shown: shown.length,
           pages: visited.size,
           matching: matching.length,
           worst: worstImpact(matching),
           // Counted at the chosen severity, so an option's count matches the badge.
-          components: componentCounts(visibleFindings(lastFindings, settings.minImpact)),
+          components: componentCounts(visibleFindings(all, settings.minImpact)),
           component: componentFilter,
+          routeChanges: routeChanges.slice(-5).reverse().map(describeNavigation),
         });
         if (!overlayView) return;
         if (!enabled) {
@@ -228,6 +260,7 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
         enabled = next;
         writeStoredEnabled(storage, enabled);
         pillView?.setEnabled(enabled);
+        setProbe(enabled);
         if (enabled) {
           scanNow(); // don't wait for the app's next stable moment
           previewCurrentFocus();
@@ -359,7 +392,11 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
             if (lastPath !== undefined && location.pathname !== lastPath) componentFilter = null;
             lastPath = location.pathname;
             // Label by route: a single-page app usually keeps one title on every route.
-            visited.set(route, { label: route, url: location.href, findings });
+            visited.set(route, {
+              label: route,
+              url: location.href,
+              findings: [...findings, ...(eventFindings.get(route) ?? [])],
+            });
             draw();
           })
           .catch(() => undefined)
@@ -386,6 +423,53 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
       document.addEventListener('close', onTopLayerChange, true);
       document.addEventListener('toggle', onTopLayerChange, true);
 
+      // Focus lost between scans. Runs only while the tool is on, so off costs nothing.
+      let probe: FocusLossProbe | undefined;
+      function onProbeFinding(finding: A11yFinding, route: string): void {
+        const list = eventFindings.get(route) ?? [];
+        const key = findingKey(route, finding);
+        if (list.some((f) => findingKey(route, f) === key)) return; // seen already
+        list.push(finding);
+        eventFindings.set(route, list);
+        const page = visited.get(route);
+        if (page) visited.set(route, { ...page, findings: [...page.findings, finding] });
+        else visited.set(route, { label: route, url: location.href, findings: [finding] });
+        if (log) {
+          (logger ?? console).warn(
+            `♿ ${finding.component ?? 'unknown component'} · ${finding.impact} · ${finding.id}: ${finding.help}`,
+            `\n  ${finding.target}\n  ${finding.helpUrl}`,
+          );
+        }
+        draw();
+      }
+      function onRouteChange(record: NavigationRecord): void {
+        routeChanges.push(record);
+        if (routeChanges.length > 20) routeChanges.shift();
+        if (log) (logger ?? console).info(`♿ a11y-devtools: route change ${describeNavigation(record)}`);
+        draw();
+      }
+      function setProbe(on: boolean): void {
+        if (!navigation) return;
+        if (on && !probe) {
+          probe = createFocusLossProbe(document, {
+            frameworkPrefixes,
+            focusTarget,
+            onFinding: onProbeFinding,
+            onNavigation: onRouteChange,
+          });
+        } else if (!on && probe) {
+          probe.stop();
+          probe = undefined;
+        }
+      }
+      setProbe(enabled);
+
+      // The probe checks for a route change as soon as the app settles, before
+      // the scan's quiet window.
+      const probeSubscription = appRef.isStable
+        .pipe(filter((stable) => stable))
+        .subscribe(() => probe?.notifyStable());
+
       const subscription = appRef.isStable
         .pipe(
           filter((stable) => stable),
@@ -395,6 +479,8 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
 
       destroyRef.onDestroy(() => {
         subscription.unsubscribe();
+        probeSubscription.unsubscribe();
+        probe?.stop();
         if (onFocusIn) document.removeEventListener('focusin', onFocusIn, true);
         if (onKeyDown) document.removeEventListener('keydown', onKeyDown, true);
         document.removeEventListener('close', onTopLayerChange, true);

@@ -409,4 +409,59 @@ describe('provideA11yDevtools', () => {
     dialog.dispatchEvent(new Event('close')); // what Escape fires; Angular never sees it
     await waitFor(() => scans() > before);
   });
+  describe('focus lost between scans', () => {
+    const warned = (logger: Logger, id: string): boolean =>
+      (logger.warn as ReturnType<typeof vi.fn>).mock.calls.some((args) => String(args[0]).includes(id));
+
+    async function removeFocused(): Promise<void> {
+      const button = document.createElement('button');
+      button.textContent = 'Remove';
+      host.appendChild(button);
+      button.focus();
+      button.remove();
+      await wait(250); // past the probe's grace period
+    }
+
+    it('reports a focused element removed by a re-render when keyboard is on', async () => {
+      const logger = makeLogger();
+      TestBed.configureTestingModule({
+        providers: [
+          provideZonelessChangeDetection(),
+          provideA11yDevtools({ root: () => host, logger, debounceMs: 0, keyboard: true, pill: false }),
+        ],
+      });
+      const fixture = TestBed.createComponent(AppComponent);
+      host.appendChild(fixture.nativeElement);
+      await fixture.whenStable();
+
+      await removeFocused();
+      expect(warned(logger, 'ngbr/focus-lost-on-rerender')).toBe(true);
+    });
+
+    it('does not watch with navigation:false, or after the app is destroyed', async () => {
+      const logger = makeLogger();
+      TestBed.configureTestingModule({
+        providers: [
+          provideZonelessChangeDetection(),
+          provideA11yDevtools({ root: () => host, logger, debounceMs: 0, keyboard: true, navigation: false, pill: false }),
+        ],
+      });
+      TestBed.createComponent(AppComponent);
+      await removeFocused();
+      expect(warned(logger, 'ngbr/focus-lost-on-rerender')).toBe(false);
+
+      TestBed.resetTestingModule();
+      const second = makeLogger();
+      TestBed.configureTestingModule({
+        providers: [
+          provideZonelessChangeDetection(),
+          provideA11yDevtools({ root: () => host, logger: second, debounceMs: 0, keyboard: true, pill: false }),
+        ],
+      });
+      TestBed.createComponent(AppComponent);
+      TestBed.resetTestingModule();
+      await removeFocused();
+      expect(warned(second, 'ngbr/focus-lost-on-rerender')).toBe(false);
+    });
+  });
 });
