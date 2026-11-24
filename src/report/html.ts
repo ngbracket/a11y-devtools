@@ -3,7 +3,9 @@ import {
   addedBySeverity,
   COVERAGE_URL,
   DARK_ONLY_NOTE,
+  formatNavigation,
   formatStep,
+  NAVIGATION_NOTE,
   REPORT_SCOPE_NOTE,
   REPORT_TITLE,
   bySeverity,
@@ -179,6 +181,7 @@ export function toHtml(report: ScanReport, diff?: BaselineDiff): string {
     }
     if (page.findings.length === 0) {
       out.push('<p class="ok">No automated violations found.</p>');
+      out.push(...htmlNavigation(page));
       out.push(...htmlWalkthrough(page));
       out.push('</section>');
       return;
@@ -220,6 +223,7 @@ export function toHtml(report: ScanReport, diff?: BaselineDiff): string {
       out.push('</ul>');
       out.push('</div>');
     }
+    out.push(...htmlNavigation(page));
     out.push(...htmlWalkthrough(page));
     out.push('</section>');
   });
@@ -228,6 +232,18 @@ export function toHtml(report: ScanReport, diff?: BaselineDiff): string {
   out.push('</body>');
   out.push('</html>');
   return out.join('\n');
+}
+
+/** The route change into a page under its own heading, or nothing. */
+function htmlNavigation(page: PageReport): string[] {
+  if (!page.navigation) return [];
+  return [
+    '<div class="walkthrough">',
+    '<h3>Route change</h3>',
+    `<p class="meta">${escapeHtml(NAVIGATION_NOTE)}</p>`,
+    `<p>${escapeHtml(formatNavigation(page.navigation))}</p>`,
+    '</div>',
+  ];
 }
 
 /** A page's walkthrough as an ordered list under its own heading, or nothing. */

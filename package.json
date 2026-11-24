@@ -82,6 +82,7 @@
     "@angular/forms": "^22.2.1",
     "@angular/platform-browser": "^22.2.1",
     "@angular/platform-browser-dynamic": "^22.2.1",
+    "@angular/router": "^22.2.1",
     "@emnapi/core": "^1.11.3",
     "@emnapi/runtime": "^1.11.3",
     "@oxc-project/runtime": "^0.149.0",

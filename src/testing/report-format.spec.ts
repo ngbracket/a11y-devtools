@@ -8,6 +8,7 @@ import {
   type ScanReport,
 } from '../report/format';
 import type { A11yFinding } from '../scan';
+import type { NavigationRecord } from '../navigation/record';
 
 function finding(partial: Partial<A11yFinding> = {}): A11yFinding {
   return {
@@ -188,5 +189,43 @@ describe('toMarkdown reference links', () => {
         '[4.1.2 Name, Role, Value](https://ngbracket.com/reference/wcag/name-role-value)',
     );
     expect(md.match(/ - WCAG \[/g)).toHaveLength(1);
+  });
+});
+
+describe('route changes in the report', () => {
+  const navigation: NavigationRecord = {
+  from: '/orders',
+  to: '/orders/42',
+  via: 'link',
+  focus: 'body',
+  focusedTarget: null,
+  focusedComponent: null,
+  focusBefore: 'a.next',
+  titleBefore: 'Shop',
+  titleAfter: 'Shop',
+  titleChanged: false,
+  announcements: ['<b>Loaded</b>'],
+};
+  const report: ScanReport = {
+    generatedAt: '2026-11-24T00:00:00Z',
+    checks: { axeVersion: '4.10.0', keyboard: false, focusTraps: false, navigation: true },
+    pages: [{ label: '/orders/42', url: 'http://x/orders/42', findings: [], navigation }],
+  };
+
+  it('keeps the route change through JSON and back', () => {
+    expect(parseReport(toJson(report))).toEqual(report);
+  });
+
+  it('drops a malformed route change when reading a report back', () => {
+    const json = toJson(report).replace('"focus": "body"', '"focus": 3');
+    expect(parseReport(json).pages[0].navigation).toBeUndefined();
+  });
+
+  it('lists the route change under its own heading in Markdown, escaping page text', () => {
+    const md = toMarkdown(report);
+    expect(md).toContain('### Route change');
+    expect(md).toContain(
+      '/orders → /orders/42: focus on body, title unchanged, announced "\\<b\\>Loaded\\</b\\>" (pressed Enter on a link)',
+    );
   });
 });

@@ -4,7 +4,8 @@
  * through the real `window.ng` debug API.
  */
 import { Dialog } from '@angular/cdk/dialog';
-import { afterNextRender, Component, Directive, inject, signal } from '@angular/core';
+import { afterNextRender, Component, Directive, ElementRef, inject, signal, viewChild } from '@angular/core';
+import { RouterLink, RouterOutlet, type Routes } from '@angular/router';
 
 const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 
@@ -128,31 +129,56 @@ export class FocusLostPageComponent {
   }
 }
 
+/**
+ * Route changes for report mode's --navigation run. Start → Plain: the link is
+ * in the old view and Plain doesn't move focus, so focus is left on the body
+ * (ngbr/focus-lost-on-navigation). Plain → Managed: Managed focuses its heading
+ * and has its own title, so nothing is reported.
+ */
+@Component({
+  selector: 'app-nav-start-page',
+  imports: [RouterLink],
+  template: `<h1>Start</h1><a routerLink="/nav-plain" class="to-plain">Go to the plain page</a>`,
+})
+export class NavStartPageComponent {}
+
+@Component({
+  selector: 'app-nav-plain-page',
+  imports: [RouterLink],
+  template: `<h1>Plain</h1><a routerLink="/nav-managed" class="to-managed">Go to the managed page</a>`,
+})
+export class NavPlainPageComponent {}
+
+@Component({
+  selector: 'app-nav-managed-page',
+  template: `<h1 #heading tabindex="-1">Managed</h1>`,
+})
+export class NavManagedPageComponent {
+  private readonly heading = viewChild.required<ElementRef<HTMLElement>>('heading');
+  constructor() {
+    afterNextRender(() => this.heading().nativeElement.focus());
+  }
+}
+
+export const routes: Routes = [
+  { path: '', component: HomePageComponent },
+  { path: 'settings', component: SettingsPageComponent },
+  { path: 'dialog', component: DialogPageComponent },
+  { path: 'focus-lost', component: FocusLostPageComponent },
+  { path: 'nav-start', component: NavStartPageComponent },
+  { path: 'nav-plain', component: NavPlainPageComponent },
+  { path: 'nav-managed', component: NavManagedPageComponent, title: 'Managed page' },
+  { path: '**', component: HomePageComponent },
+];
+
 @Component({
   selector: 'app-root',
-  imports: [HeaderComponent, HomePageComponent, SettingsPageComponent, DialogPageComponent, FocusLostPageComponent],
+  imports: [HeaderComponent, RouterOutlet],
   template: `
     <app-header />
     <main>
-      @if (page === 'settings') {
-        <app-settings-page />
-      } @else if (page === 'dialog') {
-        <app-dialog-page />
-      } @else if (page === 'focus-lost') {
-        <app-focus-lost-page />
-      } @else {
-        <app-home-page />
-      }
+      <router-outlet />
     </main>
   `,
 })
-export class AppComponent {
-  // No router needed: the route picks the page.
-  page = location.pathname.startsWith('/settings')
-    ? 'settings'
-    : location.pathname.startsWith('/dialog')
-      ? 'dialog'
-      : location.pathname.startsWith('/focus-lost')
-        ? 'focus-lost'
-        : 'home';
-}
+export class AppComponent {}

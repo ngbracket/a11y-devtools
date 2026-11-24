@@ -107,6 +107,12 @@ describe.skipIf(!built)('CLI: --from re-renders a saved report', () => {
     expect(stderr).toContain("--walkthrough can't be used with it");
   });
 
+  it('refuses --navigation, which needs a scan', async () => {
+    const { code, stderr } = await runCli(['--from', saved, '--navigation']);
+    expect(code).toBe(2);
+    expect(stderr).toContain("--navigation can't be used with it");
+  });
+
   it('names only --serve, not a defaulted --base, when --serve is used with it', async () => {
     const { code, stderr } = await runCli(['--from', saved, '--serve', 'npx ng serve']);
     expect(code).toBe(2);

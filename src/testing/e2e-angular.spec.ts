@@ -245,4 +245,53 @@ describe.skipIf(!ready)('attribution in a real Angular app (E2E)', () => {
       await browser.close();
     }
   }, 60_000);
+  describe('report mode, --navigation', () => {
+    let report: ScanReport;
+    const page = (label: string) => report.pages.find((p) => p.label === label)!;
+    const ids = (label: string) => page(label).findings.map((f) => f.id);
+
+    beforeAll(async () => {
+      report = await scanPages({
+        baseUrl: dev,
+        routes: ['/nav-start', '/nav-plain', '/nav-managed', '/settings'],
+        waitMs: 300,
+        navigation: true,
+      });
+    }, 90_000);
+
+    it('says the run checked route changes', () => {
+      expect(report.checks?.navigation).toBe(true);
+    });
+
+    it('reports focus left on the body when the clicked link went with the old view', () => {
+      expect(page('/nav-plain').navigation).toMatchObject({
+        from: '/nav-start',
+        to: '/nav-plain',
+        via: 'link',
+        focus: 'body',
+        focusBefore: 'a.to-plain',
+      });
+      const lost = page('/nav-plain').findings.find((f) => f.id === 'ngbr/focus-lost-on-navigation');
+      expect(lost).toMatchObject({ component: 'NavStartPageComponent', target: 'a.to-plain' });
+    });
+
+    it('reports nothing when the new page focuses its heading, and records the new title', () => {
+      expect(page('/nav-managed').navigation).toMatchObject({
+        via: 'link',
+        focus: 'target',
+        focusedTarget: 'h1',
+        titleChanged: true,
+        titleAfter: 'Managed page',
+      });
+      expect(ids('/nav-managed')).not.toContain('ngbr/focus-lost-on-navigation');
+    });
+
+    it('changes the URL itself when no link goes to the route', () => {
+      expect(page('/settings').navigation).toMatchObject({ from: '/nav-managed', to: '/settings', via: 'history' });
+    });
+
+    it('records nothing for the first route', () => {
+      expect(page('/nav-start').navigation).toBeUndefined();
+    });
+  });
 });

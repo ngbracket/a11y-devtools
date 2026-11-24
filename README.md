@@ -35,6 +35,7 @@ Part of the `@ngbracket` Angular tooling family.
   pressing Tab for real.
 - Focus lost between scans: reports a re-render or a route change that removes the
   focused element and leaves focus on the page body, named after the component.
+  Report mode checks route changes too, with `--navigation`.
 - Production weight: does nothing in production builds, and axe-core isn't loaded
   there.
 

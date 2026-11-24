@@ -159,3 +159,26 @@ describe('toHtml', () => {
     expect(doc.body.textContent).toContain('only issues that don’t also appear in light mode');
   });
 });
+
+describe('toHtml route change', () => {
+  it('shows the route change with page text escaped', () => {
+    const html = toHtml({
+      generatedAt: '2026-11-24T00:00:00Z',
+      pages: [{ label: '/orders/42', url: 'http://x/orders/42', findings: [], navigation: {
+  from: '/orders',
+  to: '/orders/42',
+  via: 'link',
+  focus: 'body',
+  focusedTarget: null,
+  focusedComponent: null,
+  focusBefore: 'a.next',
+  titleBefore: 'Shop',
+  titleAfter: 'Shop',
+  titleChanged: false,
+  announcements: ['<b>Loaded</b>'],
+} }],
+    });
+    expect(html).toContain('<h3>Route change</h3>');
+    expect(html).toContain('announced &quot;&lt;b&gt;Loaded&lt;/b&gt;&quot; (pressed Enter on a link)');
+  });
+});

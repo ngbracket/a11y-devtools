@@ -28,6 +28,19 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   `'main, [role="main"], h1'`). It only labels the route-change list.
 - `createFocusLossProbe` and `describeNavigation` are exported for use
   outside the provider.
+- Report mode has a new `--navigation` flag (`navigation: true` in
+  `scanPages`). After the scan it loads the first route, then moves to each
+  next route inside the app in the order given: it focuses a link to the
+  route and presses Enter, or changes the URL with `history.pushState` when
+  the page has no such link. Each route's report gets a "Route change"
+  section, and focus left on the page body is reported as
+  `ngbr/focus-lost-on-navigation`. With `--color-scheme both` it runs once.
+  A link that loads a new page is skipped with a warning, because that isn't
+  a route change inside the app.
+- The ACR worksheet counts `ngbr/focus-lost-on-navigation` as a check for
+  2.4.3 Focus Order when the run used `--navigation`.
+  `ngbr/focus-lost-on-rerender` counts only when a report has its findings,
+  because only the in-app overlay sees a re-render.
 
 ## 0.19.0
 
