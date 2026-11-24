@@ -138,14 +138,24 @@ export class FocusLostPageComponent {
 @Component({
   selector: 'app-nav-start-page',
   imports: [RouterLink],
-  template: `<h1>Start</h1><a routerLink="/nav-plain" class="to-plain">Go to the plain page</a>`,
+  // The hidden copy comes first, as in a collapsed mobile menu: the run must skip it.
+  template: `
+    <h1>Start</h1>
+    <a routerLink="/nav-plain" class="hidden-copy" hidden>Plain</a>
+    <a routerLink="/nav-plain" class="to-plain">Go to the plain page</a>
+  `,
 })
 export class NavStartPageComponent {}
 
 @Component({
   selector: 'app-nav-plain-page',
   imports: [RouterLink],
-  template: `<h1>Plain</h1><a routerLink="/nav-managed" class="to-managed">Go to the managed page</a>`,
+  // A plain href (no routerLink) loads a new page: not a route change inside the app.
+  template: `
+    <h1>Plain</h1>
+    <a routerLink="/nav-managed" class="to-managed">Go to the managed page</a>
+    <a href="/settings" class="full-load">Settings (full page load)</a>
+  `,
 })
 export class NavPlainPageComponent {}
 

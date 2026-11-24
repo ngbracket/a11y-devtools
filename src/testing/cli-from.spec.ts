@@ -113,6 +113,12 @@ describe.skipIf(!built)('CLI: --from re-renders a saved report', () => {
     expect(stderr).toContain("--navigation can't be used with it");
   });
 
+  it('refuses --navigation with fewer than 2 routes', async () => {
+    const { code, stderr } = await runCli(['--base', 'http://localhost:1', '--route', '/', '--navigation']);
+    expect(code).toBe(2);
+    expect(stderr).toContain('give 2 or more --route');
+  });
+
   it('names only --serve, not a defaulted --base, when --serve is used with it', async () => {
     const { code, stderr } = await runCli(['--from', saved, '--serve', 'npx ng serve']);
     expect(code).toBe(2);

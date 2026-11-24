@@ -294,4 +294,27 @@ describe.skipIf(!ready)('attribution in a real Angular app (E2E)', () => {
       expect(page('/nav-start').navigation).toBeUndefined();
     });
   });
+
+  it('--navigation: a repeated route gets its own record, and the first route none', async () => {
+    const report = await scanPages({
+      baseUrl: dev,
+      routes: ['/nav-start', '/nav-plain', '/nav-start'],
+      waitMs: 300,
+      navigation: true,
+    });
+    expect(report.pages[0].navigation).toBeUndefined();
+    expect(report.pages[1].navigation).toMatchObject({ from: '/nav-start', to: '/nav-plain', via: 'link' });
+    expect(report.pages[2].navigation).toMatchObject({ from: '/nav-plain', to: '/nav-start', via: 'history' });
+  }, 90_000);
+
+  it('--navigation: skips a link that loads a new page, and does not claim the check ran', async () => {
+    const report = await scanPages({
+      baseUrl: dev,
+      routes: ['/nav-plain', '/settings'],
+      waitMs: 300,
+      navigation: true,
+    });
+    expect(report.pages[1].navigation).toBeUndefined();
+    expect(report.checks?.navigation).toBeUndefined();
+  }, 90_000);
 });

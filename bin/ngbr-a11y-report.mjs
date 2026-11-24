@@ -171,6 +171,11 @@ if (!opts.out && (formats.has('acr') || formats.has('acr-md'))) {
   process.exit(2);
 }
 
+if (opts.navigation && opts.routes.length < 2) {
+  process.stderr.write('--navigation moves from one route to the next: give 2 or more --route\n');
+  process.exit(2);
+}
+
 if (opts.colorScheme && !['light', 'dark', 'both'].includes(opts.colorScheme)) {
   process.stderr.write(`Invalid --color-scheme "${opts.colorScheme}" (use light, dark or both)\n`);
   process.exit(2);
