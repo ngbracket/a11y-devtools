@@ -130,7 +130,10 @@ export function createFocusLossProbe(
   const prefixes = options.frameworkPrefixes ?? DEFAULT_FRAMEWORK_PREFIXES;
   const graceMs = options.graceMs ?? 150;
   const focusTarget = options.focusTarget ?? DEFAULT_FOCUS_TARGET;
-  const route = options.route ?? (() => location.pathname + location.search);
+  // Hash routing (`#/orders`) counts; an in-page anchor (`#section`) doesn't.
+  const route =
+    options.route ??
+    (() => location.pathname + location.search + (location.hash.startsWith('#/') ? location.hash : ''));
 
   const records: NavigationRecord[] = [];
   const findings: A11yFinding[] = [];
@@ -138,13 +141,13 @@ export function createFocusLossProbe(
   const pending = new Map<Promise<void>, { timer: ReturnType<typeof setTimeout>; done: () => void }>();
 
   let focused: FocusSnapshot | undefined;
-  /** The last element focused on each route, for "where was focus before the change". */
+  /** The element focused on each route, while it has focus, for "where was focus before the change". */
   const focusByRoute = new Map<string, FocusSnapshot>();
   let lastRoute = route();
   let lastTitle = doc.title;
   let navigating = false;
-  /** Live region text, with the route it was announced on. */
-  const announced: { text: string; route: string }[] = [];
+  /** Live region text since the last route change was recorded. */
+  const announced: string[] = [];
 
   const ours = (el: Element): boolean => el.closest(`[${OVERLAY_ATTR}]`) !== null;
   const onBody = (el: Element | null): boolean =>
@@ -181,9 +184,10 @@ export function createFocusLossProbe(
     pending.set(promise, { timer, done });
   }
 
-  function report(snap: FocusSnapshot, id: string, help: string, page: string): void {
+  function report(snap: FocusSnapshot, id: string, help: string, page: string, box: boolean): void {
     // Draw the box on the nearest ancestor still in the page: the element is gone.
-    const anchor = snap.ancestors.find((el) => el.isConnected);
+    // Not after a route change: the whole view went, so that box would be most of the page.
+    const anchor = box ? snap.ancestors.find((el) => el.isConnected) : undefined;
     const finding: A11yFinding = {
       id,
       impact: 'moderate',
@@ -202,10 +206,25 @@ export function createFocusLossProbe(
   }
 
   const onFocusIn = (event: FocusEvent): void => {
-    const el = event.target;
+    // The element itself, not its shadow host.
+    const el = event.composedPath()[0] ?? event.target;
     if (!(el instanceof Element) || onBody(el) || ours(el)) return;
     focused = snapshot(el);
     focusByRoute.set(focused.route, focused);
+  };
+
+  // Focus moved to the page body while the element stays (a click on the
+  // background): it no longer has focus, so removing it later loses nothing.
+  // Checked a moment later, because a browser may blur an element as it's removed.
+  const onFocusOut = (event: FocusEvent): void => {
+    if (event.relatedTarget) return; // focus moved to another element: focusin handles it
+    const snap = focused;
+    if (!snap) return;
+    queueMicrotask(() => {
+      if (focused !== snap || !snap.element.isConnected || !onBody(deepActiveElement(doc))) return;
+      focused = undefined;
+      if (focusByRoute.get(snap.route) === snap) focusByRoute.delete(snap.route);
+    });
   };
 
   function checkRemoval(): void {
@@ -224,6 +243,7 @@ export function createFocusLossProbe(
           `Tab starts from the top. Move focus to a sensible place before removing it ` +
           `(the next item, the list, or a heading). Heuristic — verify manually.`,
         snap.route,
+        true,
       );
     });
   }
@@ -241,7 +261,7 @@ export function createFocusLossProbe(
     }
     for (const region of regions) {
       const text = region.textContent?.replace(/\s+/g, ' ').trim();
-      if (text && announced.at(-1)?.text !== text) announced.push({ text, route: route() });
+      if (text) announced.push(text.length > 200 ? `${text.slice(0, 199)}…` : text);
     }
     if (announced.length > 50) announced.splice(0, announced.length - 50);
   }
@@ -252,6 +272,7 @@ export function createFocusLossProbe(
   });
   observer.observe(doc.documentElement, { childList: true, subtree: true, characterData: true });
   doc.addEventListener('focusin', onFocusIn, true);
+  doc.addEventListener('focusout', onFocusOut, true);
 
   // Whatever has focus when the probe starts counts as focused.
   const initial = deepActiveElement(doc);
@@ -275,7 +296,7 @@ export function createFocusLossProbe(
       const to = route();
       lastRoute = to;
       lastTitle = doc.title;
-      focusByRoute.delete(from);
+      for (const key of [...focusByRoute.keys()]) if (key !== to) focusByRoute.delete(key);
       if (to === from) return; // went there and back
       const active = deepActiveElement(doc);
       const lost = onBody(active);
@@ -295,13 +316,16 @@ export function createFocusLossProbe(
         titleBefore,
         titleAfter: doc.title,
         titleChanged: doc.title !== titleBefore,
-        // Everything announced on the new route since the last change was checked.
-        announcements: announced.filter((a) => a.route === to).map((a) => a.text),
+        // Everything announced since the last change was recorded. An announcer
+        // may speak just before the URL updates, so the route isn't checked.
+        announcements: [...announced],
       };
       announced.length = 0;
       records.push(record);
       options.onNavigation?.(record);
-      if (lost && before) {
+      // Only when the element that had focus went away with the old view: one
+      // that is still in the page (a header link) didn't lose focus by leaving.
+      if (lost && before && !before.element.isConnected) {
         report(
           before,
           'ngbr/focus-lost-on-navigation',
@@ -311,6 +335,7 @@ export function createFocusLossProbe(
             `nothing. Move focus to the new view's heading or main region after ` +
             `navigation. Heuristic — verify manually.`,
           to,
+          false,
         );
       }
     });
@@ -326,6 +351,7 @@ export function createFocusLossProbe(
     stop() {
       observer.disconnect();
       doc.removeEventListener('focusin', onFocusIn, true);
+      doc.removeEventListener('focusout', onFocusOut, true);
       for (const { timer, done } of pending.values()) {
         clearTimeout(timer);
         done();

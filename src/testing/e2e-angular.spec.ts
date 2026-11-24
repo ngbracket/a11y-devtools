@@ -226,6 +226,7 @@ describe.skipIf(!ready)('attribution in a real Angular app (E2E)', () => {
       await browser.close();
     }
   }, 60_000);
+
   it('the in-app overlay reports focus lost when a re-render removes the focused button', async () => {
     const { chromium } = await import('playwright');
     const browser = await chromium.launch();

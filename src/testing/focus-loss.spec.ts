@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createFocusLossProbe,
   describeNavigation,
@@ -85,6 +85,63 @@ describe('createFocusLossProbe', () => {
     expect(found).toEqual([]);
   });
 
+  it('does not report an element that lost focus to the page body before it was removed', async () => {
+    document.body.innerHTML = '<button id="remove">Remove</button>';
+    const p = start();
+    const button = document.getElementById('remove')!;
+    button.focus();
+    button.blur(); // a click on the page background
+    await flush();
+    button.remove();
+    await flush();
+    await p.settled();
+    expect(found).toEqual([]);
+  });
+
+  it('does not blame a route change on an element that lost focus earlier', async () => {
+    document.body.innerHTML = '<div id="view"><input id="search"></div>';
+    const p = start();
+    const input = document.getElementById('search')!;
+    input.focus();
+    input.blur(); // then a click on a card that navigates
+    await flush();
+    route = '/b';
+    document.getElementById('view')!.remove();
+    await flush();
+    p.notifyStable();
+    await p.settled();
+    expect(found).toEqual([]);
+    expect(navs[0]).toMatchObject({ focus: 'body', focusBefore: null });
+  });
+
+  it('does not blame a route change on a focused element that is still in the page', async () => {
+    document.body.innerHTML = '<header><a href="/b" id="persist">Next</a></header>';
+    const p = start();
+    const link = document.getElementById('persist')!;
+    link.focus();
+    route = '/b';
+    // jsdom can't move focus to the body without a blur, so leave the snapshot in place.
+    vi.spyOn(document, 'activeElement', 'get').mockReturnValue(document.body);
+    p.notifyStable();
+    await p.settled();
+    vi.restoreAllMocks();
+    expect(found).toEqual([]);
+    expect(navs[0]).toMatchObject({ focus: 'body', focusBefore: 'a#persist' });
+  });
+
+  it('includes hash routes, but not in-page anchors', async () => {
+    probe = createFocusLossProbe(document, { graceMs: 5, onNavigation: (r) => navs.push(r) });
+    history.pushState(null, '', '#section');
+    probe.notifyStable();
+    await probe.settled();
+    expect(navs).toEqual([]);
+    history.pushState(null, '', '#/orders');
+    probe.notifyStable();
+    await probe.settled();
+    expect(navs[0]?.to).toMatch(/#\/orders$/);
+    history.pushState(null, '', '/');
+  });
+
   it('ignores removals of elements that did not have focus', async () => {
     document.body.innerHTML = '<button id="keep">Keep</button><p id="gone">Gone</p>';
     const p = start();
@@ -135,6 +192,7 @@ describe('createFocusLossProbe', () => {
   it('records focus moved to the new heading, a new title and an announcement, with no finding', async () => {
     document.body.innerHTML =
       '<div role="status" id="status"></div><a href="/b">Next</a><main id="view"></main>';
+    // (The announcement is made before the app settles, as a router announcer would.)
     const p = start();
     document.querySelector('a')!.focus();
     route = '/b';

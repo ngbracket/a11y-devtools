@@ -216,9 +216,11 @@ export function createPillMenu(doc: Document, options: PillMenuOptions): PillMen
 
   // The latest route changes: where focus went, the title, what was announced.
   const routesHeading = doc.createElement('p');
+  routesHeading.id = `${id}-routes`;
   routesHeading.textContent = 'Route changes';
   Object.assign(routesHeading.style, { margin: '10px 0 4px', fontWeight: '700' });
   const routesList = doc.createElement('ul');
+  routesList.setAttribute('aria-labelledby', routesHeading.id);
   Object.assign(routesList.style, { margin: '0', padding: '0 0 0 16px', fontSize: '12px', color: muted });
   const routes = doc.createElement('div');
   routes.hidden = true;
