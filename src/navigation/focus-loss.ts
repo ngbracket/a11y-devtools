@@ -112,6 +112,8 @@ interface FocusSnapshot {
   directives: string[];
   target: string;
   html: string;
+  /** Already reported as lost to a re-render, so a route change doesn't report it again. */
+  reported?: boolean;
 }
 
 function safeClosest(el: Element, selector: string): Element | null {
@@ -146,8 +148,13 @@ export function createFocusLossProbe(
   let lastRoute = route();
   let lastTitle = doc.title;
   let navigating = false;
-  /** Live region text since the last route change was recorded. */
-  const announced: string[] = [];
+  /** Live region text, with when it was announced. */
+  const announced: { text: string; time: number }[] = [];
+  /**
+   * How long before the app settles an announcement still counts as part of
+   * the route change: a router announcer may speak just before the URL updates.
+   */
+  const ANNOUNCE_WINDOW_MS = 2000;
 
   const ours = (el: Element): boolean => el.closest(`[${OVERLAY_ATTR}]`) !== null;
   const onBody = (el: Element | null): boolean =>
@@ -235,6 +242,7 @@ export function createFocusLossProbe(
       // A route change took the element away: the navigation check reports that.
       if (route() !== snap.route || navigating) return;
       if (!onBody(deepActiveElement(doc))) return; // focus was put somewhere: fine
+      snap.reported = true;
       report(
         snap,
         'ngbr/focus-lost-on-rerender',
@@ -261,7 +269,7 @@ export function createFocusLossProbe(
     }
     for (const region of regions) {
       const text = region.textContent?.replace(/\s+/g, ' ').trim();
-      if (text) announced.push(text.length > 200 ? `${text.slice(0, 199)}…` : text);
+      if (text) announced.push({ text: text.length > 200 ? `${text.slice(0, 199)}…` : text, time: Date.now() });
     }
     if (announced.length > 50) announced.splice(0, announced.length - 50);
   }
@@ -291,6 +299,7 @@ export function createFocusLossProbe(
     const from = lastRoute;
     const titleBefore = lastTitle;
     const before = focusByRoute.get(from);
+    const since = Date.now() - ANNOUNCE_WINDOW_MS;
     later(() => {
       navigating = false;
       const to = route();
@@ -316,16 +325,16 @@ export function createFocusLossProbe(
         titleBefore,
         titleAfter: doc.title,
         titleChanged: doc.title !== titleBefore,
-        // Everything announced since the last change was recorded. An announcer
-        // may speak just before the URL updates, so the route isn't checked.
-        announcements: [...announced],
+        // What was announced from just before the app settled. An announcer may
+        // speak just before the URL updates, so the route isn't checked.
+        announcements: announced.filter((a) => a.time >= since).map((a) => a.text),
       };
       announced.length = 0;
       records.push(record);
       options.onNavigation?.(record);
       // Only when the element that had focus went away with the old view: one
       // that is still in the page (a header link) didn't lose focus by leaving.
-      if (lost && before && !before.element.isConnected) {
+      if (lost && before && !before.element.isConnected && !before.reported) {
         report(
           before,
           'ngbr/focus-lost-on-navigation',

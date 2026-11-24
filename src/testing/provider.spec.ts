@@ -438,7 +438,7 @@ describe('provideA11yDevtools', () => {
       expect(warned(logger, 'ngbr/focus-lost-on-rerender')).toBe(true);
     });
 
-    it('lists route changes in the pill menu and reports a lost focus once', async () => {
+    it('lists route changes in the pill menu and reports a lost focus once per change', async () => {
       const logger = makeLogger();
       TestBed.configureTestingModule({
         providers: [
@@ -449,7 +449,7 @@ describe('provideA11yDevtools', () => {
       const fixture = TestBed.createComponent(AppComponent);
       host.appendChild(fixture.nativeElement);
       await fixture.whenStable();
-      const start = location.pathname;
+      const start = location.pathname + location.search;
       try {
         for (const next of ['/route-a', '/route-b']) {
           const view = document.createElement('nav');

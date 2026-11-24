@@ -122,24 +122,76 @@ describe('createFocusLossProbe', () => {
     route = '/b';
     // jsdom can't move focus to the body without a blur, so leave the snapshot in place.
     vi.spyOn(document, 'activeElement', 'get').mockReturnValue(document.body);
-    p.notifyStable();
-    await p.settled();
-    vi.restoreAllMocks();
+    try {
+      p.notifyStable();
+      await p.settled();
+    } finally {
+      vi.restoreAllMocks();
+    }
     expect(found).toEqual([]);
     expect(navs[0]).toMatchObject({ focus: 'body', focusBefore: 'a#persist' });
   });
 
   it('includes hash routes, but not in-page anchors', async () => {
+    const start = location.href;
     probe = createFocusLossProbe(document, { graceMs: 5, onNavigation: (r) => navs.push(r) });
-    history.pushState(null, '', '#section');
-    probe.notifyStable();
-    await probe.settled();
-    expect(navs).toEqual([]);
-    history.pushState(null, '', '#/orders');
-    probe.notifyStable();
-    await probe.settled();
-    expect(navs[0]?.to).toMatch(/#\/orders$/);
-    history.pushState(null, '', '/');
+    try {
+      history.pushState(null, '', '#section');
+      probe.notifyStable();
+      await probe.settled();
+      expect(navs).toEqual([]);
+      history.pushState(null, '', '#/orders');
+      probe.notifyStable();
+      await probe.settled();
+      expect(navs[0]?.to).toMatch(/#\/orders$/);
+    } finally {
+      history.pushState(null, '', start);
+    }
+  });
+
+  it('still reports an element the browser blurs as it removes it', async () => {
+    document.body.innerHTML = '<ul id="list"><li><button>Remove</button></li></ul>';
+    const button = document.querySelector('button')!;
+    const p = start();
+    button.focus();
+    // Some browsers blur the element during removal, while it's still connected.
+    button.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }));
+    button.closest('li')!.remove();
+    await flush();
+    await p.settled();
+    expect(found.map((f) => f.finding.id)).toEqual(['ngbr/focus-lost-on-rerender']);
+  });
+
+  it('reports an element once, even when a route change follows its removal', async () => {
+    document.body.innerHTML = '<div id="view"><button>Remove</button></div>';
+    const p = start();
+    document.querySelector('button')!.focus();
+    document.querySelector('button')!.remove();
+    await flush();
+    await p.settled(); // reported as a re-render
+    route = '/b';
+    document.getElementById('view')!.remove();
+    p.notifyStable();
+    await p.settled();
+    expect(found.map((f) => f.finding.id)).toEqual(['ngbr/focus-lost-on-rerender']);
+  });
+
+  it('leaves out announcements made long before the route change', async () => {
+    document.body.innerHTML = '<div role="status" id="status"></div>';
+    const now = vi.spyOn(Date, 'now');
+    const p = start();
+    try {
+      now.mockReturnValue(1_000);
+      document.getElementById('status')!.textContent = 'Saved';
+      await flush();
+      now.mockReturnValue(600_000);
+      route = '/b';
+      p.notifyStable();
+      await p.settled();
+    } finally {
+      now.mockRestore();
+    }
+    expect(navs[0]?.announcements).toEqual([]);
   });
 
   it('ignores removals of elements that did not have focus', async () => {
