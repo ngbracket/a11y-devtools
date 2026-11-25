@@ -129,8 +129,8 @@ export function listenerNote(checks: ScanChecks | undefined): string | undefined
   if (!checks?.keyboard) return undefined;
   if (checks.listeners === 'browser') {
     return (
-      'Keyboard checks read event listeners from the browser, not from Angular’s debug API ' +
-      '(a production build), so they see listeners from any script, not only Angular’s.'
+      'Keyboard checks read event listeners from the browser, as Angular’s debug API wasn’t there ' +
+      '(usually a production build). They see listeners from any script, including library code.'
     );
   }
   if (checks.listeners === 'none') {

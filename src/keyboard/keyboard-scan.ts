@@ -155,6 +155,8 @@ function listenersVisible(): boolean {
  */
 function looksClickable(element: Element): boolean {
   if (!element.textContent?.trim()) return false;
+  // A label's click focuses or toggles its control, which Tab reaches.
+  if (element.closest('label')) return false;
   const view = element.ownerDocument?.defaultView;
   if (!view) return false;
   const cursor = (el: Element) => view.getComputedStyle(el).cursor;
@@ -359,7 +361,9 @@ function hitAreaForToggleInput(element: Element): boolean {
  * listeners from the browser, sees it.
  */
 function isBackdrop(element: Element): boolean {
-  return [...element.classList].some((c) => /backdrop|overlay-mask|dialog-mask/i.test(c));
+  // Whole class names ending in "backdrop" (cdk-overlay-backdrop, mat-drawer-backdrop),
+  // so Tailwind's backdrop-blur-sm and the like don't match.
+  return [...element.classList].some((c) => /(^|-)backdrop$|^p-(overlay|dialog)-mask$/i.test(c));
 }
 
 /**

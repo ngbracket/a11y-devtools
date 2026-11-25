@@ -637,9 +637,28 @@ describe('scanKeyboard', () => {
     });
 
     it('skips a modal backdrop, whose click Escape replaces', () => {
-      const host = fixture(`<div id="bd" class="cdk-overlay-backdrop cdk-overlay-backdrop-showing"></div>`);
-      withRecorder(new Map([[host.querySelector('#bd')!, ['click']]]), () => {
-        expect(scanKeyboard(host)).toEqual([]);
+      const host = fixture(`
+        <div id="bd" class="cdk-overlay-backdrop cdk-overlay-backdrop-showing">Backdrop</div>
+        <div id="blur" class="backdrop-blur-sm">Glass card</div>`);
+      const at = (id: string) => host.querySelector(`#${id}`)!;
+      withRecorder(
+        new Map([
+          [at('bd'), ['click']],
+          [at('blur'), ['click']],
+        ]),
+        () => {
+          // Tailwind's backdrop-* utilities aren't backdrops.
+          expect(scanKeyboard(host).map((f) => f.target)).toEqual(['div#blur']);
+        },
+      );
+    });
+
+    it('reads Angular’s listeners, not the recorder’s, when the debug API is there', () => {
+      const host = fixture(`<div id="lib">Library listener</div>`);
+      withRecorder(new Map([[host.querySelector('#lib')!, ['click']]]), () => {
+        withNg(new Map(), new Map(), () => {
+          expect(scanKeyboard(host)).toEqual([]);
+        });
       });
     });
 
@@ -661,6 +680,13 @@ describe('scanKeyboard', () => {
         const host = fixture(`
           <div id="card" style="cursor: pointer"><span>Medway Park</span><b style="cursor: pointer">Book</b></div>`);
         expect(scanKeyboard(host).map((f) => f.target)).toEqual(['div#card']);
+      });
+
+      it("doesn't guess on a label or inside one: its click goes to a control Tab reaches", () => {
+        const host = fixture(`
+          <label for="name" style="cursor: pointer">Name</label><input id="name">
+          <label style="cursor: pointer"><span style="cursor: pointer">Agree</span><input type="checkbox"></label>`);
+        expect(scanKeyboard(host)).toEqual([]);
       });
 
       it("doesn't guess inside something Tab reaches, or on something Tab reaches", () => {

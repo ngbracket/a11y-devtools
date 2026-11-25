@@ -12,9 +12,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   doesn't have, so a clickable `div` with no role or tabindex wasn't reported.
   Report mode now adds a script before the page loads that records each
   element's `addEventListener` calls, and the checks read listeners from it
-  when Angular's API is missing. A production build gets the same
+  when Angular's API is missing. A production build now gets the
   `ngbr/unreachable-control`, `ngbr/click-without-key`, arrow-key, drag and
-  hover checks as a dev build, without component names.
+  hover checks, without component names. The listeners come from any script,
+  including library code that Angular's API doesn't list, so a production
+  scan can report a little more than a dev build. Our five example apps and
+  five Angular Material docs pages gave no extra findings from library code.
+  An app that hydrates with event replay listens for events on a container
+  element, so its handlers may still be missed.
 
 ### Added
 
@@ -23,13 +28,21 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   `none`. For `browser` and `none`, the Markdown, HTML and ACR reports and the
   CLI add a note. For `none` it lists the checks that were skipped.
 - With no listener source at all (for example `scan()` called on a production
-  build outside report mode), an element with text and its own
-  `cursor: pointer` that Tab can't reach is reported as a moderate
-  `ngbr/unreachable-control`, labelled "verify manually".
+  build outside report mode, or in jsdom without Angular), an element with
+  text and its own `cursor: pointer` that Tab can't reach is reported as a
+  moderate `ngbr/unreachable-control`, labelled "verify manually". Labels are
+  skipped: their click goes to a control Tab reaches.
+
+### Changed (all builds)
+
 - An `onclick`, `onkeydown`, `onkeyup` or `onkeypress` handler property now
-  counts as a listener in every build.
-- Modal backdrops (`cdk-overlay-backdrop`, `modal-backdrop`, `p-overlay-mask`)
+  counts as a listener.
+- Modal backdrops (a class ending in `backdrop`, such as
+  `cdk-overlay-backdrop` or `modal-backdrop`, and PrimeNG's `p-overlay-mask`)
   are skipped by the unreachable-control check. Escape closes what they cover.
+- An element reported because it has a click listener no longer gets a second
+  finding for a click-only element inside it, so a clickable component host
+  and the card inside it give one finding.
 
 ## 0.20.0
 
