@@ -3,6 +3,34 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.21.0
+
+### Fixed
+
+- `--keyboard` on a production build missed click handlers. The keyboard
+  checks read listeners through Angular's debug API, which a production build
+  doesn't have, so a clickable `div` with no role or tabindex wasn't reported.
+  Report mode now adds a script before the page loads that records each
+  element's `addEventListener` calls, and the checks read listeners from it
+  when Angular's API is missing. A production build gets the same
+  `ngbr/unreachable-control`, `ngbr/click-without-key`, arrow-key, drag and
+  hover checks as a dev build, without component names.
+
+### Added
+
+- `checks.listeners` in the JSON report says where the keyboard checks read
+  listeners from: `angular` (a dev build), `browser` (a production build) or
+  `none`. For `browser` and `none`, the Markdown, HTML and ACR reports and the
+  CLI add a note. For `none` it lists the checks that were skipped.
+- With no listener source at all (for example `scan()` called on a production
+  build outside report mode), an element with text and its own
+  `cursor: pointer` that Tab can't reach is reported as a moderate
+  `ngbr/unreachable-control`, labelled "verify manually".
+- An `onclick`, `onkeydown`, `onkeyup` or `onkeypress` handler property now
+  counts as a listener in every build.
+- Modal backdrops (`cdk-overlay-backdrop`, `modal-backdrop`, `p-overlay-mask`)
+  are skipped by the unreachable-control check. Escape closes what they cover.
+
 ## 0.20.0
 
 ### Added

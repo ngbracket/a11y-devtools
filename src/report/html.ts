@@ -11,6 +11,7 @@ import {
   bySeverity,
   distinctRuleCount,
   groupByComponent,
+  listenerNote,
   viaNames,
   walkthroughCapNote,
   WALKTHROUGH_NOTE,
@@ -127,6 +128,8 @@ export function toHtml(report: ScanReport, diff?: BaselineDiff): string {
   out.push(
     `<p class="scope">${escapeHtml(REPORT_SCOPE_NOTE)} <a href="${COVERAGE_URL}">What automated checks cover</a>.</p>`,
   );
+  const listeners = listenerNote(report.checks);
+  if (listeners) out.push(`<p class="scope">${escapeHtml(listeners)}</p>`);
 
   // Summary — distinct rules next to raw node-instances, so the bigger number
   // can't be read on its own as "how bad is it".

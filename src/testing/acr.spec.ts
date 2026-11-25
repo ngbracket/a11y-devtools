@@ -226,6 +226,12 @@ describe('toAcrMarkdown / toAcrHtml', () => {
     expect(md).toContain('- region (moderate)');
   });
 
+  it('says in the scan details when a production build read listeners from the browser', () => {
+    const prod = report(run.pages, { checks: { ...checks, keyboard: true, listeners: 'browser' } });
+    expect(toAcrMarkdown(prod, RULES)).toContain('| Event listeners | Keyboard checks read event listeners from the browser');
+    expect(toAcrMarkdown(run, RULES)).not.toContain('Event listeners');
+  });
+
   it('renders an accessible HTML table with one row per criterion', () => {
     const doc = new DOMParser().parseFromString(toAcrHtml(run, RULES), 'text/html');
     expect(doc.documentElement.lang).toBe('en');

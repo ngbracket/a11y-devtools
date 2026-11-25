@@ -184,6 +184,33 @@ const PAGES: Record<string, string> = {
     <button data-ngb-a11y-overlay role="switch" aria-checked="true" style="position: fixed; left: 8px; bottom: 8px">a11y</button>
     <script>document.getElementById('overlay').showPopover();</script>`,
 
+  // A production build's click handlers, with no window.ng: the clickable location
+  // divs from a client scan (no role, no tabindex), added by script after load
+  // the way a framework binds them. Report mode records listeners before the
+  // page's scripts run, so they're still found.
+  '/prod-clicks': `
+    <main>
+      <h1>Book a class</h1>
+      <div class="location">Medway Park</div>
+      <div class="location">Strood Sports Centre</div>
+      <span class="no-key" tabindex="0">Focusable, click only</span>
+      <span class="keys" tabindex="0">Focusable, keys too</span>
+      <div class="removed">Listener removed again</div>
+      <div class="cdk-overlay-backdrop"></div>
+    </main>
+    <script>
+      const noop = () => {};
+      setTimeout(() => {
+        for (const el of document.querySelectorAll('.location, .no-key, .keys, .cdk-overlay-backdrop')) {
+          el.addEventListener('click', noop);
+        }
+        document.querySelector('.keys').addEventListener('keydown', noop);
+        const removed = document.querySelector('.removed');
+        removed.addEventListener('click', noop, { capture: true });
+        removed.removeEventListener('click', noop, true);
+      });
+    </script>`,
+
   // Plain axe + layout: a missing alt, and a positive tabindex that jumps up the page.
   '/axe': `
     <main>
@@ -304,6 +331,16 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
   it('reports axe violations and layout-dependent keyboard findings', () => {
     expect(ids('/axe')).toContain('image-alt');
     expect(ids('/axe')).toContain('ngbr/tab-order-mismatch');
+  });
+
+  it('reads a production build\'s click listeners from the browser (no window.ng)', () => {
+    expect(report.checks?.listeners).toBe('browser');
+    const keyboard = page('/prod-clicks').findings.filter((f) => f.id.startsWith('ngbr/'));
+    expect(keyboard.map((f) => [f.id, f.impact, f.html.match(/class="([^"]+)"/)?.[1]])).toEqual([
+      ['ngbr/unreachable-control', 'serious', 'location'],
+      ['ngbr/unreachable-control', 'serious', 'location'],
+      ['ngbr/click-without-key', 'moderate', 'no-key'],
+    ]);
   });
 
   it('does not count summaries inside a closed <details> as tab stops (nested sidebar)', () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   distinctRuleCount,
   groupByComponent,
+  listenerNote,
   parseReport,
   toJson,
   toMarkdown,
@@ -227,5 +228,40 @@ describe('route changes in the report', () => {
     expect(md).toContain(
       '/orders → /orders/42: focus on body, title unchanged, announced "\\<b\\>Loaded\\</b\\>" (pressed Enter on a link)',
     );
+  });
+});
+
+describe('listenerNote', () => {
+  const checks = (listeners?: 'angular' | 'browser' | 'none', keyboard = true) => ({
+    axeVersion: '4.13.0',
+    keyboard,
+    focusTraps: false,
+    ...(listeners && { listeners }),
+  });
+
+  it('says nothing for a dev build, without keyboard checks, or for an older report', () => {
+    expect(listenerNote(checks('angular'))).toBeUndefined();
+    expect(listenerNote(checks('none', false))).toBeUndefined();
+    expect(listenerNote(checks())).toBeUndefined();
+    expect(listenerNote(undefined)).toBeUndefined();
+  });
+
+  it('says a production build read listeners from the browser', () => {
+    expect(listenerNote(checks('browser'))).toContain('read event listeners from the browser');
+  });
+
+  it('lists the checks skipped when no listeners could be read', () => {
+    const note = listenerNote(checks('none'))!;
+    expect(note).toContain('couldn’t read event listeners');
+    expect(note).toContain('pointer cursor');
+    expect(note).toContain('click without Enter or Space');
+  });
+
+  it('puts the note under the scope note in Markdown, and keeps it through JSON', () => {
+    const report: ScanReport = { generatedAt: 'x', checks: checks('none'), pages: [] };
+    const md = toMarkdown(report);
+    expect(md).toContain(`> ${listenerNote(report.checks)}`);
+    expect(md.indexOf('couldn’t read')).toBeGreaterThan(md.indexOf('Automated checks cover only part'));
+    expect(parseReport(toJson(report)).checks?.listeners).toBe('none');
   });
 });

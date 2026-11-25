@@ -1,4 +1,5 @@
 import type { RunOptions as AxeRunOptions } from 'axe-core';
+import { listenerSource, type ListenerSource } from './attribution.js';
 import { createFocusWalkProbe } from './keyboard/focus-walk.js';
 import { createFocusLossProbe, type FocusLossProbe } from './navigation/focus-loss.js';
 import { linearWalkthrough, type Walkthrough } from './keyboard/walkthrough.js';
@@ -21,6 +22,11 @@ export type InPageScan = (
 const run: InPageScan = (options, scanOptions) => scan(document, options, scanOptions);
 
 (globalThis as unknown as { __ngbA11yScan: InPageScan }).__ngbA11yScan = run;
+
+// Where the keyboard layer read event listeners from, so the report can say
+// which checks ran.
+(globalThis as unknown as { __ngbA11yListenerSource: () => ListenerSource }).__ngbA11yListenerSource =
+  listenerSource;
 
 // The in-page half of the focus-trap walk: the driver creates a probe, presses
 // real Tab keys, and asks the probe what has focus after each one.

@@ -76,6 +76,10 @@ npx ngbr-a11y-report --serve "npx ng serve" --route / --route /settings \
   --keyboard --baseline a11y-baseline.json --fail-on serious --out a11y --format all
 ```
 
+Scanning a production build? Components can't be named without Angular's debug API,
+but `--keyboard` still finds click handlers Tab can't reach: report mode reads the event
+listeners from the browser, and the report says so.
+
 Preparing a VPAT/ACR? `--format acr` adds an evaluation worksheet: the results by WCAG 2.2
 A/AA criterion, with the conformance columns left for a person to fill in. Already scanned?
 `--from a11y.json --out a11y --format acr` writes it from the saved JSON report.

@@ -45,6 +45,8 @@ export class FancyDirective {}
     <input class="fancy" appFancy />
     <div class="fake-button" role="button" (click)="noop()">Unreachable</div>
     <span class="focusable-no-key" tabindex="0" (click)="noop()">No key handler</span>
+    <!-- A clickable div with no role: only its click listener says it's a control. -->
+    <div class="click-only-div" (click)="noop()">Book</div>
     <!-- Key handling through event modifiers: (keydown.enter) is still keydown. -->
     <span class="key-modifiers" tabindex="0" (click)="noop()" (keydown.enter)="noop()" (keydown.space)="noop()">Keys</span>
     <div role="tablist" aria-label="Roving" (keydown.arrowRight)="noop()" (keydown.arrowLeft)="noop()">

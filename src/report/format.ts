@@ -3,6 +3,7 @@ import type { BaselineDiff } from './baseline.js';
 import { findingCriteria, referenceUrl } from './wcag.js';
 import type { Walkthrough, WalkthroughStep } from '../keyboard/walkthrough.js';
 import { describeNavigation, type NavigationRecord } from '../navigation/record.js';
+import type { ListenerSource } from '../attribution.js';
 
 /**
  * Pure formatting for report-mode: grouping + Markdown/JSON serialization. Kept
@@ -110,6 +111,37 @@ export interface ScanChecks {
   walkthrough?: boolean;
   /** The run moved between the routes inside the app and checked focus each time. */
   navigation?: boolean;
+  /**
+   * Where the keyboard checks read event listeners from (the weakest across the
+   * pages): Angular's debug API in a dev build, the browser in a production
+   * build, or nowhere, which skips the listener-based checks. Absent when the
+   * keyboard checks didn't run, and in reports from before 0.21.0.
+   */
+  listeners?: ListenerSource;
+}
+
+/**
+ * What the report says about where keyboard checks read listeners from, or
+ * undefined when there's nothing to say (a dev build, or no keyboard checks).
+ * Shared by the Markdown, HTML and ACR reports and the CLI.
+ */
+export function listenerNote(checks: ScanChecks | undefined): string | undefined {
+  if (!checks?.keyboard) return undefined;
+  if (checks.listeners === 'browser') {
+    return (
+      'Keyboard checks read event listeners from the browser, not from Angular’s debug API ' +
+      '(a production build), so they see listeners from any script, not only Angular’s.'
+    );
+  }
+  if (checks.listeners === 'none') {
+    return (
+      'Keyboard checks couldn’t read event listeners on at least one page. Skipped there: click ' +
+      'handlers on elements that aren’t controls (elements with a pointer cursor are listed as a ' +
+      'guess instead), click without Enter or Space, arrow-key handling in widgets and drag lists, ' +
+      'and hover listeners.'
+    );
+  }
+  return undefined;
 }
 
 /** A whole report-mode run across one or more pages. */
@@ -288,6 +320,11 @@ export function toMarkdown(report: ScanReport, diff?: BaselineDiff): string {
   lines.push('');
   lines.push(`> ${REPORT_SCOPE_NOTE} [What automated checks cover](${COVERAGE_URL}).`);
   lines.push('');
+  const listeners = listenerNote(report.checks);
+  if (listeners) {
+    lines.push(`> ${listeners}`);
+    lines.push('');
+  }
 
   // Summary table — distinct rules alongside raw node-instances, so the headline
   // count can't be read as "how bad is it" on its own.

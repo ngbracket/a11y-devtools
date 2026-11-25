@@ -182,3 +182,13 @@ describe('toHtml route change', () => {
     expect(html).toContain('announced &quot;&lt;b&gt;Loaded&lt;/b&gt;&quot; (pressed Enter on a link)');
   });
 });
+
+describe('toHtml: where keyboard checks read listeners', () => {
+  it('shows the note when listeners came from the browser, and not for a dev build', () => {
+    const checks = { axeVersion: '4.13.0', keyboard: true, focusTraps: false } as const;
+    const prod = toHtml({ ...run, checks: { ...checks, listeners: 'browser' } });
+    expect(prod).toContain('<p class="scope">Keyboard checks read event listeners from the browser');
+    const dev = toHtml({ ...run, checks: { ...checks, listeners: 'angular' } });
+    expect(dev).not.toContain('read event listeners');
+  });
+});

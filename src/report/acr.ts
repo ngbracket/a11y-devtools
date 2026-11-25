@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import type { A11yFinding, Impact } from '../scan.js';
-import { impactRank, type ScanChecks, type ScanReport } from './format.js';
+import { impactRank, listenerNote, type ScanChecks, type ScanReport } from './format.js';
 import { escapeHtml, safeHref, STYLES } from './html.js';
 import { criterionForTag, NGBR_RULE_CRITERIA, understandingUrl, WCAG22_A_AA, type WcagCriterion } from './wcag.js';
 
@@ -245,6 +245,7 @@ function scanDetails(report: ScanReport, sheet: AcrWorksheet): [string, string][
     ['Tool', `@ngbracket/a11y-devtools report-mode${c ? `, axe-core ${c.axeVersion}` : ''}`],
     ['Ruleset', c?.tags ? `axe tags: ${c.tags.join(', ')}` : 'axe default ruleset'],
     ['Keyboard checks', c ? (c.keyboard ? 'on' : 'off') : 'unknown'],
+    ...(listenerNote(c) ? [['Event listeners', listenerNote(c)!] as [string, string]] : []),
     ['Keyboard-trap walk', c ? (c.focusTraps ? 'on' : 'off') : 'unknown'],
     ['Colour schemes', colorSchemes(report)],
     ['Pages scanned', sheet.pagesScanned.length ? sheet.pagesScanned.join(', ') : 'none'],

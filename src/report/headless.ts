@@ -7,7 +7,9 @@ import type { Browser, Page } from 'playwright';
 import { detectTabTrap, type FocusObservation } from '../keyboard/focus-walk.js';
 import { OVERLAY_EXCLUDE_SELECTOR } from '../overlay.js';
 import type { A11yFinding } from '../scan.js';
+import type { ListenerSource } from '../attribution.js';
 import { findingsNotIn } from './baseline.js';
+import { LISTENER_RECORDER_SCRIPT } from './listener-recorder.js';
 import type { Walkthrough } from '../keyboard/walkthrough.js';
 import type { NavigationRecord } from '../navigation/record.js';
 import type { PageReport, ScanChecks, ScanReport } from './format.js';
@@ -361,6 +363,8 @@ interface PassConfig {
   beforeScan: ScanPagesOptions['beforeScan'];
   darkClass: string | undefined;
   darkAttribute: ScanPagesOptions['darkAttribute'];
+  /** Where each scanned page's keyboard checks read listeners from; filled in by the passes. */
+  listenerSources: Set<ListenerSource>;
 }
 
 /** Settle time after switching a class/attribute theme, so colour transitions finish before axe reads them. */
@@ -393,6 +397,9 @@ async function scanPass(
     colorScheme,
     bypassCSP: true,
   });
+  // Before the app's own scripts, so a production build's click and key
+  // listeners can be seen without Angular's debug API.
+  if (config.keyboard) await context.addInitScript({ content: LISTENER_RECORDER_SCRIPT });
   const pages: PageReport[] = [];
   try {
     const page = await context.newPage();
@@ -432,6 +439,13 @@ async function scanPass(
           };
           return w.__ngbA11yScan(args.axe, args.scan);
         }, { axe: axeOptions, scan: { frameworkPrefixes, keyboard: config.keyboard } })) as A11yFinding[];
+        if (config.keyboard) {
+          config.listenerSources.add(
+            await page.evaluate(() =>
+              (window as unknown as { __ngbA11yListenerSource: () => ListenerSource }).__ngbA11yListenerSource(),
+            ),
+          );
+        }
         // Before the trap walk: pressing Tab can change the page.
         let walkthrough: Walkthrough | undefined;
         if (config.walkthrough) {
@@ -514,6 +528,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     beforeScan,
     darkClass,
     darkAttribute,
+    listenerSources: new Set(),
   };
 
   const { chromium } = await loadPlaywright();
@@ -563,8 +578,17 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     ...(walkthrough && { walkthrough }),
     // Only when at least one route change was checked, so the ACR doesn't count a check that didn't happen.
     ...(moves.size > 0 && { navigation: true }),
+    ...(keyboard && config.listenerSources.size > 0 && { listeners: weakestSource(config.listenerSources) }),
   };
   return { generatedAt: new Date().toISOString(), checks, pages };
+}
+
+/**
+ * The run's listener source: the weakest any page had, so the report never
+ * claims checks ran on a page where they couldn't.
+ */
+function weakestSource(sources: ReadonlySet<ListenerSource>): ListenerSource {
+  return sources.has('none') ? 'none' : sources.has('browser') ? 'browser' : 'angular';
 }
 
 /** Version of the installed axe-core — the one a scan run now would use. */

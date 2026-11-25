@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import {
   axeVersion,
   diffAgainstBaseline,
+  listenerNote,
   parseBaseline,
   parseReport,
   scanPages,
@@ -292,6 +293,8 @@ if (allFindings.length > 0 && allFindings.every((f) => f.component === null)) {
     'Note: no component attribution (window.ng absent) — is this a production build? Report mode names components only against a dev build.\n',
   );
 }
+const listeners = listenerNote(report.checks);
+if (listeners) process.stderr.write(`Note: ${listeners}\n`);
 
 if (!opts.out) {
   process.stdout.write(toMarkdown(report, diff) + '\n');

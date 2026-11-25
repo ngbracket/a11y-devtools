@@ -8,6 +8,7 @@ export {
 export {
   groupByComponent,
   distinctRuleCount,
+  listenerNote,
   parseReport,
   toJson,
   toMarkdown,
