@@ -30,10 +30,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   checks fields that already have a value, so a field with none was never
   reported. The purpose comes from `type="email"`, `"tel"` or `"password"`,
   then from whole words in the label, then `name`, `id` or `formcontrolname`,
-  then the placeholder. A label that names something else decides it, and
-  lookup boxes ("Find your address") are skipped. Plain "Address", "Title"
-  and "State" are left out, as they often mean something else. A heuristic,
-  moderate: 1.3.5 only covers fields about the user. It runs in every scan,
+  then the placeholder. A label that names something else, or has more than
+  5 words, decides it. Lookup boxes ("Find your address") and labels such as
+  "Country code", "Email subject" or "Fax" are skipped. Plain "Address",
+  "Title" and "State" are left out, as they often mean something else. A
+  "New password" or "Confirm password" field gets `new-password`. Open
+  shadow roots are checked. A heuristic, moderate: 1.3.5 only covers fields
+  about the user, so a form that asks about someone else can fail a
+  `--fail-on moderate` gate until you turn it off or record a baseline. It runs in every scan,
   with `--no-input-purpose` (`inputPurpose: false`) to turn it off, and
   `checks.inputPurpose` lets the ACR worksheet count it for 1.3.5.
 - `ngbr/missing-id-reference`: an `aria-labelledby` or `aria-describedby`

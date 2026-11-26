@@ -1,3 +1,4 @@
+import { queryDeep } from './aria-refs.js';
 import { appComponentFromPath, DEFAULT_FRAMEWORK_PREFIXES, resolveComponentPath, resolveDirectiveNames } from './attribution.js';
 import { RULE_DOCS, shortHtml, shortSelector, uniqueLocator } from './keyboard/keyboard-scan.js';
 import { isHidden } from './keyboard/tab-sequence.js';
@@ -33,11 +34,21 @@ const PURPOSES: readonly { purpose: string; what: string; words: RegExp }[] = [
 ];
 
 /** Purposes found from the input type alone. */
-const BY_TYPE: Readonly<Record<string, { purpose: string; what: string }>> = {
-  email: { purpose: 'email', what: 'email address' },
-  tel: { purpose: 'tel', what: 'phone number' },
-  password: { purpose: 'current-password', what: 'password' },
-};
+const BY_TYPE = new Map<string, { purpose: string; what: string }>([
+  ['email', { purpose: 'email', what: 'email address' }],
+  ['tel', { purpose: 'tel', what: 'phone number' }],
+  ['password', { purpose: 'current-password', what: 'password' }],
+]);
+
+/** Words that turn a purpose word into something else: "Country code", "Email subject", "Company size". */
+const NOT_PERSONAL =
+  /\b((?<!post |postal |zip )code|size|model|version|subject|council|template|type|format|app|recipient|emergency|fax)\b/;
+
+/** A lookup box ("Find your address", "Search by postcode") isn't the field the value is kept in. */
+const LOOKUP = /\b(search|find|look ?up)\b/;
+
+/** Longer labels are sentences or instructions, where a purpose word is often about something else. */
+const MAX_LABEL_WORDS = 5;
 
 /** Input types that never collect one of these purposes, or that the browser fills in its own way. */
 const SKIPPED_TYPES = new Set([
@@ -72,8 +83,17 @@ function labelText(field: HTMLElement): string {
  */
 export function inputPurpose(field: HTMLElement): { purpose: string; what: string; from: string } | undefined {
   const type = (field.getAttribute('type') ?? '').toLowerCase();
-  if (BY_TYPE[type]) return { ...BY_TYPE[type], from: `type="${type}"` };
   const label = labelText(field);
+  const labelWords = words(label);
+  if (LOOKUP.test(labelWords) || NOT_PERSONAL.test(labelWords)) return undefined;
+  const byType = BY_TYPE.get(type);
+  if (byType) {
+    // A second password field ("New password", "Confirm password") is for a new one.
+    if (type === 'password' && /\b(new|confirm|repeat|retype|re enter)\b/.test(labelWords)) {
+      return { purpose: 'new-password', what: 'new password', from: `the label "${label.slice(0, 60)}"` };
+    }
+    return { ...byType, from: `type="${type}"` };
+  }
   const sources: { text: string; from: string; decides?: boolean }[] = [
     { text: label, from: `the label "${label.slice(0, 60)}"`, decides: true },
     ...['name', 'id', 'formcontrolname'].map((a) => {
@@ -85,8 +105,8 @@ export function inputPurpose(field: HTMLElement): { purpose: string; what: strin
   for (const source of sources) {
     const text = words(source.text);
     if (!text) continue;
-    // A lookup box ("Find your address", "Search by postcode") isn't the field the value is kept in.
-    if (/\b(search|find|look ?up)\b/.test(text)) return undefined;
+    if (LOOKUP.test(text) || NOT_PERSONAL.test(text)) return undefined;
+    if (source.decides && text.split(' ').length > MAX_LABEL_WORDS) return undefined;
     // "Last name, First name" in one field is the whole name.
     const matches = PURPOSES.filter((p) => p.words.test(text));
     const both = matches.some((p) => p.purpose === 'given-name') && matches.some((p) => p.purpose === 'family-name');
@@ -117,8 +137,7 @@ export function scanMissingAutocomplete(
   options: { frameworkPrefixes?: readonly string[] } = {},
 ): A11yFinding[] {
   const prefixes = options.frameworkPrefixes ?? DEFAULT_FRAMEWORK_PREFIXES;
-  const fields = [...root.querySelectorAll('input, select, textarea')];
-  if (root instanceof Element && root.matches('input, select, textarea')) fields.unshift(root);
+  const fields = queryDeep(root, 'input, select, textarea');
   const findings: A11yFinding[] = [];
   for (const field of fields) {
     if (!isCandidate(field) || field.hasAttribute('autocomplete')) continue;

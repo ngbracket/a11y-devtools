@@ -74,7 +74,7 @@ function fallbackName(element: Element): string {
 }
 
 /** Every element under `root`, and `root` itself when it's an element, that matches `selector`, through open shadow roots. */
-function queryDeep(root: ParentNode, selector: string): Element[] {
+export function queryDeep(root: ParentNode, selector: string): Element[] {
   const found: Element[] = [];
   if (root instanceof Element && root.matches(selector)) found.push(root);
   const visit = (scope: ParentNode) => {

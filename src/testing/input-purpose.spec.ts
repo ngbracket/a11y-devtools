@@ -37,6 +37,10 @@ describe('inputPurpose', () => {
     ['<input placeholder="Your email">', 'email'],
     ['<input type="password">', 'current-password'],
     ['<input placeholder="Last name, First name">', 'name'],
+    ['<label for="f">Confirm password</label><input id="f" type="password">', 'new-password'],
+    ['<label for="f">New password</label><input id="f" type="password">', 'new-password'],
+    ['<label for="f">Post code</label><input id="f">', 'postal-code'],
+    ['<label for="f">Your email address</label><input id="f">', 'email'],
     ['<span id="l">Surname</span><input aria-labelledby="l">', 'family-name'],
   ])('%s → %s', (html, purpose) => {
     expect(purposeOf(html)).toBe(purpose);
@@ -55,6 +59,16 @@ describe('inputPurpose', () => {
     '<label for="f">Address Search (enter postcode or the first line of your address)</label><input id="f">',
     '<label for="f">Find your address</label><input id="f" name="postcode">',
     '<input name="postcodeLookup">',
+    '<label for="f">Email subject</label><input id="f">',
+    '<label for="f">Mobile app version</label><input id="f">',
+    '<label for="f">Phone model</label><input id="f">',
+    '<label for="f">Company size</label><input id="f">',
+    '<label for="f">Country code</label><select id="f"><option>+44</option></select>',
+    '<label for="f">City council</label><input id="f">',
+    '<label for="f">Recipient email</label><input id="f" type="email">',
+    '<label for="f">Fax</label><input id="f" type="tel">',
+    '<label for="f">Search by email</label><input id="f" type="email">',
+    '<label for="f">Tell us which city you would like to visit</label><input id="f">',
   ])('no purpose: %s', (html) => {
     expect(purposeOf(html)).toBeUndefined();
   });
@@ -100,6 +114,12 @@ describe('scanMissingAutocomplete', () => {
       <input type="checkbox" aria-label="Email me offers">
       <input type="submit" value="Email">`);
     expect(scanMissingAutocomplete(document)).toEqual([]);
+  });
+
+  it('finds fields inside open shadow roots', () => {
+    const host = render('').appendChild(document.createElement('div'));
+    host.attachShadow({ mode: 'open' }).innerHTML = '<label for="s">Surname</label><input id="s">';
+    expect(scanMissingAutocomplete(document).map((f) => f.target)).toEqual(['input#s']);
   });
 
   it('checks the root itself when it is a field', () => {
