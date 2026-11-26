@@ -608,7 +608,7 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
       expect(readFileSync(join(dir, 'baseline.html'), 'utf8')).toMatch(/^<!doctype html>/);
     }, 60_000);
 
-    it('--no-page-titles and --no-id-references turn their checks off; --from refuses them', async () => {
+    it('--no-page-titles, --no-id-references and --no-input-purpose turn their checks off; --from refuses them', async () => {
       const routes = ['--route', '/same-title-a', '--route', '/same-title-b'];
       const out = join(dir, 'titles');
       expect((await runCli(['--base', baseUrl, ...routes, '--wait', '50', '--out', out, '--format', 'json'])).code).toBe(0);
@@ -620,6 +620,10 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
       const ids = join(dir, 'ids');
       expect((await runCli(['--base', baseUrl, '--route', '/missing-id', '--wait', '50', '--no-id-references', '--out', ids, '--format', 'json'])).code).toBe(0);
       expect(readFileSync(`${ids}.json`, 'utf8')).not.toContain('ngbr/missing-id-reference');
+      const purpose = join(dir, 'purpose');
+      expect((await runCli(['--base', baseUrl, '--route', '/guest-form', '--wait', '50', '--no-input-purpose', '--out', purpose, '--format', 'json'])).code).toBe(0);
+      expect(readFileSync(`${purpose}.json`, 'utf8')).not.toContain('ngbr/missing-autocomplete');
+      expect((await runCli(['--from', `${out}.json`, '--no-input-purpose'])).code).not.toBe(0);
       const refused = await runCli(['--from', `${out}.json`, '--no-page-titles']);
       expect(refused.code).not.toBe(0);
       expect(refused.stderr).toContain('--no-page-titles');

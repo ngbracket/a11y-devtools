@@ -54,8 +54,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   "New password" or "Confirm password" field gets `new-password`. Open
   shadow roots are checked. A heuristic, moderate: 1.3.5 only covers fields
   about the user, so a form that asks about someone else can fail a
-  `--fail-on moderate` gate until you turn it off or record a baseline. It runs in every scan,
-  with `--no-input-purpose` (`inputPurpose: false`) to turn it off, and
+  `--fail-on moderate` gate until you turn it off or record a baseline. It
+  runs in every scan, in the overlay and in report mode, with
+  `--no-input-purpose` (`inputPurpose: false` in `scanPages()` and `scan()`)
+  to turn it off in report mode. The in-app overlay always runs it.
   `checks.inputPurpose` lets the ACR worksheet count it for 1.3.5.
 - `ngbr/missing-id-reference`: an `aria-labelledby` or `aria-describedby`
   that names an id with no element in the page. axe-core's
@@ -72,7 +74,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   skipped. `checks.idReferences` says a report-mode run checked it, so the
   ACR worksheet counts it for 1.3.1 and 4.1.2. Existing baselines will list
   any of these findings as new. Turn it off with `--no-id-references`
-  (`idReferences: false` in `scanPages()` and `scan()`).
+  (`idReferences: false` in `scanPages()` and `scan()`). The in-app overlay
+  always runs it.
 - `ngbr/duplicate-page-title`: with 2 or more routes, report mode compares
   their page titles and reports each route whose title is the same as another
   route's, under WCAG 2.4.2 Page Titled. An SPA that never sets a title per
@@ -97,7 +100,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   moderate `ngbr/unreachable-control`, labelled "verify manually". Labels are
   skipped: their click goes to a control Tab reaches.
 
-### Changed (all builds)
+### Changed
 
 - An `onclick`, `onkeydown`, `onkeyup` or `onkeypress` handler property now
   counts as a listener.
