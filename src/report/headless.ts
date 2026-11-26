@@ -117,6 +117,12 @@ export interface ScanPagesOptions {
    * it off, for example while an app's titles are being fixed. Default true.
    */
   pageTitles?: boolean;
+  /**
+   * Report an `aria-labelledby` or `aria-describedby` that names an id with no
+   * element, as `ngbr/missing-id-reference`. Set `false` to turn it off, for
+   * example while existing findings are being fixed. Default true.
+   */
+  idReferences?: boolean;
 }
 
 type PlaywrightModule = typeof import('playwright');
@@ -363,6 +369,7 @@ interface PassConfig {
   inPageScript: string;
   frameworkPrefixes: readonly string[] | undefined;
   keyboard: boolean | undefined;
+  idReferences: boolean;
   focusTraps: boolean;
   walkthrough: boolean;
   navigation: boolean;
@@ -445,7 +452,7 @@ async function scanPass(
             __ngbA11yScan: (a?: unknown, s?: unknown) => Promise<unknown>;
           };
           return w.__ngbA11yScan(args.axe, args.scan);
-        }, { axe: axeOptions, scan: { frameworkPrefixes, keyboard: config.keyboard } })) as A11yFinding[];
+        }, { axe: axeOptions, scan: { frameworkPrefixes, keyboard: config.keyboard, idReferences: config.idReferences } })) as A11yFinding[];
         if (config.keyboard) {
           config.listenerSources.add(
             await page.evaluate(() =>
@@ -518,6 +525,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     walkthrough = false,
     navigation = false,
     pageTitles: comparePageTitles = true,
+    idReferences = true,
     darkClass,
     darkAttribute,
   } = options;
@@ -531,6 +539,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     inPageScript: readFileSync(inPageScriptPath(), 'utf8'),
     frameworkPrefixes,
     keyboard,
+    idReferences,
     focusTraps,
     walkthrough,
     navigation,
@@ -587,7 +596,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     axeVersion: axeVersion(),
     ...(tags && { tags }),
     keyboard: keyboard ?? false,
-    idReferences: true,
+    ...(idReferences && { idReferences }),
     focusTraps,
     ...(walkthrough && { walkthrough }),
     // Only when at least one route change was checked, so the ACR doesn't count a check that didn't happen.

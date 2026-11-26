@@ -366,6 +366,13 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
     expect(report.checks?.idReferences).toBe(true);
   });
 
+  it('reports no missing ids with idReferences: false', async () => {
+    const { scanPages } = (await import(distReport)) as typeof import('../report/index');
+    const r = await scanPages({ baseUrl, routes: ['/missing-id'], waitMs: 50, idReferences: false });
+    expect(r.pages[0].findings.map((f) => f.id)).not.toContain('ngbr/missing-id-reference');
+    expect(r.checks?.idReferences).toBeUndefined();
+  });
+
   it('flags routes that share one page title, and only those', () => {
     const a = page('/same-title-a').findings.filter((f) => f.id === 'ngbr/duplicate-page-title');
     expect(a).toHaveLength(1);
@@ -531,7 +538,7 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
       expect(readFileSync(join(dir, 'baseline.html'), 'utf8')).toMatch(/^<!doctype html>/);
     }, 60_000);
 
-    it('--no-page-titles turns the title check off, and is refused with --from', async () => {
+    it('--no-page-titles and --no-id-references turn their checks off; --from refuses them', async () => {
       const routes = ['--route', '/same-title-a', '--route', '/same-title-b'];
       const out = join(dir, 'titles');
       expect((await runCli(['--base', baseUrl, ...routes, '--wait', '50', '--out', out, '--format', 'json'])).code).toBe(0);
@@ -540,6 +547,9 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
       const json = readFileSync(`${out}.json`, 'utf8');
       expect(json).not.toContain('ngbr/duplicate-page-title');
       expect(JSON.parse(json).checks.pageTitles).toBeUndefined();
+      const ids = join(dir, 'ids');
+      expect((await runCli(['--base', baseUrl, '--route', '/missing-id', '--wait', '50', '--no-id-references', '--out', ids, '--format', 'json'])).code).toBe(0);
+      expect(readFileSync(`${ids}.json`, 'utf8')).not.toContain('ngbr/missing-id-reference');
       const refused = await runCli(['--from', `${out}.json`, '--no-page-titles']);
       expect(refused.code).not.toBe(0);
       expect(refused.stderr).toContain('--no-page-titles');

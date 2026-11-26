@@ -28,6 +28,11 @@ export interface ScanOptions {
    * `ngbr/*` findings alongside the axe violations. Default false.
    */
   keyboard?: boolean;
+  /**
+   * Report an `aria-labelledby` or `aria-describedby` that names an id with no
+   * element (`ngbr/missing-id-reference`). Default true.
+   */
+  idReferences?: boolean;
 }
 
 /** One axe violation node, enriched with the component that rendered it. */
@@ -120,8 +125,8 @@ async function runAxeOnce(
   }
 
   // axe lists a labelledby or describedby that points nowhere as "needs review"
-  // at most, so check them here (always: it only reads the markup).
-  findings.push(...scanMissingIdReferences(root, { frameworkPrefixes }));
+  // at most, so check them here (on unless turned off: it only reads the markup).
+  if (scanOptions?.idReferences !== false) findings.push(...scanMissingIdReferences(root, { frameworkPrefixes }));
 
   // The keyboard layer runs over the same root, in the page, and appends its own
   // `ngbr/*` findings so they group and report exactly like the axe ones.

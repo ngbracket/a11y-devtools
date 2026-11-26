@@ -37,7 +37,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   shadow root, where the browser looks. Hidden and inert elements are
   skipped. `checks.idReferences` says a report-mode run checked it, so the
   ACR worksheet counts it for 1.3.1 and 4.1.2. Existing baselines will list
-  any of these findings as new.
+  any of these findings as new. Turn it off with `--no-id-references`
+  (`idReferences: false` in `scanPages()` and `scan()`).
 - `ngbr/duplicate-page-title`: with 2 or more routes, report mode compares
   their page titles and reports each route whose title is the same as another
   route's, under WCAG 2.4.2 Page Titled. An SPA that never sets a title per

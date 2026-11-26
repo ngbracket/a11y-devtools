@@ -75,6 +75,8 @@ Options:
                      (ngbr/focus-lost-on-navigation). Needs 2 or more routes
   --no-page-titles   Don't compare page titles across routes
                      (ngbr/duplicate-page-title)
+  --no-id-references Don't report aria-labelledby or aria-describedby that
+                     name a missing id (ngbr/missing-id-reference)
   --color-scheme <s> light | dark | both — scan with the browser emulating that
                      prefers-color-scheme (default light). "both" scans each
                      route twice; dark pages list only issues light doesn't have
@@ -116,6 +118,7 @@ function parseArgs(argv) {
       case '--walkthrough': opts.walkthrough = true; break;
       case '--navigation': opts.navigation = true; break;
       case '--no-page-titles': opts.pageTitles = false; break;
+      case '--no-id-references': opts.idReferences = false; break;
       case '--color-scheme': opts.colorScheme = next(); break;
       case '--dark-class': opts.darkClass = next(); break;
       case '--dark-attribute': opts.darkAttribute = next(); break;
@@ -134,7 +137,7 @@ const opts = parseArgs(process.argv.slice(2));
 const SCAN_ONLY = {
   base: '--base', serve: '--serve', serveTimeout: '--serve-timeout', routes: '--route', tags: '--tags',
   wait: '--wait', frameworkPrefixes: '--framework-prefixes / --no-skip-primitives', keyboard: '--keyboard',
-  focusTraps: '--focus-traps', walkthrough: '--walkthrough', navigation: '--navigation', pageTitles: '--no-page-titles', colorScheme: '--color-scheme', darkClass: '--dark-class',
+  focusTraps: '--focus-traps', walkthrough: '--walkthrough', navigation: '--navigation', pageTitles: '--no-page-titles', idReferences: '--no-id-references', colorScheme: '--color-scheme', darkClass: '--dark-class',
   darkAttribute: '--dark-attribute', headed: '--headed',
 };
 if (opts.from && !opts.help) {
@@ -270,6 +273,7 @@ if (!report) {
       walkthrough: opts.walkthrough,
       navigation: opts.navigation,
       pageTitles: opts.pageTitles,
+      idReferences: opts.idReferences,
       colorScheme: opts.colorScheme,
       darkClass: opts.darkClass,
       darkAttribute,

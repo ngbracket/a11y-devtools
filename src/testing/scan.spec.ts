@@ -36,6 +36,8 @@ describe('scan + runner (real axe + attribution)', () => {
     host.innerHTML = `<div role="dialog" aria-labelledby="loginDialogTitle"><h2>Guest details</h2></div>`;
     const findings = await scan(host);
     expect(findings.filter((f) => f.id === 'ngbr/missing-id-reference')).toHaveLength(1);
+    const off = await scan(host, undefined, { idReferences: false });
+    expect(off.map((f) => f.id)).not.toContain('ngbr/missing-id-reference');
   });
 
   it('serializes concurrent scans (axe is a singleton)', async () => {
