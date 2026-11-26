@@ -57,7 +57,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   `--fail-on moderate` gate until you turn it off or record a baseline. It
   runs in every scan, in the overlay and in report mode, with
   `--no-input-purpose` (`inputPurpose: false` in `scanPages()` and `scan()`)
-  to turn it off in report mode. The in-app overlay always runs it.
+  to turn it off in report mode, and `inputPurpose: false` in
+  `provideA11yDevtools()` for the in-app overlay.
   `checks.inputPurpose` lets the ACR worksheet count it for 1.3.5.
 - `ngbr/missing-id-reference`: an `aria-labelledby` or `aria-describedby`
   that names an id with no element in the page. axe-core's
@@ -74,8 +75,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   skipped. `checks.idReferences` says a report-mode run checked it, so the
   ACR worksheet counts it for 1.3.1 and 4.1.2. Existing baselines will list
   any of these findings as new. Turn it off with `--no-id-references`
-  (`idReferences: false` in `scanPages()` and `scan()`). The in-app overlay
-  always runs it.
+  (`idReferences: false` in `scanPages()` and `scan()`), and with
+  `idReferences: false` in `provideA11yDevtools()` for the in-app overlay.
 - `ngbr/duplicate-page-title`: with 2 or more routes, report mode compares
   their page titles and reports each route whose title is the same as another
   route's, under WCAG 2.4.2 Page Titled. An SPA that never sets a title per

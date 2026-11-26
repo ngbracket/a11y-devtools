@@ -44,6 +44,16 @@ describe('scan + runner (real axe + attribution)', () => {
     expect(off.map((f) => f.id)).not.toContain('ngbr/missing-id-reference');
   });
 
+  it('runA11yScan passes idReferences and inputPurpose through, for the overlay', async () => {
+    host.innerHTML = `<div role="dialog" aria-labelledby="gone"></div><label for="sn">Surname</label><input id="sn">`;
+    const ids = (f: { id: string }[]) => f.map((x) => x.id);
+    const on = ids(await runA11yScan(host, { log: false }));
+    expect(on).toEqual(expect.arrayContaining(['ngbr/missing-id-reference', 'ngbr/missing-autocomplete']));
+    const off = ids(await runA11yScan(host, { log: false, idReferences: false, inputPurpose: false }));
+    expect(off).not.toContain('ngbr/missing-id-reference');
+    expect(off).not.toContain('ngbr/missing-autocomplete');
+  });
+
   it('serializes concurrent scans (axe is a singleton)', async () => {
     const fixture = TestBed.createComponent(AppComponent);
     host.appendChild(fixture.nativeElement);

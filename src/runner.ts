@@ -28,6 +28,10 @@ export interface RunOptions {
    * Default false.
    */
   keyboard?: boolean;
+  /** Report `aria-labelledby` / `aria-describedby` that name a missing id (`ngbr/missing-id-reference`). Default true. */
+  idReferences?: boolean;
+  /** Report name, email, phone and address fields with no `autocomplete` (`ngbr/missing-autocomplete`). Default true. */
+  inputPurpose?: boolean;
 }
 
 /** Scan `root`, optionally report, and return the findings. */
@@ -38,6 +42,8 @@ export async function runA11yScan(
   const findings = await scan(root ?? document, options.axe, {
     frameworkPrefixes: options.frameworkPrefixes,
     keyboard: options.keyboard,
+    idReferences: options.idReferences,
+    inputPurpose: options.inputPurpose,
   });
   if (options.log !== false) {
     logFindings(findings, options.logger);
