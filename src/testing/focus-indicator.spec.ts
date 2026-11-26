@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareArea, focusChange, minimumArea } from '../keyboard/focus-indicator';
+import { compareArea, focusChange, minimumArea, visiblePart } from '../keyboard/focus-indicator';
 
 /** RGBA pixels from [r, g, b] triples. */
 const px = (...colours: [number, number, number][]) => colours.flatMap(([r, g, b]) => [r, g, b, 255]);
@@ -35,8 +35,23 @@ describe('focusChange', () => {
 });
 
 describe('minimumArea', () => {
-  it('is one pixel along two sides of the element', () => {
-    expect(minimumArea({ x: 0, y: 0, width: 100, height: 40 })).toBe(140);
+  it('is three quarters of a 1px line along the longer side, so a 1px underline passes', () => {
+    expect(minimumArea({ x: 0, y: 0, width: 100, height: 20 })).toBe(75);
+    expect(minimumArea({ x: 0, y: 0, width: 40, height: 40 })).toBe(30);
+  });
+});
+
+describe('visiblePart', () => {
+  const viewport = { width: 1280, height: 900 };
+
+  it('clips a tall element to the viewport, so the threshold only counts what is on screen', () => {
+    const visible = visiblePart({ x: 100, y: -500, width: 600, height: 3000 }, viewport)!;
+    expect(visible).toEqual({ x: 100, y: 0, width: 600, height: 900 });
+    expect(minimumArea(visible)).toBe(675);
+  });
+
+  it('is null for an element fully off screen', () => {
+    expect(visiblePart({ x: 0, y: 950, width: 100, height: 40 }, viewport)).toBeNull();
   });
 });
 

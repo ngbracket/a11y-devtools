@@ -180,6 +180,7 @@ type IndicatorWindow = {
  * ends up rather than where it starts.
  */
 const NO_MOTION_CSS =
+  'html, body { scroll-behavior: auto !important; } ' +
   '*, *::before, *::after { transition-duration: 0s !important; transition-delay: 0s !important; ' +
   'animation-duration: 0s !important; animation-delay: 0s !important; }';
 
@@ -191,9 +192,9 @@ const MAX_INDICATOR_STOPS = 200;
  * blur the element, screenshot it again, and compare the two around the element
  * in `helper` (a blank page with the in-page bundle). Then put focus back so the
  * next Tab moves on. Needs the in-page bundle already injected into `page`.
- * Blurring can run the app's blur handlers (a form field may show an error), so
- * the unfocused shot can differ more than the focus style does: that hides a
- * weak indicator, it never invents one.
+ * Anything else that changes between the two shots (a blur handler showing an
+ * error, a tooltip opened by focus, an animation) only adds changed pixels: it
+ * can hide a weak indicator, and can't add a finding.
  */
 async function walkFocusIndicators(
   page: Page,
@@ -204,7 +205,7 @@ async function walkFocusIndicators(
   try {
     return await tabThroughIndicators(page, helper, frameworkPrefixes);
   } finally {
-    await noMotion.evaluate((style) => style.remove()).catch(() => undefined);
+    await noMotion.evaluate((style) => (style as Element).remove()).catch(() => undefined);
   }
 }
 
@@ -231,22 +232,40 @@ async function tabThroughIndicators(
     );
   const shot = () => page.screenshot({ animations: 'disabled', caret: 'hide', type: 'png' });
 
+  const scroll = () => page.evaluate(() => `${window.scrollX},${window.scrollY}`);
+
   const findings: A11yFinding[] = [];
   const seen = new Set<number>();
-  for (let i = 0; i < MAX_INDICATOR_STOPS + 2; i++) {
+  // Tab moves between controls inside an iframe while the page's own focus stays
+  // on the iframe, so the same iframe repeats. Give up only if it never leaves.
+  let inFrame = 0;
+  for (let presses = 0; presses < MAX_INDICATOR_STOPS * 3; presses++) {
     await page.keyboard.press('Tab');
     const stop: FocusedStop | null = await current();
     if (!stop) {
       if (seen.size > 0) break; // focus left the page after the last stop
       continue;
     }
-    if (seen.has(stop.id) || seen.size >= MAX_INDICATOR_STOPS) break; // lapped the page
+    if (stop.skip === 'iframe' && seen.has(stop.id)) {
+      if (++inFrame > MAX_INDICATOR_STOPS) break;
+      continue;
+    }
+    inFrame = 0;
+    if (seen.has(stop.id)) break; // lapped the page
+    if (seen.size >= MAX_INDICATOR_STOPS) {
+      console.warn(`ngbr-a11y-report: measured the first ${MAX_INDICATOR_STOPS} focus indicators on this page; skipped the rest.`);
+      break;
+    }
     seen.add(stop.id);
     if (stop.skip || !stop.area) continue;
+    const before = await scroll();
     const focused = await shot();
     await blur();
     const unfocused = await shot();
+    const after = await scroll();
     await refocus(stop.id);
+    // Blurring scrolled the page, so the two shots don't line up.
+    if (before !== after) continue;
     const found = await finding(stop.id, await compareShots(helper, unfocused, focused, stop.area));
     if (found) findings.push(found);
   }
@@ -587,15 +606,6 @@ async function scanPass(
             ),
           );
         }
-        if (config.focusIndicators && helper) {
-          // Before the trap walk, which leaves focus wherever its laps end.
-          try {
-            findings.push(...(await walkFocusIndicators(page, helper, frameworkPrefixes)));
-          } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            console.warn(`ngbr-a11y-report: focus-indicator check failed on ${label}: ${message}`);
-          }
-        }
         // Before the trap walk: pressing Tab can change the page.
         let walkthrough: Walkthrough | undefined;
         if (config.walkthrough) {
@@ -612,6 +622,15 @@ async function scanPass(
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             console.warn(`ngbr-a11y-report: walkthrough failed on ${label}: ${message}`);
+          }
+        }
+        if (config.focusIndicators && helper) {
+          // After the walkthrough (blur and refocus can change the page) and before the trap walk, which leaves focus wherever its laps end.
+          try {
+            findings.push(...(await walkFocusIndicators(page, helper, frameworkPrefixes)));
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.warn(`ngbr-a11y-report: focus-indicator check failed on ${label}: ${message}`);
           }
         }
         if (config.focusTraps) {

@@ -27,15 +27,19 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   focus indicator in report mode. It presses Tab through the route, and at
   each stop screenshots the page focused and unfocused and compares the
   pixels in and up to 8px around the element. A stop that doesn't change at
-  all is reported as serious, and one where fewer pixels than the element's
-  width plus height change by a contrast ratio of 3:1 is reported as
-  moderate, with the strongest ratio found. The rule is
-  `ngbr/focus-indicator-contrast`, under WCAG 2.4.7 and 1.4.11, and it's a
-  heuristic. Transitions and animations are finished at once during the
-  walk, so a style that fades or slides in is measured where it ends.
-  Blurring a stop runs the app's blur handlers, which can make a weak
-  indicator look stronger but never weaker. Off by default, as it takes two
-  screenshots per tab stop. It runs in each colour scheme.
+  all is reported as serious. One where too few pixels change by a contrast
+  ratio of 3:1 (fewer than three quarters of a 1px line along its longer
+  side, as far as it's on screen) is reported as moderate, with the
+  strongest ratio found. The rule is `ngbr/focus-indicator-contrast`, under
+  WCAG 2.4.7 and 1.4.11, and it's a heuristic. Transitions, animations and
+  smooth scrolling are finished at once during the walk, so a style that
+  fades or slides in is measured where it ends. Stops inside an iframe are
+  passed over and the walk carries on after them. A stop covered by
+  something else at its centre, such as a fixed bar, is skipped, as that's
+  focus being hidden. Anything else that changes between the two
+  screenshots can hide a weak indicator but can't add a finding. Off by
+  default, as it takes two screenshots per tab stop. It runs in each colour
+  scheme, after the walkthrough and before the keyboard-trap walk.
 - `ngbr/missing-autocomplete`: a form field that looks like it asks for the
   user's name, email, phone number, address, postcode, date of birth,
   organisation, username or password, and has no `autocomplete` attribute

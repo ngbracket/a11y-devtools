@@ -235,19 +235,35 @@ const PAGES: Record<string, string> = {
 
   // Focus indicators: the browser's own ring, none at all, a faint tint like a
   // client's header icon buttons (1.26:1), and a strong custom outline.
+  // Also: a skip link that slides in, a 1px underline, an iframe partway down
+  // (the walk must carry on after it), and a button under a fixed bar (that's
+  // focus hidden, not a weak style, so it's skipped).
   '/focus-styles': `
     <style>
+      html { scroll-behavior: smooth; }
       button { margin: 20px; padding: 8px 16px; background: #c8b6e2; color: #000; border: 0; }
       .none:focus { outline: none; }
       .tint:focus { outline: none; background: #b39ddb; }
       .strong:focus { outline: 2px solid #000; outline-offset: 2px; }
+      .skip { position: fixed; top: 8px; left: 8px; transform: translateY(-80px); transition: transform 0.3s; background: #fff; }
+      .skip:focus { transform: none; outline: none; }
+      a.underline { color: #000; text-decoration: none; }
+      a.underline:focus { outline: none; text-decoration: underline; }
+      .bar { position: fixed; left: 0; right: 0; bottom: 0; height: 80px; background: #333; }
+      .covered { position: fixed; bottom: 20px; left: 20px; margin: 0; }
+      .covered:focus { outline: none; }
     </style>
-    <main><h1>Focus styles</h1>
+    <a class="skip" href="#main">Skip to content</a>
+    <main id="main"><h1>Focus styles</h1>
       <button class="default">Default</button>
       <button class="none">None</button>
+      <iframe title="Embedded form" srcdoc="<button>Inside one</button><button>Inside two</button>"></iframe>
       <button class="tint">Tint</button>
       <button class="strong">Strong</button>
-    </main>`,
+      <a class="underline" href="#x">Underlined on focus</a>
+      <button class="covered">Under the bar</button>
+    </main>
+    <div class="bar"></div>`,
 
   // Two routes with one static title, as a client's booking site had on every route.
   '/same-title-a': `<main><h1>Book a class</h1></main>`,

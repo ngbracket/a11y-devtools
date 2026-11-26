@@ -62,12 +62,22 @@ export function focusChange(before: ArrayLike<number>, after: ArrayLike<number>)
 }
 
 /**
- * The fewest 3:1 pixels that count as a visible indicator: one pixel along two
- * sides of the element, so a 1px outline or a 2px underline passes, and a
- * slight background tint or a colour shift in the text doesn't.
+ * The fewest 3:1 pixels that count as a visible indicator: three quarters of a
+ * 1px line along the element's longer side, as far as it's on screen. A 1px
+ * outline or a 1px underline passes; a background tint, which changes many
+ * pixels by little, doesn't.
  */
-export function minimumArea(box: Box): number {
-  return Math.round(box.width + box.height);
+export function minimumArea(visible: Box): number {
+  return Math.max(1, Math.round(Math.max(visible.width, visible.height) * 0.75));
+}
+
+/** The part of `box` inside the viewport, or null when none of it is. */
+export function visiblePart(box: Box, viewport: { width: number; height: number }): Box | null {
+  const x = Math.max(0, box.x);
+  const y = Math.max(0, box.y);
+  const right = Math.min(viewport.width, box.x + box.width);
+  const bottom = Math.min(viewport.height, box.y + box.height);
+  return right > x && bottom > y ? { x, y, width: right - x, height: bottom - y } : null;
 }
 
 /** The area screenshots are compared over: the element plus {@link FOCUS_MARGIN}, inside the viewport. */
@@ -92,8 +102,8 @@ export interface FocusedStop {
   box: Box;
   /** The area to compare, or null when the element is off screen. */
   area: Box | null;
-  /** Set when the stop can't be measured: an iframe, or an element with no size. */
-  skip?: string;
+  /** Set when the stop can't be measured: an iframe, an element with no size, or one covered by something else. */
+  skip?: 'iframe' | 'no size' | 'covered';
 }
 
 export interface FocusIndicatorProbe {
@@ -134,10 +144,24 @@ export function createFocusIndicatorProbe(
       }
       const r = active.getBoundingClientRect();
       const box = { x: r.x, y: r.y, width: r.width, height: r.height };
-      boxes.set(id, box);
       const viewport = { width: view?.innerWidth ?? 0, height: view?.innerHeight ?? 0 };
       if (active.tagName === 'IFRAME') return { id, box, area: null, skip: 'iframe' };
       if (box.width < 1 || box.height < 1) return { id, box, area: null, skip: 'no size' };
+      const visible = visiblePart(box, viewport);
+      if (!visible) return { id, box, area: null };
+      boxes.set(id, visible);
+      // Under a sticky header or a cookie bar: that's focus being hidden (2.4.11), not a weak style.
+      const cx = visible.x + visible.width / 2;
+      const cy = visible.y + visible.height / 2;
+      let top: Element | null = doc.elementFromPoint(cx, cy);
+      while (top?.shadowRoot) {
+        const inner = top.shadowRoot.elementFromPoint(cx, cy);
+        if (!inner || inner === top) break;
+        top = inner;
+      }
+      if (top && top !== active && !active.contains(top) && !top.contains(active)) {
+        return { id, box, area: null, skip: 'covered' };
+      }
       return { id, box, area: compareArea(box, viewport) };
     },
 
