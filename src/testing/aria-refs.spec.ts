@@ -81,6 +81,45 @@ describe('scanMissingIdReferences', () => {
     expect(findings[0].help).toContain('"outside"');
   });
 
+  it('is minor when the element still gets a name another way, and says where from', () => {
+    render(`<button id="b" aria-labelledby="gone">Save</button>
+      <input id="i" aria-label="Email" aria-labelledby="gone">
+      <label for="l">Phone</label><input id="l" aria-labelledby="gone">
+      <div id="d" role="dialog" aria-labelledby="gone"><h2>Guest details</h2></div>
+      <div id="g" role="group" aria-labelledby="gone" title="Address"></div>`);
+    const byTarget = Object.fromEntries(scanMissingIdReferences(document).map((f) => [f.target, f]));
+    expect(byTarget['button#b[aria-labelledby]'].impact).toBe('minor');
+    expect(byTarget['button#b[aria-labelledby]'].help).toContain('so browsers ignore it and name the element another way ("Save")');
+    expect(byTarget['input#i[aria-labelledby]'].impact).toBe('minor');
+    expect(byTarget['input#l[aria-labelledby]'].help).toContain('("Phone")');
+    expect(byTarget['div#g[aria-labelledby]'].impact).toBe('minor');
+    // A dialog doesn't take its name from its content: nothing is left.
+    expect(byTarget['div#d[aria-labelledby]'].impact).toBe('serious');
+  });
+
+  it('finds references inside open shadow roots, looking ids up in that shadow root', () => {
+    const host = render('').appendChild(document.createElement('div'));
+    host.attachShadow({ mode: 'open' }).innerHTML = `<span id="inside">Name</span>
+      <div role="dialog" aria-labelledby="inside"></div><div role="dialog" aria-labelledby="outside"></div>`;
+    document.body.insertAdjacentHTML('beforeend', '<span id="outside">Not reachable from the shadow root</span>');
+    const findings = scanMissingIdReferences(document);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].help).toContain('"outside"');
+  });
+
+  it('checks the root itself when it is an element, and skips detached elements', () => {
+    const dialog = render(`<div role="dialog" aria-labelledby="gone"></div>`).firstElementChild!;
+    expect(scanMissingIdReferences(dialog)).toHaveLength(1);
+    const detached = document.createElement('div');
+    detached.innerHTML = `<div role="dialog" aria-labelledby="gone"></div>`;
+    expect(scanMissingIdReferences(detached)).toEqual([]);
+  });
+
+  it('skips elements inside a closed <details>', () => {
+    render(`<details><summary>More</summary><div role="dialog" aria-labelledby="gone"></div></details>`);
+    expect(scanMissingIdReferences(document)).toEqual([]);
+  });
+
   it('checks only under the root it is given', () => {
     const inside = render(`<input aria-labelledby="gone">`);
     render(`<input aria-labelledby="also-gone">`);
