@@ -34,8 +34,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   says the comparison ran, so the ACR worksheet counts it for 2.4.2.
   It runs with no flag, so an app with one title on every route gets a new
   moderate finding on each route after upgrading. With `--baseline` and
-  `--fail-on moderate`, that fails the gate until you fix the titles or
-  record a new baseline.
+  `--fail-on moderate`, that fails the gate until you fix the titles, record
+  a new baseline, or turn the check off with `--no-page-titles`
+  (`pageTitles: false` in `scanPages()`).
 - `checks.listeners` in the JSON report says where the keyboard checks read
   listeners from: `angular` (a dev build), `browser` (a production build) or
   `none`. For `browser` and `none`, the Markdown, HTML and ACR reports and the

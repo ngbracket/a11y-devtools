@@ -111,6 +111,12 @@ export interface ScanPagesOptions {
    * the scan, once (in the light scheme with `colorScheme: 'both'`). Default false.
    */
   navigation?: boolean;
+  /**
+   * With 2 or more routes, compare their page titles and report routes that
+   * share one as `ngbr/duplicate-page-title` (WCAG 2.4.2). Set `false` to turn
+   * it off, for example while an app's titles are being fixed. Default true.
+   */
+  pageTitles?: boolean;
 }
 
 type PlaywrightModule = typeof import('playwright');
@@ -511,6 +517,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     focusTraps = false,
     walkthrough = false,
     navigation = false,
+    pageTitles: comparePageTitles = true,
     darkClass,
     darkAttribute,
   } = options;
@@ -573,7 +580,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     await browser.close();
   }
   // Across routes, so only once every page has scanned.
-  const pageTitles = titlesCompared(pages);
+  const pageTitles = comparePageTitles && titlesCompared(pages);
   if (pageTitles) pages = addDuplicateTitleFindings(pages);
 
   const checks: ScanChecks = {

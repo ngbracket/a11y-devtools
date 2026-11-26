@@ -33,7 +33,7 @@ Options:
                      A failed Angular build stops it straight away
   --route <path>     Route to scan; repeat for multiple routes. With 2 or more,
                      routes that share a page title are reported
-                     (ngbr/duplicate-page-title)
+                     (ngbr/duplicate-page-title); --no-page-titles turns that off
   --from <file>      Don't scan: read a previous run's JSON report (from --out)
                      and write it in the --format(s) asked for — e.g. add an
                      HTML report or ACR worksheet later. --baseline and
@@ -73,6 +73,8 @@ Options:
                      history.pushState when there's no link). Records where
                      focus went and reports focus left on the page body
                      (ngbr/focus-lost-on-navigation). Needs 2 or more routes
+  --no-page-titles   Don't compare page titles across routes
+                     (ngbr/duplicate-page-title)
   --color-scheme <s> light | dark | both — scan with the browser emulating that
                      prefers-color-scheme (default light). "both" scans each
                      route twice; dark pages list only issues light doesn't have
@@ -113,6 +115,7 @@ function parseArgs(argv) {
       case '--focus-traps': opts.focusTraps = true; break;
       case '--walkthrough': opts.walkthrough = true; break;
       case '--navigation': opts.navigation = true; break;
+      case '--no-page-titles': opts.pageTitles = false; break;
       case '--color-scheme': opts.colorScheme = next(); break;
       case '--dark-class': opts.darkClass = next(); break;
       case '--dark-attribute': opts.darkAttribute = next(); break;
@@ -131,7 +134,7 @@ const opts = parseArgs(process.argv.slice(2));
 const SCAN_ONLY = {
   base: '--base', serve: '--serve', serveTimeout: '--serve-timeout', routes: '--route', tags: '--tags',
   wait: '--wait', frameworkPrefixes: '--framework-prefixes / --no-skip-primitives', keyboard: '--keyboard',
-  focusTraps: '--focus-traps', walkthrough: '--walkthrough', navigation: '--navigation', colorScheme: '--color-scheme', darkClass: '--dark-class',
+  focusTraps: '--focus-traps', walkthrough: '--walkthrough', navigation: '--navigation', pageTitles: '--no-page-titles', colorScheme: '--color-scheme', darkClass: '--dark-class',
   darkAttribute: '--dark-attribute', headed: '--headed',
 };
 if (opts.from && !opts.help) {
@@ -266,6 +269,7 @@ if (!report) {
       focusTraps: opts.focusTraps,
       walkthrough: opts.walkthrough,
       navigation: opts.navigation,
+      pageTitles: opts.pageTitles,
       colorScheme: opts.colorScheme,
       darkClass: opts.darkClass,
       darkAttribute,

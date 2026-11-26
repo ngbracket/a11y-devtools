@@ -368,6 +368,14 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
     expect(r.checks?.pageTitles).toBeUndefined();
   });
 
+  it('compares no titles with pageTitles: false', async () => {
+    const { scanPages } = (await import(distReport)) as typeof import('../report/index');
+    const r = await scanPages({ baseUrl, routes: ['/same-title-a', '/same-title-b'], waitMs: 50, pageTitles: false });
+    expect(r.pages.flatMap((p) => p.findings).map((f) => f.id)).not.toContain('ngbr/duplicate-page-title');
+    expect(r.checks?.pageTitles).toBeUndefined();
+    expect(r.pages[0].title).toBe('Leisure centres');
+  });
+
   it('does not count one route scanned twice as a duplicate', async () => {
     const { scanPages } = (await import(distReport)) as typeof import('../report/index');
     const r = await scanPages({
@@ -504,6 +512,20 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
       expect(readFileSync(join(dir, 'baseline.md'), 'utf8')).toContain('# Automated accessibility scan');
       expect(JSON.parse(readFileSync(join(dir, 'baseline.json'), 'utf8')).pages).toHaveLength(2);
       expect(readFileSync(join(dir, 'baseline.html'), 'utf8')).toMatch(/^<!doctype html>/);
+    }, 60_000);
+
+    it('--no-page-titles turns the title check off, and is refused with --from', async () => {
+      const routes = ['--route', '/same-title-a', '--route', '/same-title-b'];
+      const out = join(dir, 'titles');
+      expect((await runCli(['--base', baseUrl, ...routes, '--wait', '50', '--out', out, '--format', 'json'])).code).toBe(0);
+      expect(readFileSync(`${out}.json`, 'utf8')).toContain('ngbr/duplicate-page-title');
+      expect((await runCli(['--base', baseUrl, ...routes, '--wait', '50', '--no-page-titles', '--out', out, '--format', 'json'])).code).toBe(0);
+      const json = readFileSync(`${out}.json`, 'utf8');
+      expect(json).not.toContain('ngbr/duplicate-page-title');
+      expect(JSON.parse(json).checks.pageTitles).toBeUndefined();
+      const refused = await runCli(['--from', `${out}.json`, '--no-page-titles']);
+      expect(refused.code).not.toBe(0);
+      expect(refused.stderr).toContain('--no-page-titles');
     }, 60_000);
 
     it('--walkthrough adds the tab order to every format, and --from keeps it', async () => {
