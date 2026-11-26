@@ -23,6 +23,17 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `ngbr/missing-id-reference`: an `aria-labelledby` or `aria-describedby`
+  that names an id with no element in the page. axe-core's
+  `aria-valid-attr-value` lists this as "needs review" when none of the ids
+  exist, and passes it when at least one does, so neither case was reported.
+  It runs in every scan, in the overlay and in report mode, with no flag. It
+  isn't a heuristic. A missing `aria-labelledby` id is serious when none of
+  the ids exist (WCAG 4.1.2) and moderate when some do. A missing
+  `aria-describedby` id is moderate or minor (WCAG 1.3.1). Hidden and inert
+  elements are skipped, and an id is looked up in the element's own document
+  or shadow root, where the browser looks. `checks.idReferences` says it ran,
+  so the ACR worksheet counts it for 1.3.1 and 4.1.2.
 - `ngbr/duplicate-page-title`: with 2 or more routes, report mode compares
   their page titles and reports each route whose title is the same as another
   route's, under WCAG 2.4.2 Page Titled. An SPA that never sets a title per

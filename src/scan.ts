@@ -7,6 +7,7 @@ import {
 } from './attribution.js';
 import { OVERLAY_EXCLUDE_SELECTOR } from './overlay.js';
 import { scanKeyboard } from './keyboard/keyboard-scan.js';
+import { scanMissingIdReferences } from './aria-refs.js';
 import { criterionForTag } from './report/wcag.js';
 
 export type Impact = 'minor' | 'moderate' | 'serious' | 'critical' | null;
@@ -117,6 +118,10 @@ async function runAxeOnce(
       });
     }
   }
+
+  // axe lists a labelledby or describedby that points nowhere as "needs review"
+  // at most, so check them here (always: it only reads the markup).
+  findings.push(...scanMissingIdReferences(root, { frameworkPrefixes }));
 
   // The keyboard layer runs over the same root, in the page, and appends its own
   // `ngbr/*` findings so they group and report exactly like the axe ones.

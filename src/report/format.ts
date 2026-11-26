@@ -115,6 +115,8 @@ export interface ScanChecks {
   navigation?: boolean;
   /** The titles of 2 or more scanned pages were compared (`ngbr/duplicate-page-title`). */
   pageTitles?: boolean;
+  /** `aria-labelledby` and `aria-describedby` were checked for ids with no element (`ngbr/missing-id-reference`). From 0.21.0. */
+  idReferences?: boolean;
   /**
    * Where the keyboard checks read event listeners from (the weakest across the
    * pages): Angular's debug API in a dev build, the browser in a production

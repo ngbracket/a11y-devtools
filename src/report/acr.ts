@@ -71,7 +71,7 @@ export interface AxeRuleMeta {
  */
 const NGBR_RULES: Record<
   string,
-  { criteria: readonly string[]; ranWhen?: keyof Pick<ScanChecks, 'keyboard' | 'focusTraps' | 'navigation' | 'pageTitles'> }
+  { criteria: readonly string[]; ranWhen?: keyof Pick<ScanChecks, 'keyboard' | 'focusTraps' | 'navigation' | 'pageTitles' | 'idReferences'> }
 > = {
   'ngbr/unreachable-control': { criteria: NGBR_RULE_CRITERIA['ngbr/unreachable-control'], ranWhen: 'keyboard' },
   'ngbr/click-without-key': { criteria: NGBR_RULE_CRITERIA['ngbr/click-without-key'], ranWhen: 'keyboard' },
@@ -83,6 +83,10 @@ const NGBR_RULES: Record<
   'ngbr/focus-lost-on-navigation': {
     criteria: NGBR_RULE_CRITERIA['ngbr/focus-lost-on-navigation'],
     ranWhen: 'navigation',
+  },
+  'ngbr/missing-id-reference': {
+    criteria: NGBR_RULE_CRITERIA['ngbr/missing-id-reference'],
+    ranWhen: 'idReferences',
   },
   'ngbr/duplicate-page-title': {
     criteria: NGBR_RULE_CRITERIA['ngbr/duplicate-page-title'],

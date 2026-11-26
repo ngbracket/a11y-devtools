@@ -211,6 +211,15 @@ const PAGES: Record<string, string> = {
       });
     </script>`,
 
+  // An open dialog named by an id that isn't in the page, as a client's guest
+  // details dialog was. axe lists it as needs review only, so it never failed.
+  '/missing-id': `
+    <main><h1>Book</h1></main>
+    <div role="dialog" aria-modal="true" aria-labelledby="loginDialogTitle">
+      <h2>Guest details</h2>
+      <button type="button">Continue</button>
+    </div>`,
+
   // Two routes with one static title, as a client's booking site had on every route.
   '/same-title-a': `<main><h1>Book a class</h1></main>`,
   '/same-title-b': `<main><h1>Book an activity</h1></main>`,
@@ -347,6 +356,14 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
       ['ngbr/unreachable-control', 'serious', 'location'],
       ['ngbr/click-without-key', 'moderate', 'no-key'],
     ]);
+  });
+
+  it('reports a dialog whose aria-labelledby id is missing, which axe only lists as needs review', () => {
+    const missing = page('/missing-id').findings.filter((f) => f.id === 'ngbr/missing-id-reference');
+    expect(missing).toHaveLength(1);
+    expect(missing[0]).toMatchObject({ impact: 'serious', wcag: ['4.1.2'], target: 'div[aria-labelledby]' });
+    expect(ids('/missing-id')).not.toContain('aria-valid-attr-value');
+    expect(report.checks?.idReferences).toBe(true);
   });
 
   it('flags routes that share one page title, and only those', () => {

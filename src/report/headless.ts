@@ -587,6 +587,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     axeVersion: axeVersion(),
     ...(tags && { tags }),
     keyboard: keyboard ?? false,
+    idReferences: true,
     focusTraps,
     ...(walkthrough && { walkthrough }),
     // Only when at least one route change was checked, so the ACR doesn't count a check that didn't happen.
