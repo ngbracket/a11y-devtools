@@ -82,6 +82,18 @@ export interface A11yDevtoolsOptions {
    */
   keyboard?: boolean;
   /**
+   * Report an `aria-labelledby` or `aria-describedby` that names an id with no
+   * element (`ngbr/missing-id-reference`). Runs whether `keyboard` is on or
+   * not. Default true.
+   */
+  idReferences?: boolean;
+  /**
+   * Report a field that looks like it asks for the user's name, email, phone
+   * number or address and has no `autocomplete` (`ngbr/missing-autocomplete`).
+   * Runs whether `keyboard` is on or not. Default true.
+   */
+  inputPurpose?: boolean;
+  /**
    * Start switched on. Default true. Only used when the developer hasn't toggled
    * it yet: once they switch it on or off (pill or shortcut), that choice is
    * remembered in `localStorage` and wins over this default on reload.
@@ -160,6 +172,8 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
     tags,
     frameworkPrefixes,
     keyboard = false,
+    idReferences = true,
+    inputPurpose = true,
     enabled: enabledByDefault = true,
     pill = 'bottom-left',
     shortcut: shortcutText = DEFAULT_TOGGLE_SHORTCUT,
@@ -383,7 +397,7 @@ function devtoolsProviders(options: A11yDevtoolsOptions): EnvironmentProviders {
           rescanQueued = true; // don't stack scans; run one more when this finishes
           return;
         }
-        currentScan = runA11yScan(root?.(), { log, logger, axe, frameworkPrefixes, keyboard })
+        currentScan = runA11yScan(root?.(), { log, logger, axe, frameworkPrefixes, keyboard, idReferences, inputPurpose })
           .then((findings) => {
             if (!enabled) return; // switched off mid-scan: draw nothing
             lastFindings = findings;

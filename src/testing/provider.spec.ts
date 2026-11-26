@@ -93,6 +93,30 @@ describe('provideA11yDevtools', () => {
     expect(pill()?.getAttribute('aria-checked')).toBe('true');
   });
 
+  it('passes idReferences: false and inputPurpose: false to its scans', async () => {
+    host.innerHTML = `<div role="dialog" aria-labelledby="gone"></div><label for="sn">Surname</label><input id="sn">`;
+    const logged = (logger: Logger) =>
+      JSON.stringify([
+        (logger.groupCollapsed as ReturnType<typeof vi.fn>).mock.calls,
+        (logger.warn as ReturnType<typeof vi.fn>).mock.calls,
+        (logger.info as ReturnType<typeof vi.fn>).mock.calls,
+      ]);
+    const logger = makeLogger();
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideA11yDevtools({ root: () => host, logger, debounceMs: 0, idReferences: false, inputPurpose: false }),
+      ],
+    });
+    TestBed.inject(ApplicationRef);
+    const fixture = TestBed.createComponent(AppComponent);
+    host.appendChild(fixture.nativeElement);
+    await fixture.whenStable();
+    await waitFor(() => (logger.groupCollapsed as ReturnType<typeof vi.fn>).mock.calls.length > 0);
+    expect(logged(logger)).not.toContain('missing-id-reference');
+    expect(logged(logger)).not.toContain('missing-autocomplete');
+  });
+
   it('respects enabled:false, pill:false and shortcut:false', async () => {
     const logger = makeLogger();
     TestBed.configureTestingModule({
