@@ -211,6 +211,10 @@ const PAGES: Record<string, string> = {
       });
     </script>`,
 
+  // Two routes with one static title, as a client's booking site had on every route.
+  '/same-title-a': `<main><h1>Book a class</h1></main>`,
+  '/same-title-b': `<main><h1>Book an activity</h1></main>`,
+
   // Plain axe + layout: a missing alt, and a positive tabindex that jumps up the page.
   '/axe': `
     <main>
@@ -243,8 +247,10 @@ const PAGES: Record<string, string> = {
 const STRICT_CSP =
   "default-src 'self'; img-src data:; script-src 'self'; style-src 'self'; require-trusted-types-for 'script'";
 
-function html(body: string): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Fixture</title></head><body>${body}</body></html>`;
+/** Each page gets its own title, except `/same-title-*`, which share one (ngbr/duplicate-page-title). */
+function html(body: string, url: string): string {
+  const title = url.startsWith('/same-title') ? 'Leisure centres' : `Fixture ${url}`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title></head><body>${body}</body></html>`;
 }
 
 describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
@@ -261,7 +267,7 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
           'content-security-policy': STRICT_CSP,
         }),
       });
-      const page = body ? html(body) : 'not found';
+      const page = body ? html(body, req.url!) : 'not found';
       res.end(
         req.url === '/csp-meta'
           ? page.replace('<head>', `<head><meta http-equiv="Content-Security-Policy" content="${STRICT_CSP}">`)
@@ -341,6 +347,36 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
       ['ngbr/unreachable-control', 'serious', 'location'],
       ['ngbr/click-without-key', 'moderate', 'no-key'],
     ]);
+  });
+
+  it('flags routes that share one page title, and only those', () => {
+    const a = page('/same-title-a').findings.filter((f) => f.id === 'ngbr/duplicate-page-title');
+    expect(a).toHaveLength(1);
+    expect(a[0]).toMatchObject({ impact: 'moderate', wcag: ['2.4.2'], target: 'title', component: null });
+    expect(a[0].help).toContain('"Leisure centres"');
+    expect(a[0].help).toContain('(/same-title-b)');
+    expect(ids('/same-title-b')).toContain('ngbr/duplicate-page-title');
+    expect(ids('/axe')).not.toContain('ngbr/duplicate-page-title');
+    expect(page('/axe').title).toBe('Fixture /axe');
+    expect(report.checks?.pageTitles).toBe(true);
+  });
+
+  it('does not compare titles with only one route', async () => {
+    const { scanPages } = (await import(distReport)) as typeof import('../report/index');
+    const r = await scanPages({ baseUrl, routes: ['/same-title-a'], waitMs: 50 });
+    expect(r.pages[0].findings.map((f) => f.id)).not.toContain('ngbr/duplicate-page-title');
+    expect(r.checks?.pageTitles).toBeUndefined();
+  });
+
+  it('does not count one route scanned twice as a duplicate', async () => {
+    const { scanPages } = (await import(distReport)) as typeof import('../report/index');
+    const r = await scanPages({
+      baseUrl,
+      routes: ['/same-title-a', '/same-title-a#main'],
+      labels: { '/same-title-a#main': 'Again' },
+      waitMs: 50,
+    });
+    expect(r.pages.flatMap((p) => p.findings).map((f) => f.id)).not.toContain('ngbr/duplicate-page-title');
   });
 
   it('does not count summaries inside a closed <details> as tab stops (nested sidebar)', () => {

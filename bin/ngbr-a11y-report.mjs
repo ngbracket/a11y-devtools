@@ -31,7 +31,9 @@ Options:
   --serve-timeout <s>
                      Seconds to wait for --serve to answer (default 180).
                      A failed Angular build stops it straight away
-  --route <path>     Route to scan; repeat for multiple routes
+  --route <path>     Route to scan; repeat for multiple routes. With 2 or more,
+                     routes that share a page title are reported
+                     (ngbr/duplicate-page-title)
   --from <file>      Don't scan: read a previous run's JSON report (from --out)
                      and write it in the --format(s) asked for — e.g. add an
                      HTML report or ACR worksheet later. --baseline and

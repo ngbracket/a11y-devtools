@@ -23,6 +23,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `ngbr/duplicate-page-title`: with 2 or more routes, report mode compares
+  their page titles and reports each route whose title is the same as another
+  route's, under WCAG 2.4.2 Page Titled. An SPA that never sets a title per
+  route shows the same one on every page, so tabs, history and a screen
+  reader can't tell the pages apart. It is a heuristic to verify by hand:
+  routes that show the same content can share a title. Routes that failed to
+  scan, dark passes and empty titles (axe's `document-title`) are left out.
+  Each page in the JSON report now has its `title`, and `checks.pageTitles`
+  says the comparison ran, so the ACR worksheet counts it for 2.4.2.
 - `checks.listeners` in the JSON report says where the keyboard checks read
   listeners from: `angular` (a dev build), `browser` (a production build) or
   `none`. For `browser` and `none`, the Markdown, HTML and ACR reports and the

@@ -17,6 +17,8 @@ export interface PageReport {
   label: string;
   /** The URL actually scanned. */
   url: string;
+  /** `document.title` when the page was scanned. Absent in reports from before 0.21.0. */
+  title?: string;
   findings: A11yFinding[];
   /** Set when this route failed to scan; findings will be empty. */
   error?: string;
@@ -111,6 +113,8 @@ export interface ScanChecks {
   walkthrough?: boolean;
   /** The run moved between the routes inside the app and checked focus each time. */
   navigation?: boolean;
+  /** The titles of 2 or more scanned pages were compared (`ngbr/duplicate-page-title`). */
+  pageTitles?: boolean;
   /**
    * Where the keyboard checks read event listeners from (the weakest across the
    * pages): Angular's debug API in a dev build, the browser in a production
@@ -217,6 +221,7 @@ export function toJson(report: ScanReport, diff?: BaselineDiff): string {
       pages: report.pages.map((p) => ({
         label: p.label,
         url: p.url,
+        ...(p.title !== undefined && { title: p.title }),
         // A failed route must not read as a clean one: keep its error.
         ...(p.error !== undefined && { error: p.error }),
         ...(p.colorScheme && { colorScheme: p.colorScheme }),
@@ -264,6 +269,7 @@ export function parseReport(json: string): ScanReport {
     pages: pages.map((p) => ({
       label: p.label,
       url: p.url,
+      ...(typeof p.title === 'string' && { title: p.title }),
       findings: p.findings,
       ...(p.error !== undefined && { error: p.error }),
       ...(p.colorScheme && { colorScheme: p.colorScheme }),

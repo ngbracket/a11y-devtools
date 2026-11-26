@@ -10,6 +10,7 @@ import type { A11yFinding } from '../scan.js';
 import type { ListenerSource } from '../attribution.js';
 import { findingsNotIn } from './baseline.js';
 import { LISTENER_RECORDER_SCRIPT } from './listener-recorder.js';
+import { addDuplicateTitleFindings, titlesCompared } from './page-titles.js';
 import type { Walkthrough } from '../keyboard/walkthrough.js';
 import type { NavigationRecord } from '../navigation/record.js';
 import type { PageReport, ScanChecks, ScanReport } from './format.js';
@@ -474,7 +475,8 @@ async function scanPass(
             console.warn(`ngbr-a11y-report: focus-trap walk failed on ${label}: ${message}`);
           }
         }
-        pages.push({ label, url: page.url(), findings, colorScheme, ...(walkthrough && { walkthrough }) });
+        const title = await page.title();
+        pages.push({ label, url: page.url(), title, findings, colorScheme, ...(walkthrough && { walkthrough }) });
       } catch (err) {
         // One bad route shouldn't sink the whole run — record it and continue.
         const message = err instanceof Error ? err.message : String(err);
@@ -569,6 +571,9 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
   } finally {
     await browser.close();
   }
+  // Across routes, so only once every page has scanned.
+  const pageTitles = titlesCompared(pages);
+  if (pageTitles) pages = addDuplicateTitleFindings(pages);
 
   const checks: ScanChecks = {
     axeVersion: axeVersion(),
@@ -578,6 +583,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     ...(walkthrough && { walkthrough }),
     // Only when at least one route change was checked, so the ACR doesn't count a check that didn't happen.
     ...(moves.size > 0 && { navigation: true }),
+    ...(pageTitles && { pageTitles }),
     ...(keyboard && config.listenerSources.size > 0 && { listeners: weakestSource(config.listenerSources) }),
   };
   return { generatedAt: new Date().toISOString(), checks, pages };

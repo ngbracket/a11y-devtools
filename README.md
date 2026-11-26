@@ -36,6 +36,8 @@ Part of the `@ngbracket` Angular tooling family.
 - Focus lost between scans: reports a re-render or a route change that removes the
   focused element and leaves focus on the page body, named after the component.
   Report mode checks route changes too, with `--navigation`.
+- Same page title on every route: report mode compares the titles of the routes it
+  scans and reports routes that share one (`ngbr/duplicate-page-title`).
 - Production weight: does nothing in production builds, and axe-core isn't loaded
   there.
 
@@ -148,3 +150,4 @@ ever becomes reachable through a static import.
 - Issue-count badge on the pill and a per-component filter in its menu.
 - Tab order walkthrough in report mode (`--walkthrough`).
 - Focus lost to a re-render or a route change, with a route-change list in the pill menu.
+- Routes that share one page title, in report mode.

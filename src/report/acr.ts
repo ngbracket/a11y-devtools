@@ -71,7 +71,7 @@ export interface AxeRuleMeta {
  */
 const NGBR_RULES: Record<
   string,
-  { criteria: readonly string[]; ranWhen?: keyof Pick<ScanChecks, 'keyboard' | 'focusTraps' | 'navigation'> }
+  { criteria: readonly string[]; ranWhen?: keyof Pick<ScanChecks, 'keyboard' | 'focusTraps' | 'navigation' | 'pageTitles'> }
 > = {
   'ngbr/unreachable-control': { criteria: NGBR_RULE_CRITERIA['ngbr/unreachable-control'], ranWhen: 'keyboard' },
   'ngbr/click-without-key': { criteria: NGBR_RULE_CRITERIA['ngbr/click-without-key'], ranWhen: 'keyboard' },
@@ -83,6 +83,10 @@ const NGBR_RULES: Record<
   'ngbr/focus-lost-on-navigation': {
     criteria: NGBR_RULE_CRITERIA['ngbr/focus-lost-on-navigation'],
     ranWhen: 'navigation',
+  },
+  'ngbr/duplicate-page-title': {
+    criteria: NGBR_RULE_CRITERIA['ngbr/duplicate-page-title'],
+    ranWhen: 'pageTitles',
   },
   // Only the in-app overlay can see a re-render remove the focused element: no
   // run checks for it, so it counts only when a report has its findings.

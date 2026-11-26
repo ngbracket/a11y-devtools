@@ -127,6 +127,13 @@ describe('buildAcrWorksheet', () => {
     expect(row(tagged.rows, '2.5.8')).toMatchObject({ result: 'no-failures-detected', checkedBy: ['target-size'] });
   });
 
+  it('counts the page-title rule for 2.4.2 only when titles were compared', () => {
+    const page = [{ label: '/', url: 'http://x/', findings: [] }];
+    expect(row(buildAcrWorksheet(report(page), RULES).rows, '2.4.2').checkedBy).not.toContain('ngbr/duplicate-page-title');
+    const on = buildAcrWorksheet(report(page, { checks: { ...checks, pageTitles: true } }), RULES);
+    expect(row(on.rows, '2.4.2').checkedBy).toEqual(['ngbr/duplicate-page-title']);
+  });
+
   it('counts the route-change rule only when the run moved between routes', () => {
     const page = [{ label: '/', url: 'http://x/', findings: [] }];
     const on = buildAcrWorksheet(report(page, { checks: { ...checks, navigation: true } }), RULES);

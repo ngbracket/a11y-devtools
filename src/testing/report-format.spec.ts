@@ -90,9 +90,10 @@ describe('toJson', () => {
 describe('parseReport', () => {
   const full: ScanReport = {
     generatedAt: report.generatedAt,
-    checks: { axeVersion: '4.13.0', tags: ['wcag22aa'], keyboard: true, focusTraps: false },
+    checks: { axeVersion: '4.13.0', tags: ['wcag22aa'], keyboard: true, focusTraps: false, pageTitles: true },
     pages: [
       ...report.pages,
+      { label: 'Book', url: 'http://localhost:4200/book', title: 'Book a class', findings: [] },
       { label: 'Admin', url: 'http://localhost:4200/admin', findings: [], error: 'Timeout 30000ms exceeded' },
       {
         label: 'Dashboard (dark)',
