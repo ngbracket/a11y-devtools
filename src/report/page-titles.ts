@@ -41,22 +41,22 @@ export function titlesCompared(pages: readonly PageReport[]): boolean {
  * One `ngbr/duplicate-page-title` finding per page whose title is the same as
  * another scanned page's (WCAG 2.4.2 Page Titled). A heuristic: two routes that
  * show the same content can share a title, so each finding says to verify it.
- * Keyed by the page's label, for {@link addDuplicateTitleFindings}.
+ * Keyed by the page's index in `pages`, for {@link addDuplicateTitleFindings}.
  */
-export function duplicateTitleFindings(pages: readonly PageReport[]): Map<string, A11yFinding> {
+export function duplicateTitleFindings(pages: readonly PageReport[]): Map<number, A11yFinding> {
   const byTitle = new Map<string, PageReport[]>();
   for (const page of checkedPages(pages)) {
     const title = normalizeTitle(page.title!);
     byTitle.set(title, [...(byTitle.get(title) ?? []), page]);
   }
-  const findings = new Map<string, A11yFinding>();
+  const findings = new Map<number, A11yFinding>();
   for (const [title, group] of byTitle) {
     const keys = [...new Set(group.map((p) => pageKey(p.url)))];
     if (keys.length < 2) continue;
     for (const page of group) {
       const own = pageKey(page.url);
       const others = keys.filter((k) => k !== own);
-      findings.set(page.label, {
+      findings.set(pages.indexOf(page), {
         id: DUPLICATE_TITLE_RULE,
         impact: 'moderate',
         help:
@@ -81,8 +81,8 @@ export function duplicateTitleFindings(pages: readonly PageReport[]): Map<string
 export function addDuplicateTitleFindings(pages: PageReport[]): PageReport[] {
   const findings = duplicateTitleFindings(pages);
   if (!findings.size) return pages;
-  return pages.map((page) => {
-    const finding = findings.get(page.label);
+  return pages.map((page, i) => {
+    const finding = findings.get(i);
     return finding ? { ...page, findings: [...page.findings, finding] } : page;
   });
 }

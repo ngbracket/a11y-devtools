@@ -475,8 +475,9 @@ async function scanPass(
             console.warn(`ngbr-a11y-report: focus-trap walk failed on ${label}: ${message}`);
           }
         }
-        const title = await page.title();
-        pages.push({ label, url: page.url(), title, findings, colorScheme, ...(walkthrough && { walkthrough }) });
+        // A late client redirect can destroy the page context; the title isn't worth losing the findings for.
+        const title = await page.title().catch(() => undefined);
+        pages.push({ label, url: page.url(), ...(title !== undefined && { title }), findings, colorScheme, ...(walkthrough && { walkthrough }) });
       } catch (err) {
         // One bad route shouldn't sink the whole run — record it and continue.
         const message = err instanceof Error ? err.message : String(err);

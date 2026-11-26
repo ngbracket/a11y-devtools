@@ -18,8 +18,8 @@ describe('duplicateTitleFindings', () => {
       page('Home', '/', 'Leisure Centres'),
       page('About', '/about', 'About us | Leisure Centres'),
     ]);
-    expect([...found.keys()]).toEqual(['Book class', 'Book activity', 'Home']);
-    const finding = found.get('Book class')!;
+    expect([...found.keys()]).toEqual([0, 1, 2]);
+    const finding = found.get(0)!;
     expect(finding).toMatchObject({
       id: 'ngbr/duplicate-page-title',
       impact: 'moderate',
@@ -31,12 +31,12 @@ describe('duplicateTitleFindings', () => {
     });
     expect(finding.help).toContain('the same on 2 other scanned pages (/book/activity, /)');
     expect(finding.help).toContain('Heuristic');
-    expect(found.get('Home')!.help).toContain('(/book/class, /book/activity)');
+    expect(found.get(2)!.help).toContain('(/book/class, /book/activity)');
   });
 
   it('says "another scanned page" for a pair', () => {
     const found = duplicateTitleFindings([page('A', '/a', 'Shop'), page('B', '/b', 'Shop')]);
-    expect(found.get('A')!.help).toContain('the same on another scanned page (/b)');
+    expect(found.get(0)!.help).toContain('the same on another scanned page (/b)');
   });
 
   it('treats hash routes as different pages, and an in-page anchor as the same page', () => {
@@ -59,7 +59,7 @@ describe('duplicateTitleFindings', () => {
 
   it('escapes the title in the html snippet', () => {
     const found = duplicateTitleFindings([page('A', '/a', 'Tom & <Jerry>'), page('B', '/b', 'Tom & <Jerry>')]);
-    expect(found.get('A')!.html).toBe('<title>Tom &amp; &lt;Jerry&gt;</title>');
+    expect(found.get(0)!.html).toBe('<title>Tom &amp; &lt;Jerry&gt;</title>');
   });
 });
 
@@ -72,6 +72,12 @@ describe('titlesCompared', () => {
 });
 
 describe('addDuplicateTitleFindings', () => {
+  it('gives each page its own finding when two routes share a label', () => {
+    const out = addDuplicateTitleFindings([page('Same', '/a', 'Shop'), page('Same', '/b', 'Shop')]);
+    expect(out[0].findings[0].help).toContain('(/b)');
+    expect(out[1].findings[0].help).toContain('(/a)');
+  });
+
   it('appends the finding to its page and leaves the others as they were', () => {
     const pages = [page('A', '/a', 'Shop'), page('B', '/b', 'Shop'), page('C', '/c', 'Basket')];
     const out = addDuplicateTitleFindings(pages);
