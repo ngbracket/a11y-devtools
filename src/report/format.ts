@@ -119,6 +119,8 @@ export interface ScanChecks {
   idReferences?: boolean;
   /** Fields were checked for a missing `autocomplete` (`ngbr/missing-autocomplete`). From 0.21.0. */
   inputPurpose?: boolean;
+  /** Each tab stop's focus indicator was measured from screenshots (`ngbr/focus-indicator-contrast`). From 0.21.0. */
+  focusIndicators?: boolean;
   /**
    * Where the keyboard checks read event listeners from (the weakest across the
    * pages): Angular's debug API in a dev build, the browser in a production

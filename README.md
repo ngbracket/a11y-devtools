@@ -36,6 +36,9 @@ Part of the `@ngbracket` Angular tooling family.
 - Focus lost between scans: reports a re-render or a route change that removes the
   focused element and leaves focus on the page body, named after the component.
   Report mode checks route changes too, with `--navigation`.
+- Focus indicators measured from screenshots: report mode presses Tab through each
+  route and reports a stop whose focus style doesn't change it, or changes it by less
+  than 3:1 (`--focus-indicators`, `ngbr/focus-indicator-contrast`).
 - Personal-data fields with no `autocomplete`: name, email, phone and address fields
   that browsers can't fill in (`ngbr/missing-autocomplete`).
 - ARIA references to missing ids: an `aria-labelledby` or `aria-describedby` that
@@ -157,3 +160,4 @@ ever becomes reachable through a static import.
 - Routes that share one page title, in report mode.
 - `aria-labelledby` and `aria-describedby` that name a missing id.
 - Name, email, phone and address fields with no `autocomplete`.
+- Focus indicator contrast from screenshots, in report mode (`--focus-indicators`).

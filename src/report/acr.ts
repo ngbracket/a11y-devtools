@@ -71,7 +71,7 @@ export interface AxeRuleMeta {
  */
 const NGBR_RULES: Record<
   string,
-  { criteria: readonly string[]; ranWhen?: keyof Pick<ScanChecks, 'keyboard' | 'focusTraps' | 'navigation' | 'pageTitles' | 'idReferences' | 'inputPurpose'> }
+  { criteria: readonly string[]; ranWhen?: keyof Pick<ScanChecks, 'keyboard' | 'focusTraps' | 'navigation' | 'pageTitles' | 'idReferences' | 'inputPurpose' | 'focusIndicators'> }
 > = {
   'ngbr/unreachable-control': { criteria: NGBR_RULE_CRITERIA['ngbr/unreachable-control'], ranWhen: 'keyboard' },
   'ngbr/click-without-key': { criteria: NGBR_RULE_CRITERIA['ngbr/click-without-key'], ranWhen: 'keyboard' },
@@ -87,6 +87,10 @@ const NGBR_RULES: Record<
   'ngbr/missing-id-reference': {
     criteria: NGBR_RULE_CRITERIA['ngbr/missing-id-reference'],
     ranWhen: 'idReferences',
+  },
+  'ngbr/focus-indicator-contrast': {
+    criteria: NGBR_RULE_CRITERIA['ngbr/focus-indicator-contrast'],
+    ranWhen: 'focusIndicators',
   },
   'ngbr/missing-autocomplete': {
     criteria: NGBR_RULE_CRITERIA['ngbr/missing-autocomplete'],

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import type { RunOptions as AxeRunOptions } from 'axe-core';
 import type { Browser, Page } from 'playwright';
 import { detectTabTrap, type FocusObservation } from '../keyboard/focus-walk.js';
+import type { Box, FocusChange, FocusIndicatorProbe, FocusedStop } from '../keyboard/focus-indicator.js';
 import { OVERLAY_EXCLUDE_SELECTOR } from '../overlay.js';
 import type { A11yFinding } from '../scan.js';
 import type { ListenerSource } from '../attribution.js';
@@ -129,6 +130,14 @@ export interface ScanPagesOptions {
    * Set `false` to turn it off. Default true.
    */
   inputPurpose?: boolean;
+  /**
+   * Also press Tab through each route and measure every tab stop's focus
+   * indicator: screenshot the stop focused and unfocused, and report one that
+   * doesn't change at all, or changes by less than 3:1, as
+   * `ngbr/focus-indicator-contrast` (WCAG 2.4.7 and 1.4.11). Takes two
+   * screenshots per stop, so it's off by default. Runs in each colour scheme.
+   */
+  focusIndicators?: boolean;
 }
 
 type PlaywrightModule = typeof import('playwright');
@@ -158,6 +167,110 @@ type ProbeWindow = {
   __ngbA11yCreateFocusProbe: (prefixes?: readonly string[]) => InPageProbe;
   __ngbA11yFocusProbe: InPageProbe;
 };
+
+type IndicatorWindow = {
+  __ngbA11yCreateFocusIndicatorProbe: (prefixes?: readonly string[]) => FocusIndicatorProbe;
+  __ngbA11yFocusIndicatorProbe: FocusIndicatorProbe;
+  __ngbA11yFocusChange: (before: ArrayLike<number>, after: ArrayLike<number>) => FocusChange;
+};
+
+/**
+ * Finishes transitions and animations at once while the walk runs, so a focus
+ * style that fades in, or a skip link that slides in, is measured where it
+ * ends up rather than where it starts.
+ */
+const NO_MOTION_CSS =
+  '*, *::before, *::after { transition-duration: 0s !important; transition-delay: 0s !important; ' +
+  'animation-duration: 0s !important; animation-delay: 0s !important; }';
+
+/** Most tab stops measured on one page, so a huge page can't run forever. */
+const MAX_INDICATOR_STOPS = 200;
+
+/**
+ * Press Tab through the page once, and at each stop screenshot the page focused,
+ * blur the element, screenshot it again, and compare the two around the element
+ * in `helper` (a blank page with the in-page bundle). Then put focus back so the
+ * next Tab moves on. Needs the in-page bundle already injected into `page`.
+ * Blurring can run the app's blur handlers (a form field may show an error), so
+ * the unfocused shot can differ more than the focus style does: that hides a
+ * weak indicator, it never invents one.
+ */
+async function walkFocusIndicators(
+  page: Page,
+  helper: Page,
+  frameworkPrefixes: readonly string[] | undefined,
+): Promise<A11yFinding[]> {
+  const noMotion = await page.addStyleTag({ content: NO_MOTION_CSS });
+  try {
+    return await tabThroughIndicators(page, helper, frameworkPrefixes);
+  } finally {
+    await noMotion.evaluate((style) => style.remove()).catch(() => undefined);
+  }
+}
+
+async function tabThroughIndicators(
+  page: Page,
+  helper: Page,
+  frameworkPrefixes: readonly string[] | undefined,
+): Promise<A11yFinding[]> {
+  await page.evaluate((prefixes) => {
+    const w = window as unknown as IndicatorWindow;
+    w.__ngbA11yFocusIndicatorProbe = w.__ngbA11yCreateFocusIndicatorProbe(prefixes);
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    window.scrollTo(0, 0);
+  }, frameworkPrefixes);
+  const current = () =>
+    page.evaluate(() => (window as unknown as IndicatorWindow).__ngbA11yFocusIndicatorProbe.current());
+  const blur = () => page.evaluate(() => (window as unknown as IndicatorWindow).__ngbA11yFocusIndicatorProbe.blur());
+  const refocus = (id: number) =>
+    page.evaluate((i) => (window as unknown as IndicatorWindow).__ngbA11yFocusIndicatorProbe.refocus(i), id);
+  const finding = (id: number, change: FocusChange) =>
+    page.evaluate(
+      ({ id, change }) => (window as unknown as IndicatorWindow).__ngbA11yFocusIndicatorProbe.finding(id, change),
+      { id, change },
+    );
+  const shot = () => page.screenshot({ animations: 'disabled', caret: 'hide', type: 'png' });
+
+  const findings: A11yFinding[] = [];
+  const seen = new Set<number>();
+  for (let i = 0; i < MAX_INDICATOR_STOPS + 2; i++) {
+    await page.keyboard.press('Tab');
+    const stop: FocusedStop | null = await current();
+    if (!stop) {
+      if (seen.size > 0) break; // focus left the page after the last stop
+      continue;
+    }
+    if (seen.has(stop.id) || seen.size >= MAX_INDICATOR_STOPS) break; // lapped the page
+    seen.add(stop.id);
+    if (stop.skip || !stop.area) continue;
+    const focused = await shot();
+    await blur();
+    const unfocused = await shot();
+    await refocus(stop.id);
+    const found = await finding(stop.id, await compareShots(helper, unfocused, focused, stop.area));
+    if (found) findings.push(found);
+  }
+  return findings;
+}
+
+/** Decode two screenshots in the helper page and compare them over `area`. */
+async function compareShots(helper: Page, before: Buffer, after: Buffer, area: Box): Promise<FocusChange> {
+  return helper.evaluate(
+    async ({ a, b, area }) => {
+      const pixels = async (base64: string) => {
+        const blob = await (await fetch(`data:image/png;base64,${base64}`)).blob();
+        const bitmap = await createImageBitmap(blob);
+        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(bitmap, 0, 0);
+        return ctx.getImageData(area.x, area.y, area.width, area.height).data;
+      };
+      const w = window as unknown as IndicatorWindow;
+      return w.__ngbA11yFocusChange(await pixels(a), await pixels(b));
+    },
+    { a: before.toString('base64'), b: after.toString('base64'), area },
+  );
+}
 
 /**
  * Press Tab through the page until focus either laps the page (no trap) or
@@ -377,6 +490,7 @@ interface PassConfig {
   keyboard: boolean | undefined;
   idReferences: boolean;
   inputPurpose: boolean;
+  focusIndicators: boolean;
   focusTraps: boolean;
   walkthrough: boolean;
   navigation: boolean;
@@ -424,6 +538,12 @@ async function scanPass(
   const pages: PageReport[] = [];
   try {
     const page = await context.newPage();
+    // A blank page to decode and compare focus-indicator screenshots in.
+    let helper: Page | undefined;
+    if (config.focusIndicators) {
+      helper = await context.newPage();
+      await helper.addScriptTag({ content: inPageScript });
+    }
 
     if (config.setup) {
       await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
@@ -466,6 +586,15 @@ async function scanPass(
               (window as unknown as { __ngbA11yListenerSource: () => ListenerSource }).__ngbA11yListenerSource(),
             ),
           );
+        }
+        if (config.focusIndicators && helper) {
+          // Before the trap walk, which leaves focus wherever its laps end.
+          try {
+            findings.push(...(await walkFocusIndicators(page, helper, frameworkPrefixes)));
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.warn(`ngbr-a11y-report: focus-indicator check failed on ${label}: ${message}`);
+          }
         }
         // Before the trap walk: pressing Tab can change the page.
         let walkthrough: Walkthrough | undefined;
@@ -534,6 +663,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     pageTitles: comparePageTitles = true,
     idReferences = true,
     inputPurpose = true,
+    focusIndicators = false,
     darkClass,
     darkAttribute,
   } = options;
@@ -549,6 +679,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     keyboard,
     idReferences,
     inputPurpose,
+    focusIndicators,
     focusTraps,
     walkthrough,
     navigation,
@@ -607,6 +738,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     keyboard: keyboard ?? false,
     ...(idReferences && { idReferences }),
     ...(inputPurpose && { inputPurpose }),
+    ...(focusIndicators && { focusIndicators }),
     focusTraps,
     ...(walkthrough && { walkthrough }),
     // Only when at least one route change was checked, so the ACR doesn't count a check that didn't happen.

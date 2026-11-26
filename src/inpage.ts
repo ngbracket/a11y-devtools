@@ -1,6 +1,7 @@
 import type { RunOptions as AxeRunOptions } from 'axe-core';
 import { listenerSource, type ListenerSource } from './attribution.js';
 import { createFocusWalkProbe } from './keyboard/focus-walk.js';
+import { createFocusIndicatorProbe, focusChange, type FocusIndicatorProbe } from './keyboard/focus-indicator.js';
 import { createFocusLossProbe, type FocusLossProbe } from './navigation/focus-loss.js';
 import { linearWalkthrough, type Walkthrough } from './keyboard/walkthrough.js';
 import { scan, type A11yFinding, type ScanOptions } from './scan.js';
@@ -33,6 +34,14 @@ const run: InPageScan = (options, scanOptions) => scan(document, options, scanOp
 (globalThis as unknown as {
   __ngbA11yCreateFocusProbe: (prefixes?: readonly string[]) => ReturnType<typeof createFocusWalkProbe>;
 }).__ngbA11yCreateFocusProbe = (prefixes) => createFocusWalkProbe(document, prefixes);
+
+// The focus-indicator check: the driver presses Tab, screenshots each stop
+// focused and unfocused, and compares the two (in a blank page, with
+// __ngbA11yFocusChange) around the element.
+(globalThis as unknown as {
+  __ngbA11yCreateFocusIndicatorProbe: (prefixes?: readonly string[]) => FocusIndicatorProbe;
+}).__ngbA11yCreateFocusIndicatorProbe = (prefixes) => createFocusIndicatorProbe(document, prefixes);
+(globalThis as unknown as { __ngbA11yFocusChange: typeof focusChange }).__ngbA11yFocusChange = focusChange;
 
 // The linear walkthrough: the tab order with each stop's computed role and name.
 (globalThis as unknown as {

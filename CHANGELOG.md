@@ -23,6 +23,19 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `--focus-indicators` (`focusIndicators: true`) measures each tab stop's
+  focus indicator in report mode. It presses Tab through the route, and at
+  each stop screenshots the page focused and unfocused and compares the
+  pixels in and up to 8px around the element. A stop that doesn't change at
+  all is reported as serious, and one where fewer pixels than the element's
+  width plus height change by a contrast ratio of 3:1 is reported as
+  moderate, with the strongest ratio found. The rule is
+  `ngbr/focus-indicator-contrast`, under WCAG 2.4.7 and 1.4.11, and it's a
+  heuristic. Transitions and animations are finished at once during the
+  walk, so a style that fades or slides in is measured where it ends.
+  Blurring a stop runs the app's blur handlers, which can make a weak
+  indicator look stronger but never weaker. Off by default, as it takes two
+  screenshots per tab stop. It runs in each colour scheme.
 - `ngbr/missing-autocomplete`: a form field that looks like it asks for the
   user's name, email, phone number, address, postcode, date of birth,
   organisation, username or password, and has no `autocomplete` attribute

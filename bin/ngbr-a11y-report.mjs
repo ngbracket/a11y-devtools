@@ -65,6 +65,9 @@ Options:
   --focus-traps      Also walk each route with real Tab presses to find keyboard
                      traps — focus that cycles inside part of the page and
                      never moves on (ngbr/focus-trap). Runs after the scan
+  --focus-indicators Also press Tab through each route and measure every tab
+                     stop's focus indicator from screenshots: no visible change,
+                     or a change under 3:1 (ngbr/focus-indicator-contrast)
   --walkthrough      Also list each route's tab order with every stop's computed
                      role, name, states and component (an approximation, not
                      any one screen reader's output)
@@ -118,6 +121,7 @@ function parseArgs(argv) {
       case '--keyboard': opts.keyboard = true; break;
       case '--focus-traps': opts.focusTraps = true; break;
       case '--walkthrough': opts.walkthrough = true; break;
+      case '--focus-indicators': opts.focusIndicators = true; break;
       case '--navigation': opts.navigation = true; break;
       case '--no-page-titles': opts.pageTitles = false; break;
       case '--no-id-references': opts.idReferences = false; break;
@@ -140,7 +144,7 @@ const opts = parseArgs(process.argv.slice(2));
 const SCAN_ONLY = {
   base: '--base', serve: '--serve', serveTimeout: '--serve-timeout', routes: '--route', tags: '--tags',
   wait: '--wait', frameworkPrefixes: '--framework-prefixes / --no-skip-primitives', keyboard: '--keyboard',
-  focusTraps: '--focus-traps', walkthrough: '--walkthrough', navigation: '--navigation', pageTitles: '--no-page-titles', idReferences: '--no-id-references', inputPurpose: '--no-input-purpose', colorScheme: '--color-scheme', darkClass: '--dark-class',
+  focusTraps: '--focus-traps', walkthrough: '--walkthrough', focusIndicators: '--focus-indicators', navigation: '--navigation', pageTitles: '--no-page-titles', idReferences: '--no-id-references', inputPurpose: '--no-input-purpose', colorScheme: '--color-scheme', darkClass: '--dark-class',
   darkAttribute: '--dark-attribute', headed: '--headed',
 };
 if (opts.from && !opts.help) {
@@ -274,6 +278,7 @@ if (!report) {
       keyboard: opts.keyboard,
       focusTraps: opts.focusTraps,
       walkthrough: opts.walkthrough,
+      focusIndicators: opts.focusIndicators,
       navigation: opts.navigation,
       pageTitles: opts.pageTitles,
       idReferences: opts.idReferences,

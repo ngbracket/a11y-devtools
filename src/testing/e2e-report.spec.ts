@@ -233,6 +233,22 @@ const PAGES: Record<string, string> = {
       </form>
     </main>`,
 
+  // Focus indicators: the browser's own ring, none at all, a faint tint like a
+  // client's header icon buttons (1.26:1), and a strong custom outline.
+  '/focus-styles': `
+    <style>
+      button { margin: 20px; padding: 8px 16px; background: #c8b6e2; color: #000; border: 0; }
+      .none:focus { outline: none; }
+      .tint:focus { outline: none; background: #b39ddb; }
+      .strong:focus { outline: 2px solid #000; outline-offset: 2px; }
+    </style>
+    <main><h1>Focus styles</h1>
+      <button class="default">Default</button>
+      <button class="none">None</button>
+      <button class="tint">Tint</button>
+      <button class="strong">Strong</button>
+    </main>`,
+
   // Two routes with one static title, as a client's booking site had on every route.
   '/same-title-a': `<main><h1>Book a class</h1></main>`,
   '/same-title-b': `<main><h1>Book an activity</h1></main>`,
@@ -378,6 +394,20 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
     expect(ids('/missing-id')).not.toContain('aria-valid-attr-value');
     expect(report.checks?.idReferences).toBe(true);
   });
+
+  it('measures focus indicators from screenshots: none and a faint tint are reported', async () => {
+    const { scanPages } = (await import(distReport)) as typeof import('../report/index');
+    const r = await scanPages({ baseUrl, routes: ['/focus-styles'], waitMs: 50, focusIndicators: true });
+    const found = r.pages[0].findings.filter((f) => f.id === 'ngbr/focus-indicator-contrast');
+    expect(found.map((f) => [f.target, f.impact])).toEqual([
+      ['button.none', 'serious'],
+      ['button.tint', 'moderate'],
+    ]);
+    expect(found[0].wcag).toEqual(['1.4.11', '2.4.7']);
+    expect(found[1].help).toMatch(/the strongest change is 1\.\d\d:1/);
+    expect(r.checks?.focusIndicators).toBe(true);
+    expect(page('/focus-styles').findings.map((f) => f.id)).not.toContain('ngbr/focus-indicator-contrast');
+  }, 60_000);
 
   it('reports personal-data fields with no autocomplete, which axe never checks', async () => {
     const found = page('/guest-form').findings.filter((f) => f.id === 'ngbr/missing-autocomplete');
