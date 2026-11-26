@@ -3,6 +3,114 @@
 All notable changes to `@ngbracket/a11y-devtools` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.21.0
+
+### Fixed
+
+- `--keyboard` on a production build missed click handlers. The keyboard
+  checks read listeners through Angular's debug API, which a production build
+  doesn't have, so a clickable `div` with no role or tabindex wasn't reported.
+  Report mode now adds a script before the page loads that records each
+  element's `addEventListener` calls, and the checks read listeners from it
+  when Angular's API is missing. A production build now gets the
+  `ngbr/unreachable-control`, `ngbr/click-without-key`, arrow-key, drag and
+  hover checks, without component names. The listeners come from any script,
+  including library code that Angular's API doesn't list, so a production
+  scan can report a little more than a dev build. Our five example apps and
+  five Angular Material docs pages gave no extra findings from library code.
+  An app that hydrates with event replay listens for events on a container
+  element, so its handlers may still be missed.
+
+### Added
+
+- `--focus-indicators` (`focusIndicators: true`) measures each tab stop's
+  focus indicator in report mode. It presses Tab through the route, and at
+  each stop screenshots the page focused and unfocused and compares the
+  pixels in and up to 8px around the element. A stop that doesn't change at
+  all is reported as serious. One where too few pixels change by a contrast
+  ratio of 3:1 (fewer than three quarters of a 1px line along its longer
+  side, as far as it's on screen) is reported as moderate, with the
+  strongest ratio found. The rule is `ngbr/focus-indicator-contrast`, under
+  WCAG 2.4.7 and 1.4.11, and it's a heuristic. Transitions, animations and
+  smooth scrolling are finished at once during the walk, so a style that
+  fades or slides in is measured where it ends. Stops inside an iframe are
+  passed over and the walk carries on after them. A stop covered by
+  something else at its centre, such as a fixed bar, is skipped, as that's
+  focus being hidden. Anything else that changes between the two
+  screenshots can hide a weak indicator but can't add a finding. Off by
+  default, as it takes two screenshots per tab stop. It runs in each colour
+  scheme, after the walkthrough and before the keyboard-trap walk.
+- `ngbr/missing-autocomplete`: a form field that looks like it asks for the
+  user's name, email, phone number, address, postcode, date of birth,
+  organisation, username or password, and has no `autocomplete` attribute
+  (WCAG 1.3.5 Identify Input Purpose). axe-core's `autocomplete-valid` only
+  checks fields that already have a value, so a field with none was never
+  reported. The purpose comes from `type="email"`, `"tel"` or `"password"`,
+  then from whole words in the label, then `name`, `id` or `formcontrolname`,
+  then the placeholder. A label that names something else, or has more than
+  5 words, decides it. Lookup boxes ("Find your address") and labels such as
+  "Country code", "Email subject" or "Fax" are skipped. Plain "Address",
+  "Title" and "State" are left out, as they often mean something else. A
+  "New password" or "Confirm password" field gets `new-password`. Open
+  shadow roots are checked. A heuristic, moderate: 1.3.5 only covers fields
+  about the user, so a form that asks about someone else can fail a
+  `--fail-on moderate` gate until you turn it off or record a baseline. It
+  runs in every scan, in the overlay and in report mode, with
+  `--no-input-purpose` (`inputPurpose: false` in `scanPages()` and `scan()`)
+  to turn it off in report mode. The in-app overlay always runs it.
+  `checks.inputPurpose` lets the ACR worksheet count it for 1.3.5.
+- `ngbr/missing-id-reference`: an `aria-labelledby` or `aria-describedby`
+  that names an id with no element in the page. axe-core's
+  `aria-valid-attr-value` lists this as "needs review" when none of the ids
+  exist, and passes it when at least one does, so neither case was reported.
+  It runs in every scan, in the overlay and in report mode, with no flag.
+  The missing id is certain. A missing `aria-labelledby` id is serious when
+  none of the ids exist and the element has no other name (WCAG 4.1.2),
+  moderate when some ids exist, and minor when the browser names the element
+  another way, from `aria-label`, a `<label>`, `title` or its text. A missing
+  `aria-describedby` id is moderate or minor (WCAG 1.3.1). Open shadow roots
+  are checked, and an id is looked up in the element's own document or
+  shadow root, where the browser looks. Hidden and inert elements are
+  skipped. `checks.idReferences` says a report-mode run checked it, so the
+  ACR worksheet counts it for 1.3.1 and 4.1.2. Existing baselines will list
+  any of these findings as new. Turn it off with `--no-id-references`
+  (`idReferences: false` in `scanPages()` and `scan()`). The in-app overlay
+  always runs it.
+- `ngbr/duplicate-page-title`: with 2 or more routes, report mode compares
+  their page titles and reports each route whose title is the same as another
+  route's, under WCAG 2.4.2 Page Titled. An SPA that never sets a title per
+  route shows the same one on every page, so tabs, history and a screen
+  reader can't tell the pages apart. It is a heuristic to verify by hand:
+  routes that show the same content can share a title. Routes that failed to
+  scan, dark passes and empty titles (axe's `document-title`) are left out.
+  Each page in the JSON report now has its `title`, and `checks.pageTitles`
+  says the comparison ran, so the ACR worksheet counts it for 2.4.2.
+  It runs with no flag, so an app with one title on every route gets a new
+  moderate finding on each route after upgrading. With `--baseline` and
+  `--fail-on moderate`, that fails the gate until you fix the titles, record
+  a new baseline, or turn the check off with `--no-page-titles`
+  (`pageTitles: false` in `scanPages()`).
+- `checks.listeners` in the JSON report says where the keyboard checks read
+  listeners from: `angular` (a dev build), `browser` (a production build) or
+  `none`. For `browser` and `none`, the Markdown, HTML and ACR reports and the
+  CLI add a note. For `none` it lists the checks that were skipped.
+- With no listener source at all (for example `scan()` called on a production
+  build outside report mode, or in jsdom without Angular), an element with
+  text and its own `cursor: pointer` that Tab can't reach is reported as a
+  moderate `ngbr/unreachable-control`, labelled "verify manually". Labels are
+  skipped: their click goes to a control Tab reaches.
+
+### Changed
+
+- An `onclick`, `onkeydown`, `onkeyup` or `onkeypress` handler property now
+  counts as a listener.
+- Modal backdrops (a class ending in `backdrop`, such as
+  `cdk-overlay-backdrop` or `modal-backdrop`, and PrimeNG's `p-overlay-mask`)
+  are skipped by the unreachable-control check. Escape closes what they cover.
+- An element reported because it has a click listener no longer gets a second
+  finding for a click-only element inside it, so a clickable component host
+  and the card inside it give one finding.
+
 ## 0.20.0
 
 ### Added

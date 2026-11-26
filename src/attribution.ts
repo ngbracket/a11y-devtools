@@ -33,24 +33,67 @@ export interface NgListener {
 }
 
 /**
- * The DOM event names Angular has a listener bound for on `node` (template
- * `(event)` bindings and `@HostListener`s), lowercased and de-duplicated. Empty
- * when the debug global is absent (prod) or the node has none. Output/`@Output`
- * emitters are excluded — only real DOM events matter for keyboard operability.
+ * Where the keyboard layer reads event listeners from:
+ * - `'angular'`: Angular's dev-mode debug API (`window.ng.getListeners`);
+ * - `'browser'`: report mode's listener recorder, which runs before the page's
+ *   scripts and sees every `addEventListener` (a production build);
+ * - `'none'`: neither, so listener-based checks can't run.
+ */
+export type ListenerSource = 'angular' | 'browser' | 'none';
+
+/** The listener registry report mode's recorder publishes (see report/listener-recorder.ts). */
+interface RecordedListeners {
+  events(element: Element): string[];
+}
+
+function recordedListeners(): RecordedListeners | undefined {
+  const recorder = (globalThis as { __ngbA11yListeners?: RecordedListeners }).__ngbA11yListeners;
+  return typeof recorder?.events === 'function' ? recorder : undefined;
+}
+
+/** Which listener source {@link resolveListenerEvents} uses on this page. */
+export function listenerSource(): ListenerSource {
+  if (typeof ngDebug()?.getListeners === 'function') return 'angular';
+  return recordedListeners() ? 'browser' : 'none';
+}
+
+/** Event handler properties that count as listeners whatever the source (`onclick="…"`, `el.onclick = …`). */
+const HANDLER_PROPERTIES = ['click', 'keydown', 'keyup', 'keypress'];
+
+/**
+ * The DOM event names `node` has a listener for, lowercased and de-duplicated.
+ * In a dev build these are what Angular bound (template `(event)` bindings and
+ * `@HostListener`s, with key modifiers: `keydown.enter`); output/`@Output`
+ * emitters are excluded, as only real DOM events matter for keyboard
+ * operability. Without the debug API (prod), report mode's recorder supplies
+ * every `addEventListener` on the node instead (see {@link listenerSource}).
+ * Either way, an `onclick` or `onkey*` handler property counts too. Empty when
+ * nothing can be read or the node has none.
  */
 export function resolveListenerEvents(node: Element): string[] {
-  const ng = ngDebug();
-  if (typeof ng?.getListeners !== 'function') return [];
-  let listeners: NgListener[];
-  try {
-    listeners = ng.getListeners(node) ?? [];
-  } catch {
-    return []; // node isn't part of a live view
-  }
   const events = new Set<string>();
-  for (const listener of listeners) {
-    if (listener?.type === 'output') continue;
-    if (typeof listener?.name === 'string') events.add(listener.name.toLowerCase());
+  const ng = ngDebug();
+  const recorder = recordedListeners();
+  if (typeof ng?.getListeners === 'function') {
+    let listeners: NgListener[] = [];
+    try {
+      listeners = ng.getListeners(node) ?? [];
+    } catch {
+      // node isn't part of a live view
+    }
+    for (const listener of listeners) {
+      if (listener?.type === 'output') continue;
+      if (typeof listener?.name === 'string') events.add(listener.name.toLowerCase());
+    }
+  } else if (recorder) {
+    try {
+      for (const name of recorder.events(node)) events.add(name);
+    } catch {
+      // a recorder from another realm, or a page that broke it
+    }
+  }
+  for (const name of HANDLER_PROPERTIES) {
+    if (typeof (node as unknown as Record<string, unknown>)[`on${name}`] === 'function') events.add(name);
   }
   return [...events];
 }

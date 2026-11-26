@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { RULE_DOCS, scanKeyboard } from '../keyboard/keyboard-scan';
 
 /**
@@ -568,6 +568,144 @@ describe('scanKeyboard', () => {
     const el = host.querySelector('#text')!;
     withNg(new Map(), new Map([[el, 'X']]), () => {
       expect(scanKeyboard(host)).toEqual([]);
+    });
+  });
+
+  describe('a production build: no window.ng', () => {
+    // Angular's test setup publishes the real debug global; a production build has none.
+    let ng: unknown;
+    beforeEach(() => {
+      ng = (globalThis as { ng?: unknown }).ng;
+      delete (globalThis as { ng?: unknown }).ng;
+    });
+    afterEach(() => {
+      (globalThis as { ng?: unknown }).ng = ng;
+    });
+
+    /** Install report mode's recorder registry: `listeners` maps an element to its event types. */
+    function withRecorder(listeners: Map<Element, string[]>, fn: () => void): void {
+      const g = globalThis as { __ngbA11yListeners?: unknown };
+      g.__ngbA11yListeners = { events: (el: Element) => listeners.get(el) ?? [] };
+      try {
+        fn();
+      } finally {
+        delete g.__ngbA11yListeners;
+      }
+    }
+
+    it('reads click and key listeners from the recorder', () => {
+      const host = fixture(`
+        <div id="book">Book</div>
+        <span id="no-key" tabindex="0">No key handler</span>
+        <span id="keys" tabindex="0">Keys</span>`);
+      const at = (id: string) => host.querySelector(`#${id}`)!;
+      withRecorder(
+        new Map([
+          [at('book'), ['click']],
+          [at('no-key'), ['click']],
+          [at('keys'), ['click', 'keydown']],
+        ]),
+        () => {
+          const findings = scanKeyboard(host);
+          expect(findings.map((f) => [f.id, f.target, f.impact, f.component])).toEqual([
+            ['ngbr/unreachable-control', 'div#book', 'serious', null],
+            ['ngbr/click-without-key', 'span#no-key', 'moderate', null],
+          ]);
+        },
+      );
+    });
+
+    it('reports a clickable component host once, not again for the clickable card inside it', () => {
+      const host = fixture(`<lib-web-button id="loc"><div id="card">Medway Park</div></lib-web-button>`);
+      const at = (id: string) => host.querySelector(`#${id}`)!;
+      withRecorder(
+        new Map([
+          [at('loc'), ['click']],
+          [at('card'), ['click']],
+        ]),
+        () => {
+          expect(scanKeyboard(host).map((f) => f.target)).toEqual(['lib-web-button#loc']);
+        },
+      );
+    });
+
+    it('counts an onclick handler property, with or without a listener source', () => {
+      const host = fixture(`<div id="inline" onclick="void 0">Book</div>`);
+      expect(scanKeyboard(host).map((f) => [f.id, f.target, f.impact])).toEqual([
+        ['ngbr/unreachable-control', 'div#inline', 'serious'],
+      ]);
+    });
+
+    it('skips a modal backdrop, whose click Escape replaces', () => {
+      const host = fixture(`
+        <div id="bd" class="cdk-overlay-backdrop cdk-overlay-backdrop-showing">Backdrop</div>
+        <div id="blur" class="backdrop-blur-sm">Glass card</div>`);
+      const at = (id: string) => host.querySelector(`#${id}`)!;
+      withRecorder(
+        new Map([
+          [at('bd'), ['click']],
+          [at('blur'), ['click']],
+        ]),
+        () => {
+          // Tailwind's backdrop-* utilities aren't backdrops.
+          expect(scanKeyboard(host).map((f) => f.target)).toEqual(['div#blur']);
+        },
+      );
+    });
+
+    it('reads Angular’s listeners, not the recorder’s, when the debug API is there', () => {
+      const host = fixture(`<div id="lib">Library listener</div>`);
+      withRecorder(new Map([[host.querySelector('#lib')!, ['click']]]), () => {
+        withNg(new Map(), new Map(), () => {
+          expect(scanKeyboard(host)).toEqual([]);
+        });
+      });
+    });
+
+    describe('with no listener source, a pointer cursor stands in for a click listener', () => {
+      it('flags a div with text and its own pointer cursor as a moderate guess', () => {
+        const host = fixture(`
+          <div id="location" style="cursor: pointer">Medway Park</div>
+          <div id="plain">Plain text</div>
+          <div id="empty" style="cursor: pointer"></div>`);
+        const findings = scanKeyboard(host);
+        expect(findings.map((f) => [f.id, f.target, f.impact])).toEqual([
+          ['ngbr/unreachable-control', 'div#location', 'moderate'],
+        ]);
+        expect(findings[0].help).toContain('pointer cursor');
+        expect(findings[0].help).toContain('Heuristic — verify manually.');
+      });
+
+      it('reports the outer element once, not each child that inherits or repeats the cursor', () => {
+        const host = fixture(`
+          <div id="card" style="cursor: pointer"><span>Medway Park</span><b style="cursor: pointer">Book</b></div>`);
+        expect(scanKeyboard(host).map((f) => f.target)).toEqual(['div#card']);
+      });
+
+      it("doesn't guess on a label or inside one: its click goes to a control Tab reaches", () => {
+        const host = fixture(`
+          <label for="name" style="cursor: pointer">Name</label><input id="name">
+          <label style="cursor: pointer"><span style="cursor: pointer">Agree</span><input type="checkbox"></label>`);
+        expect(scanKeyboard(host)).toEqual([]);
+      });
+
+      it("doesn't guess inside something Tab reaches, or on something Tab reaches", () => {
+        const host = fixture(`
+          <a href="#x"><span style="cursor: pointer">Link text</span></a>
+          <div tabindex="0" style="cursor: pointer">Focusable</div>
+          <div style="cursor: pointer"><button>Real button</button></div>`);
+        expect(scanKeyboard(host)).toEqual([]);
+      });
+
+      it("doesn't guess when listeners can be read", () => {
+        const host = fixture(`<div id="location" style="cursor: pointer">Medway Park</div>`);
+        withRecorder(new Map(), () => {
+          expect(scanKeyboard(host)).toEqual([]);
+        });
+        withNg(new Map(), new Map(), () => {
+          expect(scanKeyboard(host)).toEqual([]);
+        });
+      });
     });
   });
 });

@@ -138,6 +138,7 @@ describe.skipIf(!ready)('attribution in a real Angular app (E2E)', () => {
 
     it('finds keyboard problems through Angular event listeners (ng.getListeners)', () => {
       expect(find(page('/').findings, 'ngbr/unreachable-control', 'fake-button').component).toBe('HomePageComponent');
+      expect(find(page('/').findings, 'ngbr/unreachable-control', 'click-only-div').component).toBe('HomePageComponent');
       expect(find(page('/').findings, 'ngbr/click-without-key', 'focusable-no-key').component).toBe(
         'HomePageComponent',
       );
@@ -193,6 +194,23 @@ describe.skipIf(!ready)('attribution in a real Angular app (E2E)', () => {
     expect(stdout).toContain('(unknown component)'); // …but can't name components
     expect(stdout).not.toContain('HeaderComponent');
     expect(stderr).toContain('no component attribution (window.ng absent)');
+  }, 60_000);
+
+  it('a production build still gets the click and key checks, read from the browser', async () => {
+    const report = await scanPages({ baseUrl: prod, routes: ['/'], waitMs: 300, keyboard: true });
+    expect(report.checks?.listeners).toBe('browser');
+    const findings = report.pages[0].findings;
+    expect(find(findings, 'ngbr/unreachable-control', 'click-only-div').impact).toBe('serious');
+    expect(find(findings, 'ngbr/click-without-key', 'focusable-no-key').component).toBeNull();
+    expect(findings.filter((f) => f.html.includes('key-modifiers'))).toEqual([]);
+  }, 60_000);
+
+  it('the CLI says where a production build\'s listeners came from', async () => {
+    const { code, stdout, stderr } = await runCli(['--base', prod, '--route', '/', '--wait', '300', '--keyboard']);
+    expect(code).toBe(0);
+    expect(stdout).toContain('click-only-div');
+    expect(stdout).toContain('read event listeners from the browser');
+    expect(stderr).toContain('Note: Keyboard checks read event listeners from the browser');
   }, 60_000);
 
   it('the tab-order layer shows only the stops of an open CDK dialog (aria-modal="false")', async () => {

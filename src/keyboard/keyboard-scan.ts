@@ -1,8 +1,9 @@
 /**
  * The keyboard layer, part B: findings axe can't produce, because they depend on
  * runtime state axe never sees — which elements actually have a DOM `click`
- * listener (read from Angular's `window.ng.getListeners`) and whether the tab
- * path matches the visual order. These are emitted as {@link A11yFinding}s with
+ * listener (read from Angular's `window.ng.getListeners`, or on a production
+ * build from report mode's listener recorder) and whether the tab path matches
+ * the visual order. These are emitted as {@link A11yFinding}s with
  * synthetic `ngbr/*` rule ids, so they flow through the same grouped console
  * output, overlay, and report as the axe violations — attributed to the owning
  * component like everything else.
@@ -14,6 +15,7 @@
 import {
   appComponentFromPath,
   DEFAULT_FRAMEWORK_PREFIXES,
+  listenerSource,
   resolveComponentPath,
   resolveDirectiveNames,
   resolveListenerEvents,
@@ -104,8 +106,9 @@ const COMPOSITE_SELECTOR = ['tablist', 'toolbar', 'menu', 'menubar', 'radiogroup
  *   arrow keys may not move to it — the classic half-built tab list.
  * - `false`: not a composite item, or one Tab can't get into / script can't focus.
  *
- * Key listeners are read through Angular's dev-mode debug API. Without it (a
- * production build) nothing can be seen, so roving tabindex counts as reached.
+ * Key listeners are read through Angular's dev-mode debug API, or report mode's
+ * listener recorder. With neither, nothing can be seen, so roving tabindex
+ * counts as reached.
  */
 function reachedWithinWidget(
   element: Element,
@@ -139,9 +142,27 @@ function reachedWithinWidget(
   return keys ? 'reached' : 'no-keys';
 }
 
-/** True when Angular's debug API can tell us which listeners an element has. */
+/** True when Angular's debug API or report mode's recorder can tell us which listeners an element has. */
 function listenersVisible(): boolean {
-  return typeof ngDebug()?.getListeners === 'function';
+  return listenerSource() !== 'none';
+}
+
+/**
+ * The production fallback when no listeners can be read: true when `element`
+ * looks clickable. It sets `cursor: pointer` itself (its parent doesn't, so the
+ * cursor isn't just inherited from a link or button around it) and has text, so
+ * it's something a person would click. A guess, reported as one.
+ */
+function looksClickable(element: Element): boolean {
+  if (!element.textContent?.trim()) return false;
+  // A label's click focuses or toggles its control, which Tab reaches.
+  if (element.closest('label')) return false;
+  const view = element.ownerDocument?.defaultView;
+  if (!view) return false;
+  const cursor = (el: Element) => view.getComputedStyle(el).cursor;
+  if (cursor(element) !== 'pointer') return false;
+  const parent = element.parentElement;
+  return !parent || cursor(parent) !== 'pointer';
 }
 
 /**
@@ -259,6 +280,15 @@ function isComponentHost(el: Element, ng: ReturnType<typeof ngDebug>): boolean {
   }
 }
 
+/** True when an ancestor of `element` is in `reported`. */
+function hasReportedAncestor(element: Element, reported: ReadonlySet<Element>): boolean {
+  if (!reported.size) return false;
+  for (let el = element.parentElement; el; el = el.parentElement) {
+    if (reported.has(el)) return true;
+  }
+  return false;
+}
+
 /**
  * True when an ancestor of `element` is tabbable (focus lands there, as with an
  * icon inside a link) or is in `flagged` (already reported).
@@ -324,6 +354,19 @@ function hitAreaForToggleInput(element: Element): boolean {
 }
 
 /**
+ * True for a modal's backdrop (CDK's `cdk-overlay-backdrop`, Bootstrap's
+ * `modal-backdrop`, PrimeNG's `p-overlay-mask`): clicking it closes what's open,
+ * and Escape does the same from the keyboard, so it isn't a control. Libraries
+ * add its click listener in code, so only a production scan, which reads
+ * listeners from the browser, sees it.
+ */
+function isBackdrop(element: Element): boolean {
+  // Whole class names ending in "backdrop" (cdk-overlay-backdrop, mat-drawer-backdrop),
+  // so Tailwind's backdrop-blur-sm and the like don't match.
+  return [...element.classList].some((c) => /(^|-)backdrop$|^p-(overlay|dialog)-mask$/i.test(c));
+}
+
+/**
  * Each rule's page: what the message means, who it affects, exactly what
  * triggers it, how to fix and check it, and the WCAG/APG reference.
  */
@@ -386,9 +429,11 @@ export function shortHtml(element: Element): string {
 
 /**
  * Scan `root` for keyboard-operability problems and return them as findings.
- * Runs entirely in the page. Listener-based checks and attribution need the
- * live `window.ng`, so in production only the markup-based checks (roles, tooltip
- * markers, icon titles, tab order) report anything.
+ * Runs entirely in the page. Listener-based checks need the live `window.ng` or
+ * report mode's listener recorder (see {@link listenerSource}). With neither,
+ * the markup-based checks (roles, tooltip markers, icon titles, tab order) still
+ * run, and an element with a pointer cursor stands in for a click listener.
+ * Attribution always needs `window.ng`.
  */
 export function scanKeyboard(
   root: ParentNode = document,
@@ -397,10 +442,14 @@ export function scanKeyboard(
   const prefixes = options.frameworkPrefixes ?? DEFAULT_FRAMEWORK_PREFIXES;
   const isVisible = options.isVisible;
   const findings: A11yFinding[] = [];
+  // No listener source: guess click targets from the pointer cursor instead.
+  const guessClicks = !listenersVisible();
   const keyCache = new Map<Element, boolean>();
   const sharedCache: SharedStopCache = new Map();
   /** Elements reported as unreachable controls, so the hover check doesn't repeat them. */
   const unreachable = new Set<Element>();
+  /** The ones reported for a click listener alone (no interactive role). */
+  const clickOnly = new Set<Element>();
   /** Checkbox and radio hit areas, skipped by the hover check too. */
   const hitAreas = new Set<Element>();
   /** Angular listener names per element, read once and shared by both passes. */
@@ -503,16 +552,31 @@ export function scanKeyboard(
     // Native controls are keyboard-reachable and activate on Enter/Space on their
     // own, so they can't be the subject of either finding — skip them outright.
     if (isNativelyFocusable(element)) continue;
+    if (isBackdrop(element)) continue;
 
     const role = element.getAttribute('role')?.toLowerCase() ?? '';
     const events = eventsOf(element);
-    const hasClick = events.includes('click');
     const interactiveByRole = INTERACTIVE_ROLES.has(role);
+    const listensForClick = events.includes('click');
+    // Without listeners, a pointer cursor is the only sign. Only for something
+    // Tab can't reach, inside nothing Tab reaches: a pointer cursor on a
+    // focusable element says nothing about whether Enter works.
+    const guessed =
+      guessClicks &&
+      !listensForClick &&
+      !interactiveByRole &&
+      looksClickable(element) &&
+      !isTabbable(element, isVisible) &&
+      !hasTabbableOrFlaggedAncestor(element, unreachable, isVisible);
+    const hasClick = listensForClick || guessed;
     if (!hasClick && !interactiveByRole) continue; // nothing marks this as interactive
     // A click listener on a container of links/controls (no interactive role of
     // its own) is event delegation, not a control — the controls inside are what
     // the keyboard reaches.
     if (!interactiveByRole && hasFocusableDescendant(element)) continue;
+    // A click-only element inside one already reported (a component host with a
+    // click listener around its own clickable card): one finding is enough.
+    if (!interactiveByRole && hasReportedAncestor(element, clickOnly)) continue;
     // Hidden (a closed <details>, [hidden], display:none): not reachable because
     // it isn't shown. Check it when it is.
     if (isHidden(element, isVisible)) continue;
@@ -546,8 +610,25 @@ export function scanKeyboard(
         unreachable.add(element);
         continue;
       }
-      const reason = interactiveByRole ? `has role="${role}"` : 'has a click handler';
       unreachable.add(element);
+      if (!interactiveByRole) clickOnly.add(element);
+      if (guessed) {
+        findings.push(
+          make(
+            element,
+            'ngbr/unreachable-control',
+            'moderate',
+            `Keyboard users may not be able to reach this: it has a pointer cursor, so it looks ` +
+              `clickable, but it isn't a native control and has no tabindex="0", so Tab skips it. ` +
+              `This page doesn't expose its event listeners, so check whether clicking it does ` +
+              `something. If it does, use a <button> or <a href>, or add tabindex="0" and ` +
+              `Enter/Space handling. Heuristic — verify manually.`,
+            `${RULE_DOCS}/unreachable-control`,
+          ),
+        );
+        continue;
+      }
+      const reason = interactiveByRole ? `has role="${role}"` : 'has a click handler';
       findings.push(
         make(
           element,

@@ -84,6 +84,8 @@ describe('production weight (axe-core stays out of the initial bundle)', () => {
     const all = [...reachable(meta, start, true)];
     expect(all.some((i) => /report\/headless/.test(i))).toBe(false);
     expect(all.some((i) => /playwright/.test(i))).toBe(false);
+    // The focus-indicator probe only runs from report mode's in-page bundle.
+    expect(all.some((i) => /keyboard\/focus-indicator/.test(i))).toBe(false);
     // Sanity: the shared *pure* formatter is allowed in the browser graph
     // (the console logger reuses `groupByComponent`).
     expect(all.some((i) => /report\/format/.test(i))).toBe(true);
@@ -152,6 +154,8 @@ describe('production weight (axe-core stays out of the initial bundle)', () => {
     expect(prod).not.toContain('ngb-a11y-overlay'); // overlay
     expect(prod).not.toContain('ngbr-a11y-devtools'); // pill + settings storage
     expect(prod).not.toContain('Download report'); // menu
+    expect(prod).not.toContain('ngbr/missing-id-reference'); // aria-refs
+    expect(prod).not.toContain('ngbr/missing-autocomplete'); // input-purpose
 
     expect(prod.length).toBeLessThan(2000); // just the provider shell
 

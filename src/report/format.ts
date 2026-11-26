@@ -3,6 +3,7 @@ import type { BaselineDiff } from './baseline.js';
 import { findingCriteria, referenceUrl } from './wcag.js';
 import type { Walkthrough, WalkthroughStep } from '../keyboard/walkthrough.js';
 import { describeNavigation, type NavigationRecord } from '../navigation/record.js';
+import type { ListenerSource } from '../attribution.js';
 
 /**
  * Pure formatting for report-mode: grouping + Markdown/JSON serialization. Kept
@@ -16,6 +17,8 @@ export interface PageReport {
   label: string;
   /** The URL actually scanned. */
   url: string;
+  /** `document.title` when the page was scanned. Absent in reports from before 0.21.0. */
+  title?: string;
   findings: A11yFinding[];
   /** Set when this route failed to scan; findings will be empty. */
   error?: string;
@@ -110,6 +113,45 @@ export interface ScanChecks {
   walkthrough?: boolean;
   /** The run moved between the routes inside the app and checked focus each time. */
   navigation?: boolean;
+  /** The titles of 2 or more scanned pages were compared (`ngbr/duplicate-page-title`). */
+  pageTitles?: boolean;
+  /** `aria-labelledby` and `aria-describedby` were checked for ids with no element (`ngbr/missing-id-reference`). From 0.21.0. */
+  idReferences?: boolean;
+  /** Fields were checked for a missing `autocomplete` (`ngbr/missing-autocomplete`). From 0.21.0. */
+  inputPurpose?: boolean;
+  /** Each tab stop's focus indicator was measured from screenshots (`ngbr/focus-indicator-contrast`). From 0.21.0. */
+  focusIndicators?: boolean;
+  /**
+   * Where the keyboard checks read event listeners from (the weakest across the
+   * pages): Angular's debug API in a dev build, the browser in a production
+   * build, or nowhere, which skips the listener-based checks. Absent when the
+   * keyboard checks didn't run, and in reports from before 0.21.0.
+   */
+  listeners?: ListenerSource;
+}
+
+/**
+ * What the report says about where keyboard checks read listeners from, or
+ * undefined when there's nothing to say (a dev build, or no keyboard checks).
+ * Shared by the Markdown, HTML and ACR reports and the CLI.
+ */
+export function listenerNote(checks: ScanChecks | undefined): string | undefined {
+  if (!checks?.keyboard) return undefined;
+  if (checks.listeners === 'browser') {
+    return (
+      'Keyboard checks read event listeners from the browser, as Angular’s debug API wasn’t there ' +
+      '(usually a production build). They see listeners from any script, including library code.'
+    );
+  }
+  if (checks.listeners === 'none') {
+    return (
+      'Keyboard checks couldn’t read event listeners on at least one page. Skipped there: click ' +
+      'handlers on elements that aren’t controls (elements with a pointer cursor are listed as a ' +
+      'guess instead), click without Enter or Space, arrow-key handling in widgets and drag lists, ' +
+      'and hover listeners.'
+    );
+  }
+  return undefined;
 }
 
 /** A whole report-mode run across one or more pages. */
@@ -185,6 +227,7 @@ export function toJson(report: ScanReport, diff?: BaselineDiff): string {
       pages: report.pages.map((p) => ({
         label: p.label,
         url: p.url,
+        ...(p.title !== undefined && { title: p.title }),
         // A failed route must not read as a clean one: keep its error.
         ...(p.error !== undefined && { error: p.error }),
         ...(p.colorScheme && { colorScheme: p.colorScheme }),
@@ -232,6 +275,7 @@ export function parseReport(json: string): ScanReport {
     pages: pages.map((p) => ({
       label: p.label,
       url: p.url,
+      ...(typeof p.title === 'string' && { title: p.title }),
       findings: p.findings,
       ...(p.error !== undefined && { error: p.error }),
       ...(p.colorScheme && { colorScheme: p.colorScheme }),
@@ -288,6 +332,11 @@ export function toMarkdown(report: ScanReport, diff?: BaselineDiff): string {
   lines.push('');
   lines.push(`> ${REPORT_SCOPE_NOTE} [What automated checks cover](${COVERAGE_URL}).`);
   lines.push('');
+  const listeners = listenerNote(report.checks);
+  if (listeners) {
+    lines.push(`> ${listeners}`);
+    lines.push('');
+  }
 
   // Summary table — distinct rules alongside raw node-instances, so the headline
   // count can't be read as "how bad is it" on its own.

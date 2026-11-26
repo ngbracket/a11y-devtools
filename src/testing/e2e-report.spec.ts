@@ -184,6 +184,91 @@ const PAGES: Record<string, string> = {
     <button data-ngb-a11y-overlay role="switch" aria-checked="true" style="position: fixed; left: 8px; bottom: 8px">a11y</button>
     <script>document.getElementById('overlay').showPopover();</script>`,
 
+  // A production build's click handlers, with no window.ng: the clickable location
+  // divs from a client scan (no role, no tabindex), added by script after load
+  // the way a framework binds them. Report mode records listeners before the
+  // page's scripts run, so they're still found.
+  '/prod-clicks': `
+    <main>
+      <h1>Book a class</h1>
+      <div class="location">Medway Park</div>
+      <div class="location">Strood Sports Centre</div>
+      <span class="no-key" tabindex="0">Focusable, click only</span>
+      <span class="keys" tabindex="0">Focusable, keys too</span>
+      <div class="removed">Listener removed again</div>
+      <div class="cdk-overlay-backdrop"></div>
+    </main>
+    <script>
+      const noop = () => {};
+      setTimeout(() => {
+        for (const el of document.querySelectorAll('.location, .no-key, .keys, .cdk-overlay-backdrop')) {
+          el.addEventListener('click', noop);
+        }
+        document.querySelector('.keys').addEventListener('keydown', noop);
+        const removed = document.querySelector('.removed');
+        removed.addEventListener('click', noop, { capture: true });
+        removed.removeEventListener('click', noop, true);
+      });
+    </script>`,
+
+  // An open dialog named by an id that isn't in the page, as a client's guest
+  // details dialog was. axe lists it as needs review only, so it never failed.
+  '/missing-id': `
+    <main><h1>Book</h1></main>
+    <div role="dialog" aria-modal="true" aria-labelledby="loginDialogTitle">
+      <h2>Guest details</h2>
+      <button type="button">Continue</button>
+    </div>`,
+
+  // A client's guest details form: personal-data fields with no autocomplete,
+  // which axe's autocomplete-valid never checks. One field already has it.
+  '/guest-form': `
+    <main><h1>Guest details</h1>
+      <form>
+        <label for="g-fn">Forename</label><input id="g-fn">
+        <label for="g-sn">Surname</label><input id="g-sn">
+        <label for="g-em">Email</label><input id="g-em" type="email">
+        <label for="g-pc">Postcode</label><input id="g-pc" autocomplete="postal-code">
+        <label for="g-promo">Promo code</label><input id="g-promo">
+      </form>
+    </main>`,
+
+  // Focus indicators: the browser's own ring, none at all, a faint tint like a
+  // client's header icon buttons (1.26:1), and a strong custom outline.
+  // Also: a skip link that slides in, a 1px underline, an iframe partway down
+  // (the walk must carry on after it), and a button under a fixed bar (that's
+  // focus hidden, not a weak style, so it's skipped).
+  '/focus-styles': `
+    <style>
+      html { scroll-behavior: smooth; }
+      button { margin: 20px; padding: 8px 16px; background: #c8b6e2; color: #000; border: 0; }
+      .none:focus { outline: none; }
+      .tint:focus { outline: none; background: #b39ddb; }
+      .strong:focus { outline: 2px solid #000; outline-offset: 2px; }
+      .skip { position: fixed; top: 8px; left: 8px; transform: translateY(-80px); transition: transform 0.3s; background: #fff; }
+      .skip:focus { transform: none; outline: none; }
+      a.underline { color: #000; text-decoration: none; }
+      a.underline:focus { outline: none; text-decoration: underline; }
+      .bar { position: fixed; left: 0; right: 0; bottom: 0; height: 80px; background: #333; }
+      .covered { position: fixed; bottom: 20px; left: 20px; margin: 0; }
+      .covered:focus { outline: none; }
+    </style>
+    <a class="skip" href="#main">Skip to content</a>
+    <main id="main"><h1>Focus styles</h1>
+      <button class="default">Default</button>
+      <button class="none">None</button>
+      <iframe title="Embedded form" srcdoc="<button>Inside one</button><button>Inside two</button>"></iframe>
+      <button class="tint">Tint</button>
+      <button class="strong">Strong</button>
+      <a class="underline" href="#x">Underlined on focus</a>
+      <button class="covered">Under the bar</button>
+    </main>
+    <div class="bar"></div>`,
+
+  // Two routes with one static title, as a client's booking site had on every route.
+  '/same-title-a': `<main><h1>Book a class</h1></main>`,
+  '/same-title-b': `<main><h1>Book an activity</h1></main>`,
+
   // Plain axe + layout: a missing alt, and a positive tabindex that jumps up the page.
   '/axe': `
     <main>
@@ -216,8 +301,10 @@ const PAGES: Record<string, string> = {
 const STRICT_CSP =
   "default-src 'self'; img-src data:; script-src 'self'; style-src 'self'; require-trusted-types-for 'script'";
 
-function html(body: string): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Fixture</title></head><body>${body}</body></html>`;
+/** Each page gets its own title, except `/same-title-*`, which share one (ngbr/duplicate-page-title). */
+function html(body: string, url: string): string {
+  const title = url.startsWith('/same-title') ? 'Leisure centres' : `Fixture ${url}`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title></head><body>${body}</body></html>`;
 }
 
 describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
@@ -234,7 +321,7 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
           'content-security-policy': STRICT_CSP,
         }),
       });
-      const page = body ? html(body) : 'not found';
+      const page = body ? html(body, req.url!) : 'not found';
       res.end(
         req.url === '/csp-meta'
           ? page.replace('<head>', `<head><meta http-equiv="Content-Security-Policy" content="${STRICT_CSP}">`)
@@ -304,6 +391,94 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
   it('reports axe violations and layout-dependent keyboard findings', () => {
     expect(ids('/axe')).toContain('image-alt');
     expect(ids('/axe')).toContain('ngbr/tab-order-mismatch');
+  });
+
+  it('reads a production build\'s click listeners from the browser (no window.ng)', () => {
+    expect(report.checks?.listeners).toBe('browser');
+    const keyboard = page('/prod-clicks').findings.filter((f) => f.id.startsWith('ngbr/'));
+    expect(keyboard.map((f) => [f.id, f.impact, f.html.match(/class="([^"]+)"/)?.[1]])).toEqual([
+      ['ngbr/unreachable-control', 'serious', 'location'],
+      ['ngbr/unreachable-control', 'serious', 'location'],
+      ['ngbr/click-without-key', 'moderate', 'no-key'],
+    ]);
+  });
+
+  it('reports a dialog whose aria-labelledby id is missing, which axe only lists as needs review', () => {
+    const missing = page('/missing-id').findings.filter((f) => f.id === 'ngbr/missing-id-reference');
+    expect(missing).toHaveLength(1);
+    expect(missing[0]).toMatchObject({ impact: 'serious', wcag: ['4.1.2'], target: 'div[aria-labelledby]' });
+    expect(ids('/missing-id')).not.toContain('aria-valid-attr-value');
+    expect(report.checks?.idReferences).toBe(true);
+  });
+
+  it('measures focus indicators from screenshots: none and a faint tint are reported', async () => {
+    const { scanPages } = (await import(distReport)) as typeof import('../report/index');
+    const r = await scanPages({ baseUrl, routes: ['/focus-styles'], waitMs: 50, focusIndicators: true });
+    const found = r.pages[0].findings.filter((f) => f.id === 'ngbr/focus-indicator-contrast');
+    expect(found.map((f) => [f.target, f.impact])).toEqual([
+      ['button.none', 'serious'],
+      ['button.tint', 'moderate'],
+    ]);
+    expect(found[0].wcag).toEqual(['1.4.11', '2.4.7']);
+    expect(found[1].help).toMatch(/the strongest change is 1\.\d\d:1/);
+    expect(r.checks?.focusIndicators).toBe(true);
+    expect(page('/focus-styles').findings.map((f) => f.id)).not.toContain('ngbr/focus-indicator-contrast');
+  }, 60_000);
+
+  it('reports personal-data fields with no autocomplete, which axe never checks', async () => {
+    const found = page('/guest-form').findings.filter((f) => f.id === 'ngbr/missing-autocomplete');
+    expect(found.map((f) => f.target)).toEqual(['input#g-fn', 'input#g-sn', 'input#g-em']);
+    expect(ids('/guest-form')).not.toContain('autocomplete-valid');
+    expect(report.checks?.inputPurpose).toBe(true);
+    const { scanPages } = (await import(distReport)) as typeof import('../report/index');
+    const off = await scanPages({ baseUrl, routes: ['/guest-form'], waitMs: 50, inputPurpose: false });
+    expect(off.pages[0].findings.map((f) => f.id)).not.toContain('ngbr/missing-autocomplete');
+    expect(off.checks?.inputPurpose).toBeUndefined();
+  });
+
+  it('reports no missing ids with idReferences: false', async () => {
+    const { scanPages } = (await import(distReport)) as typeof import('../report/index');
+    const r = await scanPages({ baseUrl, routes: ['/missing-id'], waitMs: 50, idReferences: false });
+    expect(r.pages[0].findings.map((f) => f.id)).not.toContain('ngbr/missing-id-reference');
+    expect(r.checks?.idReferences).toBeUndefined();
+  });
+
+  it('flags routes that share one page title, and only those', () => {
+    const a = page('/same-title-a').findings.filter((f) => f.id === 'ngbr/duplicate-page-title');
+    expect(a).toHaveLength(1);
+    expect(a[0]).toMatchObject({ impact: 'moderate', wcag: ['2.4.2'], target: 'title', component: null });
+    expect(a[0].help).toContain('"Leisure centres"');
+    expect(a[0].help).toContain('(/same-title-b)');
+    expect(ids('/same-title-b')).toContain('ngbr/duplicate-page-title');
+    expect(ids('/axe')).not.toContain('ngbr/duplicate-page-title');
+    expect(page('/axe').title).toBe('Fixture /axe');
+    expect(report.checks?.pageTitles).toBe(true);
+  });
+
+  it('does not compare titles with only one route', async () => {
+    const { scanPages } = (await import(distReport)) as typeof import('../report/index');
+    const r = await scanPages({ baseUrl, routes: ['/same-title-a'], waitMs: 50 });
+    expect(r.pages[0].findings.map((f) => f.id)).not.toContain('ngbr/duplicate-page-title');
+    expect(r.checks?.pageTitles).toBeUndefined();
+  });
+
+  it('compares no titles with pageTitles: false', async () => {
+    const { scanPages } = (await import(distReport)) as typeof import('../report/index');
+    const r = await scanPages({ baseUrl, routes: ['/same-title-a', '/same-title-b'], waitMs: 50, pageTitles: false });
+    expect(r.pages.flatMap((p) => p.findings).map((f) => f.id)).not.toContain('ngbr/duplicate-page-title');
+    expect(r.checks?.pageTitles).toBeUndefined();
+    expect(r.pages[0].title).toBe('Leisure centres');
+  });
+
+  it('does not count one route scanned twice as a duplicate', async () => {
+    const { scanPages } = (await import(distReport)) as typeof import('../report/index');
+    const r = await scanPages({
+      baseUrl,
+      routes: ['/same-title-a', '/same-title-a#main'],
+      labels: { '/same-title-a#main': 'Again' },
+      waitMs: 50,
+    });
+    expect(r.pages.flatMap((p) => p.findings).map((f) => f.id)).not.toContain('ngbr/duplicate-page-title');
   });
 
   it('does not count summaries inside a closed <details> as tab stops (nested sidebar)', () => {
@@ -431,6 +606,27 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
       expect(readFileSync(join(dir, 'baseline.md'), 'utf8')).toContain('# Automated accessibility scan');
       expect(JSON.parse(readFileSync(join(dir, 'baseline.json'), 'utf8')).pages).toHaveLength(2);
       expect(readFileSync(join(dir, 'baseline.html'), 'utf8')).toMatch(/^<!doctype html>/);
+    }, 60_000);
+
+    it('--no-page-titles, --no-id-references and --no-input-purpose turn their checks off; --from refuses them', async () => {
+      const routes = ['--route', '/same-title-a', '--route', '/same-title-b'];
+      const out = join(dir, 'titles');
+      expect((await runCli(['--base', baseUrl, ...routes, '--wait', '50', '--out', out, '--format', 'json'])).code).toBe(0);
+      expect(readFileSync(`${out}.json`, 'utf8')).toContain('ngbr/duplicate-page-title');
+      expect((await runCli(['--base', baseUrl, ...routes, '--wait', '50', '--no-page-titles', '--out', out, '--format', 'json'])).code).toBe(0);
+      const json = readFileSync(`${out}.json`, 'utf8');
+      expect(json).not.toContain('ngbr/duplicate-page-title');
+      expect(JSON.parse(json).checks.pageTitles).toBeUndefined();
+      const ids = join(dir, 'ids');
+      expect((await runCli(['--base', baseUrl, '--route', '/missing-id', '--wait', '50', '--no-id-references', '--out', ids, '--format', 'json'])).code).toBe(0);
+      expect(readFileSync(`${ids}.json`, 'utf8')).not.toContain('ngbr/missing-id-reference');
+      const purpose = join(dir, 'purpose');
+      expect((await runCli(['--base', baseUrl, '--route', '/guest-form', '--wait', '50', '--no-input-purpose', '--out', purpose, '--format', 'json'])).code).toBe(0);
+      expect(readFileSync(`${purpose}.json`, 'utf8')).not.toContain('ngbr/missing-autocomplete');
+      expect((await runCli(['--from', `${out}.json`, '--no-input-purpose'])).code).not.toBe(0);
+      const refused = await runCli(['--from', `${out}.json`, '--no-page-titles']);
+      expect(refused.code).not.toBe(0);
+      expect(refused.stderr).toContain('--no-page-titles');
     }, 60_000);
 
     it('--walkthrough adds the tab order to every format, and --from keeps it', async () => {

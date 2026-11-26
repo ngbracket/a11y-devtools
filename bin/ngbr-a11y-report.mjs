@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import {
   axeVersion,
   diffAgainstBaseline,
+  listenerNote,
   parseBaseline,
   parseReport,
   scanPages,
@@ -30,7 +31,9 @@ Options:
   --serve-timeout <s>
                      Seconds to wait for --serve to answer (default 180).
                      A failed Angular build stops it straight away
-  --route <path>     Route to scan; repeat for multiple routes
+  --route <path>     Route to scan; repeat for multiple routes. With 2 or more,
+                     routes that share a page title are reported
+                     (ngbr/duplicate-page-title); --no-page-titles turns that off
   --from <file>      Don't scan: read a previous run's JSON report (from --out)
                      and write it in the --format(s) asked for — e.g. add an
                      HTML report or ACR worksheet later. --baseline and
@@ -62,6 +65,9 @@ Options:
   --focus-traps      Also walk each route with real Tab presses to find keyboard
                      traps — focus that cycles inside part of the page and
                      never moves on (ngbr/focus-trap). Runs after the scan
+  --focus-indicators Also press Tab through each route and measure every tab
+                     stop's focus indicator from screenshots: no visible change,
+                     or a change under 3:1 (ngbr/focus-indicator-contrast)
   --walkthrough      Also list each route's tab order with every stop's computed
                      role, name, states and component (an approximation, not
                      any one screen reader's output)
@@ -70,6 +76,12 @@ Options:
                      history.pushState when there's no link). Records where
                      focus went and reports focus left on the page body
                      (ngbr/focus-lost-on-navigation). Needs 2 or more routes
+  --no-page-titles   Don't compare page titles across routes
+                     (ngbr/duplicate-page-title)
+  --no-id-references Don't report aria-labelledby or aria-describedby that
+                     name a missing id (ngbr/missing-id-reference)
+  --no-input-purpose Don't report name, email, phone and address fields with
+                     no autocomplete (ngbr/missing-autocomplete)
   --color-scheme <s> light | dark | both — scan with the browser emulating that
                      prefers-color-scheme (default light). "both" scans each
                      route twice; dark pages list only issues light doesn't have
@@ -109,7 +121,11 @@ function parseArgs(argv) {
       case '--keyboard': opts.keyboard = true; break;
       case '--focus-traps': opts.focusTraps = true; break;
       case '--walkthrough': opts.walkthrough = true; break;
+      case '--focus-indicators': opts.focusIndicators = true; break;
       case '--navigation': opts.navigation = true; break;
+      case '--no-page-titles': opts.pageTitles = false; break;
+      case '--no-id-references': opts.idReferences = false; break;
+      case '--no-input-purpose': opts.inputPurpose = false; break;
       case '--color-scheme': opts.colorScheme = next(); break;
       case '--dark-class': opts.darkClass = next(); break;
       case '--dark-attribute': opts.darkAttribute = next(); break;
@@ -128,7 +144,7 @@ const opts = parseArgs(process.argv.slice(2));
 const SCAN_ONLY = {
   base: '--base', serve: '--serve', serveTimeout: '--serve-timeout', routes: '--route', tags: '--tags',
   wait: '--wait', frameworkPrefixes: '--framework-prefixes / --no-skip-primitives', keyboard: '--keyboard',
-  focusTraps: '--focus-traps', walkthrough: '--walkthrough', navigation: '--navigation', colorScheme: '--color-scheme', darkClass: '--dark-class',
+  focusTraps: '--focus-traps', walkthrough: '--walkthrough', focusIndicators: '--focus-indicators', navigation: '--navigation', pageTitles: '--no-page-titles', idReferences: '--no-id-references', inputPurpose: '--no-input-purpose', colorScheme: '--color-scheme', darkClass: '--dark-class',
   darkAttribute: '--dark-attribute', headed: '--headed',
 };
 if (opts.from && !opts.help) {
@@ -262,7 +278,11 @@ if (!report) {
       keyboard: opts.keyboard,
       focusTraps: opts.focusTraps,
       walkthrough: opts.walkthrough,
+      focusIndicators: opts.focusIndicators,
       navigation: opts.navigation,
+      pageTitles: opts.pageTitles,
+      idReferences: opts.idReferences,
+      inputPurpose: opts.inputPurpose,
       colorScheme: opts.colorScheme,
       darkClass: opts.darkClass,
       darkAttribute,
@@ -292,6 +312,8 @@ if (allFindings.length > 0 && allFindings.every((f) => f.component === null)) {
     'Note: no component attribution (window.ng absent) — is this a production build? Report mode names components only against a dev build.\n',
   );
 }
+const listeners = listenerNote(report.checks);
+if (listeners) process.stderr.write(`Note: ${listeners}\n`);
 
 if (!opts.out) {
   process.stdout.write(toMarkdown(report, diff) + '\n');

@@ -32,6 +32,18 @@ describe('scan + runner (real axe + attribution)', () => {
     expect(imgAlt!.wcag).toEqual(['1.1.1']);
   });
 
+  it('adds ngbr/missing-id-reference to every scan, without the keyboard layer', async () => {
+    host.innerHTML = `<div role="dialog" aria-labelledby="loginDialogTitle"><h2>Guest details</h2></div>`;
+    const findings = await scan(host);
+    expect(findings.filter((f) => f.id === 'ngbr/missing-id-reference')).toHaveLength(1);
+    host.insertAdjacentHTML('beforeend', '<label for="sn">Surname</label><input id="sn">');
+    expect((await scan(host)).map((f) => f.id)).toContain('ngbr/missing-autocomplete');
+    const noPurpose = await scan(host, undefined, { inputPurpose: false });
+    expect(noPurpose.map((f) => f.id)).not.toContain('ngbr/missing-autocomplete');
+    const off = await scan(host, undefined, { idReferences: false });
+    expect(off.map((f) => f.id)).not.toContain('ngbr/missing-id-reference');
+  });
+
   it('serializes concurrent scans (axe is a singleton)', async () => {
     const fixture = TestBed.createComponent(AppComponent);
     host.appendChild(fixture.nativeElement);

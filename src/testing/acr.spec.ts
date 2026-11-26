@@ -127,6 +127,13 @@ describe('buildAcrWorksheet', () => {
     expect(row(tagged.rows, '2.5.8')).toMatchObject({ result: 'no-failures-detected', checkedBy: ['target-size'] });
   });
 
+  it('counts the page-title rule for 2.4.2 only when titles were compared', () => {
+    const page = [{ label: '/', url: 'http://x/', findings: [] }];
+    expect(row(buildAcrWorksheet(report(page), RULES).rows, '2.4.2').checkedBy).not.toContain('ngbr/duplicate-page-title');
+    const on = buildAcrWorksheet(report(page, { checks: { ...checks, pageTitles: true } }), RULES);
+    expect(row(on.rows, '2.4.2').checkedBy).toEqual(['ngbr/duplicate-page-title']);
+  });
+
   it('counts the route-change rule only when the run moved between routes', () => {
     const page = [{ label: '/', url: 'http://x/', findings: [] }];
     const on = buildAcrWorksheet(report(page, { checks: { ...checks, navigation: true } }), RULES);
@@ -224,6 +231,12 @@ describe('toAcrMarkdown / toAcrHtml', () => {
     expect(md).toMatch(/\| \[1\.4\.3 Contrast \(Minimum\)\]\(https:\/\/www\.w3\.org\/WAI\/WCAG22\/Understanding\/contrast-minimum\.html\) \| AA \| Automated failures found \| color-contrast \(serious\): 1 instance\(s\) on \/login; components: LoginComponent \| \| \|/);
     expect(md).toContain('## Other findings');
     expect(md).toContain('- region (moderate)');
+  });
+
+  it('says in the scan details when a production build read listeners from the browser', () => {
+    const prod = report(run.pages, { checks: { ...checks, keyboard: true, listeners: 'browser' } });
+    expect(toAcrMarkdown(prod, RULES)).toContain('| Event listeners | Keyboard checks read event listeners from the browser');
+    expect(toAcrMarkdown(run, RULES)).not.toContain('Event listeners');
   });
 
   it('renders an accessible HTML table with one row per criterion', () => {

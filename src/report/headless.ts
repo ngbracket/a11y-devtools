@@ -5,9 +5,13 @@ import { fileURLToPath } from 'node:url';
 import type { RunOptions as AxeRunOptions } from 'axe-core';
 import type { Browser, Page } from 'playwright';
 import { detectTabTrap, type FocusObservation } from '../keyboard/focus-walk.js';
+import type { Box, FocusChange, FocusIndicatorProbe, FocusedStop } from '../keyboard/focus-indicator.js';
 import { OVERLAY_EXCLUDE_SELECTOR } from '../overlay.js';
 import type { A11yFinding } from '../scan.js';
+import type { ListenerSource } from '../attribution.js';
 import { findingsNotIn } from './baseline.js';
+import { LISTENER_RECORDER_SCRIPT } from './listener-recorder.js';
+import { addDuplicateTitleFindings, titlesCompared } from './page-titles.js';
 import type { Walkthrough } from '../keyboard/walkthrough.js';
 import type { NavigationRecord } from '../navigation/record.js';
 import type { PageReport, ScanChecks, ScanReport } from './format.js';
@@ -108,6 +112,32 @@ export interface ScanPagesOptions {
    * the scan, once (in the light scheme with `colorScheme: 'both'`). Default false.
    */
   navigation?: boolean;
+  /**
+   * With 2 or more routes, compare their page titles and report routes that
+   * share one as `ngbr/duplicate-page-title` (WCAG 2.4.2). Set `false` to turn
+   * it off, for example while an app's titles are being fixed. Default true.
+   */
+  pageTitles?: boolean;
+  /**
+   * Report an `aria-labelledby` or `aria-describedby` that names an id with no
+   * element, as `ngbr/missing-id-reference`. Set `false` to turn it off, for
+   * example while existing findings are being fixed. Default true.
+   */
+  idReferences?: boolean;
+  /**
+   * Report a field that looks like it asks for the user's name, email, phone
+   * number or address and has no `autocomplete`, as `ngbr/missing-autocomplete`.
+   * Set `false` to turn it off. Default true.
+   */
+  inputPurpose?: boolean;
+  /**
+   * Also press Tab through each route and measure every tab stop's focus
+   * indicator: screenshot the stop focused and unfocused, and report one that
+   * doesn't change at all, or changes by less than 3:1, as
+   * `ngbr/focus-indicator-contrast` (WCAG 2.4.7 and 1.4.11). Takes two
+   * screenshots per stop, so it's off by default. Runs in each colour scheme.
+   */
+  focusIndicators?: boolean;
 }
 
 type PlaywrightModule = typeof import('playwright');
@@ -137,6 +167,129 @@ type ProbeWindow = {
   __ngbA11yCreateFocusProbe: (prefixes?: readonly string[]) => InPageProbe;
   __ngbA11yFocusProbe: InPageProbe;
 };
+
+type IndicatorWindow = {
+  __ngbA11yCreateFocusIndicatorProbe: (prefixes?: readonly string[]) => FocusIndicatorProbe;
+  __ngbA11yFocusIndicatorProbe: FocusIndicatorProbe;
+  __ngbA11yFocusChange: (before: ArrayLike<number>, after: ArrayLike<number>) => FocusChange;
+};
+
+/**
+ * Finishes transitions and animations at once while the walk runs, so a focus
+ * style that fades in, or a skip link that slides in, is measured where it
+ * ends up rather than where it starts.
+ */
+const NO_MOTION_CSS =
+  'html, body { scroll-behavior: auto !important; } ' +
+  '*, *::before, *::after { transition-duration: 0s !important; transition-delay: 0s !important; ' +
+  'animation-duration: 0s !important; animation-delay: 0s !important; }';
+
+/** Most tab stops measured on one page, so a huge page can't run forever. */
+const MAX_INDICATOR_STOPS = 200;
+
+/**
+ * Press Tab through the page once, and at each stop screenshot the page focused,
+ * blur the element, screenshot it again, and compare the two around the element
+ * in `helper` (a blank page with the in-page bundle). Then put focus back so the
+ * next Tab moves on. Needs the in-page bundle already injected into `page`.
+ * Anything else that changes between the two shots (a blur handler showing an
+ * error, a tooltip opened by focus, an animation) only adds changed pixels: it
+ * can hide a weak indicator, and can't add a finding.
+ */
+async function walkFocusIndicators(
+  page: Page,
+  helper: Page,
+  frameworkPrefixes: readonly string[] | undefined,
+): Promise<A11yFinding[]> {
+  const noMotion = await page.addStyleTag({ content: NO_MOTION_CSS });
+  try {
+    return await tabThroughIndicators(page, helper, frameworkPrefixes);
+  } finally {
+    await noMotion.evaluate((style) => (style as Element).remove()).catch(() => undefined);
+  }
+}
+
+async function tabThroughIndicators(
+  page: Page,
+  helper: Page,
+  frameworkPrefixes: readonly string[] | undefined,
+): Promise<A11yFinding[]> {
+  await page.evaluate((prefixes) => {
+    const w = window as unknown as IndicatorWindow;
+    w.__ngbA11yFocusIndicatorProbe = w.__ngbA11yCreateFocusIndicatorProbe(prefixes);
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    window.scrollTo(0, 0);
+  }, frameworkPrefixes);
+  const current = () =>
+    page.evaluate(() => (window as unknown as IndicatorWindow).__ngbA11yFocusIndicatorProbe.current());
+  const blur = () => page.evaluate(() => (window as unknown as IndicatorWindow).__ngbA11yFocusIndicatorProbe.blur());
+  const refocus = (id: number) =>
+    page.evaluate((i) => (window as unknown as IndicatorWindow).__ngbA11yFocusIndicatorProbe.refocus(i), id);
+  const finding = (id: number, change: FocusChange) =>
+    page.evaluate(
+      ({ id, change }) => (window as unknown as IndicatorWindow).__ngbA11yFocusIndicatorProbe.finding(id, change),
+      { id, change },
+    );
+  const shot = () => page.screenshot({ animations: 'disabled', caret: 'hide', type: 'png' });
+
+  const scroll = () => page.evaluate(() => `${window.scrollX},${window.scrollY}`);
+
+  const findings: A11yFinding[] = [];
+  const seen = new Set<number>();
+  // Tab moves between controls inside an iframe while the page's own focus stays
+  // on the iframe, so the same iframe repeats. Give up only if it never leaves.
+  let inFrame = 0;
+  for (let presses = 0; presses < MAX_INDICATOR_STOPS * 3; presses++) {
+    await page.keyboard.press('Tab');
+    const stop: FocusedStop | null = await current();
+    if (!stop) {
+      if (seen.size > 0) break; // focus left the page after the last stop
+      continue;
+    }
+    if (stop.skip === 'iframe' && seen.has(stop.id)) {
+      if (++inFrame > MAX_INDICATOR_STOPS) break;
+      continue;
+    }
+    inFrame = 0;
+    if (seen.has(stop.id)) break; // lapped the page
+    if (seen.size >= MAX_INDICATOR_STOPS) {
+      console.warn(`ngbr-a11y-report: measured the first ${MAX_INDICATOR_STOPS} focus indicators on this page; skipped the rest.`);
+      break;
+    }
+    seen.add(stop.id);
+    if (stop.skip || !stop.area) continue;
+    const before = await scroll();
+    const focused = await shot();
+    await blur();
+    const unfocused = await shot();
+    const after = await scroll();
+    await refocus(stop.id);
+    // Blurring scrolled the page, so the two shots don't line up.
+    if (before !== after) continue;
+    const found = await finding(stop.id, await compareShots(helper, unfocused, focused, stop.area));
+    if (found) findings.push(found);
+  }
+  return findings;
+}
+
+/** Decode two screenshots in the helper page and compare them over `area`. */
+async function compareShots(helper: Page, before: Buffer, after: Buffer, area: Box): Promise<FocusChange> {
+  return helper.evaluate(
+    async ({ a, b, area }) => {
+      const pixels = async (base64: string) => {
+        const blob = await (await fetch(`data:image/png;base64,${base64}`)).blob();
+        const bitmap = await createImageBitmap(blob);
+        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(bitmap, 0, 0);
+        return ctx.getImageData(area.x, area.y, area.width, area.height).data;
+      };
+      const w = window as unknown as IndicatorWindow;
+      return w.__ngbA11yFocusChange(await pixels(a), await pixels(b));
+    },
+    { a: before.toString('base64'), b: after.toString('base64'), area },
+  );
+}
 
 /**
  * Press Tab through the page until focus either laps the page (no trap) or
@@ -354,6 +507,9 @@ interface PassConfig {
   inPageScript: string;
   frameworkPrefixes: readonly string[] | undefined;
   keyboard: boolean | undefined;
+  idReferences: boolean;
+  inputPurpose: boolean;
+  focusIndicators: boolean;
   focusTraps: boolean;
   walkthrough: boolean;
   navigation: boolean;
@@ -361,6 +517,8 @@ interface PassConfig {
   beforeScan: ScanPagesOptions['beforeScan'];
   darkClass: string | undefined;
   darkAttribute: ScanPagesOptions['darkAttribute'];
+  /** Where each scanned page's keyboard checks read listeners from; filled in by the passes. */
+  listenerSources: Set<ListenerSource>;
 }
 
 /** Settle time after switching a class/attribute theme, so colour transitions finish before axe reads them. */
@@ -393,9 +551,18 @@ async function scanPass(
     colorScheme,
     bypassCSP: true,
   });
+  // Before the app's own scripts, so a production build's click and key
+  // listeners can be seen without Angular's debug API.
+  if (config.keyboard) await context.addInitScript({ content: LISTENER_RECORDER_SCRIPT });
   const pages: PageReport[] = [];
   try {
     const page = await context.newPage();
+    // A blank page to decode and compare focus-indicator screenshots in.
+    let helper: Page | undefined;
+    if (config.focusIndicators) {
+      helper = await context.newPage();
+      await helper.addScriptTag({ content: inPageScript });
+    }
 
     if (config.setup) {
       await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
@@ -431,7 +598,14 @@ async function scanPass(
             __ngbA11yScan: (a?: unknown, s?: unknown) => Promise<unknown>;
           };
           return w.__ngbA11yScan(args.axe, args.scan);
-        }, { axe: axeOptions, scan: { frameworkPrefixes, keyboard: config.keyboard } })) as A11yFinding[];
+        }, { axe: axeOptions, scan: { frameworkPrefixes, keyboard: config.keyboard, idReferences: config.idReferences, inputPurpose: config.inputPurpose } })) as A11yFinding[];
+        if (config.keyboard) {
+          config.listenerSources.add(
+            await page.evaluate(() =>
+              (window as unknown as { __ngbA11yListenerSource: () => ListenerSource }).__ngbA11yListenerSource(),
+            ),
+          );
+        }
         // Before the trap walk: pressing Tab can change the page.
         let walkthrough: Walkthrough | undefined;
         if (config.walkthrough) {
@@ -450,6 +624,15 @@ async function scanPass(
             console.warn(`ngbr-a11y-report: walkthrough failed on ${label}: ${message}`);
           }
         }
+        if (config.focusIndicators && helper) {
+          // After the walkthrough (blur and refocus can change the page) and before the trap walk, which leaves focus wherever its laps end.
+          try {
+            findings.push(...(await walkFocusIndicators(page, helper, frameworkPrefixes)));
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.warn(`ngbr-a11y-report: focus-indicator check failed on ${label}: ${message}`);
+          }
+        }
         if (config.focusTraps) {
           // A failed walk shouldn't throw away the scan's findings — warn and move on.
           try {
@@ -460,7 +643,9 @@ async function scanPass(
             console.warn(`ngbr-a11y-report: focus-trap walk failed on ${label}: ${message}`);
           }
         }
-        pages.push({ label, url: page.url(), findings, colorScheme, ...(walkthrough && { walkthrough }) });
+        // A late client redirect can destroy the page context; the title isn't worth losing the findings for.
+        const title = await page.title().catch(() => undefined);
+        pages.push({ label, url: page.url(), ...(title !== undefined && { title }), findings, colorScheme, ...(walkthrough && { walkthrough }) });
       } catch (err) {
         // One bad route shouldn't sink the whole run — record it and continue.
         const message = err instanceof Error ? err.message : String(err);
@@ -494,6 +679,10 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     focusTraps = false,
     walkthrough = false,
     navigation = false,
+    pageTitles: comparePageTitles = true,
+    idReferences = true,
+    inputPurpose = true,
+    focusIndicators = false,
     darkClass,
     darkAttribute,
   } = options;
@@ -507,6 +696,9 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     inPageScript: readFileSync(inPageScriptPath(), 'utf8'),
     frameworkPrefixes,
     keyboard,
+    idReferences,
+    inputPurpose,
+    focusIndicators,
     focusTraps,
     walkthrough,
     navigation,
@@ -514,6 +706,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     beforeScan,
     darkClass,
     darkAttribute,
+    listenerSources: new Set(),
   };
 
   const { chromium } = await loadPlaywright();
@@ -554,17 +747,33 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
   } finally {
     await browser.close();
   }
+  // Across routes, so only once every page has scanned.
+  const pageTitles = comparePageTitles && titlesCompared(pages);
+  if (pageTitles) pages = addDuplicateTitleFindings(pages);
 
   const checks: ScanChecks = {
     axeVersion: axeVersion(),
     ...(tags && { tags }),
     keyboard: keyboard ?? false,
+    ...(idReferences && { idReferences }),
+    ...(inputPurpose && { inputPurpose }),
+    ...(focusIndicators && { focusIndicators }),
     focusTraps,
     ...(walkthrough && { walkthrough }),
     // Only when at least one route change was checked, so the ACR doesn't count a check that didn't happen.
     ...(moves.size > 0 && { navigation: true }),
+    ...(pageTitles && { pageTitles }),
+    ...(keyboard && config.listenerSources.size > 0 && { listeners: weakestSource(config.listenerSources) }),
   };
   return { generatedAt: new Date().toISOString(), checks, pages };
+}
+
+/**
+ * The run's listener source: the weakest any page had, so the report never
+ * claims checks ran on a page where they couldn't.
+ */
+function weakestSource(sources: ReadonlySet<ListenerSource>): ListenerSource {
+  return sources.has('none') ? 'none' : sources.has('browser') ? 'browser' : 'angular';
 }
 
 /** Version of the installed axe-core — the one a scan run now would use. */

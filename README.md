@@ -36,6 +36,15 @@ Part of the `@ngbracket` Angular tooling family.
 - Focus lost between scans: reports a re-render or a route change that removes the
   focused element and leaves focus on the page body, named after the component.
   Report mode checks route changes too, with `--navigation`.
+- Focus indicators measured from screenshots: report mode presses Tab through each
+  route and reports a stop whose focus style doesn't change it, or changes it by less
+  than 3:1 (`--focus-indicators`, `ngbr/focus-indicator-contrast`).
+- Personal-data fields with no `autocomplete`: name, email, phone and address fields
+  that browsers can't fill in (`ngbr/missing-autocomplete`).
+- ARIA references to missing ids: an `aria-labelledby` or `aria-describedby` that
+  names an id with no element in the page (`ngbr/missing-id-reference`).
+- Same page title on every route: report mode compares the titles of the routes it
+  scans and reports routes that share one (`ngbr/duplicate-page-title`).
 - Production weight: does nothing in production builds, and axe-core isn't loaded
   there.
 
@@ -75,6 +84,10 @@ In CI (`--serve` starts `ng serve`, waits for it, and stops it after the scan):
 npx ngbr-a11y-report --serve "npx ng serve" --route / --route /settings \
   --keyboard --baseline a11y-baseline.json --fail-on serious --out a11y --format all
 ```
+
+Scanning a production build? Components can't be named without Angular's debug API,
+but `--keyboard` still finds click handlers Tab can't reach: report mode reads the event
+listeners from the browser, and the report says so.
 
 Preparing a VPAT/ACR? `--format acr` adds an evaluation worksheet: the results by WCAG 2.2
 A/AA criterion, with the conformance columns left for a person to fill in. Already scanned?
@@ -144,3 +157,7 @@ ever becomes reachable through a static import.
 - Issue-count badge on the pill and a per-component filter in its menu.
 - Tab order walkthrough in report mode (`--walkthrough`).
 - Focus lost to a re-render or a route change, with a route-change list in the pill menu.
+- Routes that share one page title, in report mode.
+- `aria-labelledby` and `aria-describedby` that name a missing id.
+- Name, email, phone and address fields with no `autocomplete`.
+- Focus indicator contrast from screenshots, in report mode (`--focus-indicators`).

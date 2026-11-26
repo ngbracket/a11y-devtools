@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import type { A11yFinding, Impact } from '../scan.js';
-import { impactRank, type ScanChecks, type ScanReport } from './format.js';
+import { impactRank, listenerNote, type ScanChecks, type ScanReport } from './format.js';
 import { escapeHtml, safeHref, STYLES } from './html.js';
 import { criterionForTag, NGBR_RULE_CRITERIA, understandingUrl, WCAG22_A_AA, type WcagCriterion } from './wcag.js';
 
@@ -71,7 +71,7 @@ export interface AxeRuleMeta {
  */
 const NGBR_RULES: Record<
   string,
-  { criteria: readonly string[]; ranWhen?: keyof Pick<ScanChecks, 'keyboard' | 'focusTraps' | 'navigation'> }
+  { criteria: readonly string[]; ranWhen?: keyof Pick<ScanChecks, 'keyboard' | 'focusTraps' | 'navigation' | 'pageTitles' | 'idReferences' | 'inputPurpose' | 'focusIndicators'> }
 > = {
   'ngbr/unreachable-control': { criteria: NGBR_RULE_CRITERIA['ngbr/unreachable-control'], ranWhen: 'keyboard' },
   'ngbr/click-without-key': { criteria: NGBR_RULE_CRITERIA['ngbr/click-without-key'], ranWhen: 'keyboard' },
@@ -83,6 +83,22 @@ const NGBR_RULES: Record<
   'ngbr/focus-lost-on-navigation': {
     criteria: NGBR_RULE_CRITERIA['ngbr/focus-lost-on-navigation'],
     ranWhen: 'navigation',
+  },
+  'ngbr/missing-id-reference': {
+    criteria: NGBR_RULE_CRITERIA['ngbr/missing-id-reference'],
+    ranWhen: 'idReferences',
+  },
+  'ngbr/focus-indicator-contrast': {
+    criteria: NGBR_RULE_CRITERIA['ngbr/focus-indicator-contrast'],
+    ranWhen: 'focusIndicators',
+  },
+  'ngbr/missing-autocomplete': {
+    criteria: NGBR_RULE_CRITERIA['ngbr/missing-autocomplete'],
+    ranWhen: 'inputPurpose',
+  },
+  'ngbr/duplicate-page-title': {
+    criteria: NGBR_RULE_CRITERIA['ngbr/duplicate-page-title'],
+    ranWhen: 'pageTitles',
   },
   // Only the in-app overlay can see a re-render remove the focused element: no
   // run checks for it, so it counts only when a report has its findings.
@@ -245,6 +261,7 @@ function scanDetails(report: ScanReport, sheet: AcrWorksheet): [string, string][
     ['Tool', `@ngbracket/a11y-devtools report-mode${c ? `, axe-core ${c.axeVersion}` : ''}`],
     ['Ruleset', c?.tags ? `axe tags: ${c.tags.join(', ')}` : 'axe default ruleset'],
     ['Keyboard checks', c ? (c.keyboard ? 'on' : 'off') : 'unknown'],
+    ...(listenerNote(c) ? [['Event listeners', listenerNote(c)!] as [string, string]] : []),
     ['Keyboard-trap walk', c ? (c.focusTraps ? 'on' : 'off') : 'unknown'],
     ['Colour schemes', colorSchemes(report)],
     ['Pages scanned', sheet.pagesScanned.length ? sheet.pagesScanned.join(', ') : 'none'],

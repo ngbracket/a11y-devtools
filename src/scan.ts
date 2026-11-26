@@ -7,6 +7,8 @@ import {
 } from './attribution.js';
 import { OVERLAY_EXCLUDE_SELECTOR } from './overlay.js';
 import { scanKeyboard } from './keyboard/keyboard-scan.js';
+import { scanMissingIdReferences } from './aria-refs.js';
+import { scanMissingAutocomplete } from './input-purpose.js';
 import { criterionForTag } from './report/wcag.js';
 
 export type Impact = 'minor' | 'moderate' | 'serious' | 'critical' | null;
@@ -27,6 +29,17 @@ export interface ScanOptions {
    * `ngbr/*` findings alongside the axe violations. Default false.
    */
   keyboard?: boolean;
+  /**
+   * Report an `aria-labelledby` or `aria-describedby` that names an id with no
+   * element (`ngbr/missing-id-reference`). Default true.
+   */
+  idReferences?: boolean;
+  /**
+   * Report a field that looks like it asks for the user's name, email, phone
+   * number or address and has no `autocomplete` (`ngbr/missing-autocomplete`).
+   * Default true.
+   */
+  inputPurpose?: boolean;
 }
 
 /** One axe violation node, enriched with the component that rendered it. */
@@ -117,6 +130,12 @@ async function runAxeOnce(
       });
     }
   }
+
+  // axe lists a labelledby or describedby that points nowhere as "needs review"
+  // at most, so check them here (on unless turned off: it only reads the markup).
+  if (scanOptions?.idReferences !== false) findings.push(...scanMissingIdReferences(root, { frameworkPrefixes }));
+  // axe's autocomplete-valid only checks fields that have an autocomplete value.
+  if (scanOptions?.inputPurpose !== false) findings.push(...scanMissingAutocomplete(root, { frameworkPrefixes }));
 
   // The keyboard layer runs over the same root, in the page, and appends its own
   // `ngbr/*` findings so they group and report exactly like the axe ones.
