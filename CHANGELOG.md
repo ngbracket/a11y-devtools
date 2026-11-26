@@ -23,6 +23,19 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `ngbr/missing-autocomplete`: a form field that looks like it asks for the
+  user's name, email, phone number, address, postcode, date of birth,
+  organisation, username or password, and has no `autocomplete` attribute
+  (WCAG 1.3.5 Identify Input Purpose). axe-core's `autocomplete-valid` only
+  checks fields that already have a value, so a field with none was never
+  reported. The purpose comes from `type="email"`, `"tel"` or `"password"`,
+  then from whole words in the label, then `name`, `id` or `formcontrolname`,
+  then the placeholder. A label that names something else decides it, and
+  lookup boxes ("Find your address") are skipped. Plain "Address", "Title"
+  and "State" are left out, as they often mean something else. A heuristic,
+  moderate: 1.3.5 only covers fields about the user. It runs in every scan,
+  with `--no-input-purpose` (`inputPurpose: false`) to turn it off, and
+  `checks.inputPurpose` lets the ACR worksheet count it for 1.3.5.
 - `ngbr/missing-id-reference`: an `aria-labelledby` or `aria-describedby`
   that names an id with no element in the page. axe-core's
   `aria-valid-attr-value` lists this as "needs review" when none of the ids

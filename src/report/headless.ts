@@ -123,6 +123,12 @@ export interface ScanPagesOptions {
    * example while existing findings are being fixed. Default true.
    */
   idReferences?: boolean;
+  /**
+   * Report a field that looks like it asks for the user's name, email, phone
+   * number or address and has no `autocomplete`, as `ngbr/missing-autocomplete`.
+   * Set `false` to turn it off. Default true.
+   */
+  inputPurpose?: boolean;
 }
 
 type PlaywrightModule = typeof import('playwright');
@@ -370,6 +376,7 @@ interface PassConfig {
   frameworkPrefixes: readonly string[] | undefined;
   keyboard: boolean | undefined;
   idReferences: boolean;
+  inputPurpose: boolean;
   focusTraps: boolean;
   walkthrough: boolean;
   navigation: boolean;
@@ -452,7 +459,7 @@ async function scanPass(
             __ngbA11yScan: (a?: unknown, s?: unknown) => Promise<unknown>;
           };
           return w.__ngbA11yScan(args.axe, args.scan);
-        }, { axe: axeOptions, scan: { frameworkPrefixes, keyboard: config.keyboard, idReferences: config.idReferences } })) as A11yFinding[];
+        }, { axe: axeOptions, scan: { frameworkPrefixes, keyboard: config.keyboard, idReferences: config.idReferences, inputPurpose: config.inputPurpose } })) as A11yFinding[];
         if (config.keyboard) {
           config.listenerSources.add(
             await page.evaluate(() =>
@@ -526,6 +533,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     navigation = false,
     pageTitles: comparePageTitles = true,
     idReferences = true,
+    inputPurpose = true,
     darkClass,
     darkAttribute,
   } = options;
@@ -540,6 +548,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     frameworkPrefixes,
     keyboard,
     idReferences,
+    inputPurpose,
     focusTraps,
     walkthrough,
     navigation,
@@ -597,6 +606,7 @@ export async function scanPages(options: ScanPagesOptions): Promise<ScanReport> 
     ...(tags && { tags }),
     keyboard: keyboard ?? false,
     ...(idReferences && { idReferences }),
+    ...(inputPurpose && { inputPurpose }),
     focusTraps,
     ...(walkthrough && { walkthrough }),
     // Only when at least one route change was checked, so the ACR doesn't count a check that didn't happen.

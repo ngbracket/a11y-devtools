@@ -117,6 +117,8 @@ export interface ScanChecks {
   pageTitles?: boolean;
   /** `aria-labelledby` and `aria-describedby` were checked for ids with no element (`ngbr/missing-id-reference`). From 0.21.0. */
   idReferences?: boolean;
+  /** Fields were checked for a missing `autocomplete` (`ngbr/missing-autocomplete`). From 0.21.0. */
+  inputPurpose?: boolean;
   /**
    * Where the keyboard checks read event listeners from (the weakest across the
    * pages): Angular's debug API in a dev build, the browser in a production

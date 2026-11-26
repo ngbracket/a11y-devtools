@@ -77,6 +77,8 @@ Options:
                      (ngbr/duplicate-page-title)
   --no-id-references Don't report aria-labelledby or aria-describedby that
                      name a missing id (ngbr/missing-id-reference)
+  --no-input-purpose Don't report name, email, phone and address fields with
+                     no autocomplete (ngbr/missing-autocomplete)
   --color-scheme <s> light | dark | both — scan with the browser emulating that
                      prefers-color-scheme (default light). "both" scans each
                      route twice; dark pages list only issues light doesn't have
@@ -119,6 +121,7 @@ function parseArgs(argv) {
       case '--navigation': opts.navigation = true; break;
       case '--no-page-titles': opts.pageTitles = false; break;
       case '--no-id-references': opts.idReferences = false; break;
+      case '--no-input-purpose': opts.inputPurpose = false; break;
       case '--color-scheme': opts.colorScheme = next(); break;
       case '--dark-class': opts.darkClass = next(); break;
       case '--dark-attribute': opts.darkAttribute = next(); break;
@@ -137,7 +140,7 @@ const opts = parseArgs(process.argv.slice(2));
 const SCAN_ONLY = {
   base: '--base', serve: '--serve', serveTimeout: '--serve-timeout', routes: '--route', tags: '--tags',
   wait: '--wait', frameworkPrefixes: '--framework-prefixes / --no-skip-primitives', keyboard: '--keyboard',
-  focusTraps: '--focus-traps', walkthrough: '--walkthrough', navigation: '--navigation', pageTitles: '--no-page-titles', idReferences: '--no-id-references', colorScheme: '--color-scheme', darkClass: '--dark-class',
+  focusTraps: '--focus-traps', walkthrough: '--walkthrough', navigation: '--navigation', pageTitles: '--no-page-titles', idReferences: '--no-id-references', inputPurpose: '--no-input-purpose', colorScheme: '--color-scheme', darkClass: '--dark-class',
   darkAttribute: '--dark-attribute', headed: '--headed',
 };
 if (opts.from && !opts.help) {
@@ -274,6 +277,7 @@ if (!report) {
       navigation: opts.navigation,
       pageTitles: opts.pageTitles,
       idReferences: opts.idReferences,
+      inputPurpose: opts.inputPurpose,
       colorScheme: opts.colorScheme,
       darkClass: opts.darkClass,
       darkAttribute,

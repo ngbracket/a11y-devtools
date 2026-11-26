@@ -113,6 +113,7 @@ export const NGBR_RULE_CRITERIA: Readonly<Record<string, readonly string[]>> = {
   'ngbr/focus-lost-on-rerender': ['2.4.3'],
   'ngbr/duplicate-page-title': ['2.4.2'],
   'ngbr/missing-id-reference': ['1.3.1', '4.1.2'],
+  'ngbr/missing-autocomplete': ['1.3.5'],
 };
 
 /** The `wcag` list for an `ngbr/*` finding; [] for an unknown id. */

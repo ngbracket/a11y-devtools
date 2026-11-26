@@ -220,6 +220,19 @@ const PAGES: Record<string, string> = {
       <button type="button">Continue</button>
     </div>`,
 
+  // A client's guest details form: personal-data fields with no autocomplete,
+  // which axe's autocomplete-valid never checks. One field already has it.
+  '/guest-form': `
+    <main><h1>Guest details</h1>
+      <form>
+        <label for="g-fn">Forename</label><input id="g-fn">
+        <label for="g-sn">Surname</label><input id="g-sn">
+        <label for="g-em">Email</label><input id="g-em" type="email">
+        <label for="g-pc">Postcode</label><input id="g-pc" autocomplete="postal-code">
+        <label for="g-promo">Promo code</label><input id="g-promo">
+      </form>
+    </main>`,
+
   // Two routes with one static title, as a client's booking site had on every route.
   '/same-title-a': `<main><h1>Book a class</h1></main>`,
   '/same-title-b': `<main><h1>Book an activity</h1></main>`,
@@ -364,6 +377,17 @@ describe.skipIf(!ready)('report-mode in a real browser (E2E)', () => {
     expect(missing[0]).toMatchObject({ impact: 'serious', wcag: ['4.1.2'], target: 'div[aria-labelledby]' });
     expect(ids('/missing-id')).not.toContain('aria-valid-attr-value');
     expect(report.checks?.idReferences).toBe(true);
+  });
+
+  it('reports personal-data fields with no autocomplete, which axe never checks', async () => {
+    const found = page('/guest-form').findings.filter((f) => f.id === 'ngbr/missing-autocomplete');
+    expect(found.map((f) => f.target)).toEqual(['input#g-fn', 'input#g-sn', 'input#g-em']);
+    expect(ids('/guest-form')).not.toContain('autocomplete-valid');
+    expect(report.checks?.inputPurpose).toBe(true);
+    const { scanPages } = (await import(distReport)) as typeof import('../report/index');
+    const off = await scanPages({ baseUrl, routes: ['/guest-form'], waitMs: 50, inputPurpose: false });
+    expect(off.pages[0].findings.map((f) => f.id)).not.toContain('ngbr/missing-autocomplete');
+    expect(off.checks?.inputPurpose).toBeUndefined();
   });
 
   it('reports no missing ids with idReferences: false', async () => {
